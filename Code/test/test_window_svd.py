@@ -2,7 +2,7 @@ import numpy as np
 import helmholtz as hm
 import unittest
 from numpy.ma.testutils import assert_array_almost_equal
-from scipy.linalg import norm
+from numpy.linalg import norm
 
 
 class TestWindowSvd:

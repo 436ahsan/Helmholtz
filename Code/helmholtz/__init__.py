@@ -1,1 +1,1 @@
-from . import kaczmarz, linalg, window_svd
+from . import bootstrap, kaczmarz, linalg, window_svd

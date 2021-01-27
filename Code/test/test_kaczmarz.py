@@ -2,7 +2,7 @@ import numpy as np
 import helmholtz as hm
 import unittest
 from numpy.ma.testutils import assert_array_almost_equal
-from scipy.linalg import norm
+from numpy.linalg import norm
 
 
 class TestKaczmarz:
@@ -16,13 +16,11 @@ class TestKaczmarz:
         relaxer = hm.kaczmarz.KaczmarzRelaxer(a)
 
         x = np.random.random((n, 5))
-        # Ensure the null space component does not increase during the first sweep by subtracting it beforehand.
-        x -= np.mean(x)
         r_norm = norm(a.dot(x))
         for i in range(10):
             y = kaczmarz_relax_with_loop(kh, x)
             x = relaxer.step(x)
-            assert_array_almost_equal(x, y)
+            assert_array_almost_equal(x - x.mean(), y - y.mean())
             r_norm_new = norm(a.dot(x))
             assert r_norm_new < r_norm
             r_norm = r_norm_new

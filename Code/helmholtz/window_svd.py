@@ -1,9 +1,11 @@
-"""Calculates the SVD of a test matrix on a window with periodic boundary conditions."""
+"""Calculates the SVD of a test matrix on a window, which gives us the coarse variables definition (R)."""
 import logging
 import numpy as np
 from numpy.linalg import svd, norm
 from typing import Tuple
 from helmholtz.linalg import scaled_norm
+
+logger = logging.getLogger(__name__)
 
 
 def get_window_svd(operator, relaxer, window_shape: tuple, num_sweeps: int = 30, num_examples: int = None) -> \
@@ -22,7 +24,6 @@ def get_window_svd(operator, relaxer, window_shape: tuple, num_sweeps: int = 30,
         s: singular values in descending order.
         vh: corresponding V^T matrix of right singular vectors. The kth singular vector is the row vh[k].
     """
-    logger = logging.getLogger("get_window_svd")
     if num_examples is None:
         # By default, use more test functions than gridpoints so we have a sufficiently large test function sample.
         num_examples = 4 * np.prod(window_shape)
