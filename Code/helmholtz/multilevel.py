@@ -18,6 +18,37 @@ class Multilevel:
     def __len__(self):
         return len(self.level)
 
+    def relax(self, x: np.array, nu_pre: int, nu_post: int) -> np.array:
+        """
+        Executes a relaxation V(nu_pre, nu_post) -cycle on A*x = 0.
+
+        Args:
+            x: initial guess. May be a vector of size n or a matrix of size n x m, where A is n x n.
+            nu_pre: number of relaxation cycles at a level before visiting coarser levels.
+            nu_post: number of relaxation cycles at a level after visiting coarser levels.
+
+        Returns:
+            x after the cycle.
+        """
+        # TODO(orenlivne): replace by a general-cycle-index, non-recursive loop.
+        return self._relax(0, x, nu_pre, nu_post)
+
+    def _relax(self, level_ind: int, x: np.array, nu_pre: int, nu_post: int) -> np.array:
+        level = self.level[level_ind]
+
+        for _ in range(nu_pre):
+            x = level.relax(x)
+
+        if level_ind == len(self) - 1:
+            coarse_level = self.level[level_ind + 1]
+            xc = coarse_level.r.dot(x)
+            xc = self._relax(level_ind + 1, xc, nu_pre, nu_post)
+            x = coarse_level.p.dot(xc)
+
+        for _ in range(nu_post):
+            x = level.relax.step(x)
+        return x
+
 
 class Level:
     """A single level in the multilevel hierarchy."""
