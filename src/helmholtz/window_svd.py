@@ -28,8 +28,9 @@ def get_window_svd(a,
     if num_examples is None:
         # By default, use more test functions than gridpoints so we have a sufficiently large test function sample.
         num_examples = 4 * np.prod(window_shape)
+    e = hm.multilevel.random_test_matrix(window_shape, num_examples=num_examples)
     level = hm.multilevel.Level(a)
-    e = level.create_relaxed_test_matrix(window_shape, num_examples, num_sweeps=num_sweeps)
+    e = level.relax_test_matrix(e, num_sweeps=num_sweeps)
     # Calculate the SVD.
     e_matrix = np.reshape(e, [np.prod(window_shape), num_examples])
     _, s, vh = svd(e_matrix.transpose())

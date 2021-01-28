@@ -87,39 +87,55 @@ class Level:
         """
         return self._relaxer.step(x)
 
-    def create_relaxed_test_matrix(self,
-                                   window_shape: Tuple[int],
-                                   num_examples: int,
-                                   num_sweeps: int = 30) -> np.ndarray:
+    def relax_test_matrix(self, e: np.ndarray, num_sweeps: int = 30) -> np.ndarray:
         """
         Creates test functions (functions that approximately satisfy A*x=0) using single level relaxation.
 
         Args:
-            window_shape: domain size (#gridpoints in each dimension).
-            num_examples: number of test functions to generate.
+            e: test matrix initial approximation to the test functions.
             num_sweeps: number of sweeps to execute.
 
         Returns:
-            e: window_size x num_examples test matrix.
+            e: relaxed test matrix.
         """
-        if num_examples is None:
-            # By default, use more test functions than gridpoints so we have a sufficiently large test function sample.
-            num_examples = 4 * np.prod(window_shape)
-
-        # Start from random[-1,1] guess for each function.
-        e = 2 * np.random.random(window_shape + (num_examples,)) - 1
         # Print the error and residual norm of the first test function.
-        # A poor way of getting the last "column" of the tensor e.
-        e0 = e.reshape(-1, e.shape[-1])[:, 0].reshape(e.shape[:-1])
-        _LOGGER.debug("{:5d} |e| {:.8e} |r| {:.8e}".format(0, scaled_norm(e0), scaled_norm(self.operator(e0))))
+        e0 = e[:, 0]
+        r_norm = scaled_norm(self.operator(e0))
+        _LOGGER.debug("{:5d} |e| {:.8e} |r| {:.8e}".format(0, scaled_norm(e0), r_norm))
 
         # Run 'num_sweeps' relaxation sweeps.
         for i in range(1, num_sweeps + 1):
-            e = self.relax(e)
             if i % (num_sweeps // 10) == 0:
-                # A poor way of getting the last "column" of the tensor e.
-                e0 = e.reshape(-1, e.shape[-1])[:, 0].reshape(e.shape[:-1])
-                _LOGGER.debug("{:5d} |e| {:.8e} |r| {:.8e}".format(i, scaled_norm(e0), scaled_norm(self.operator(e0))))
-            # Scale e to unit norm to avoid underflow, as we are calculating eigenvectors.
+                r_norm_old = scaled_norm(self.operator(e0))
+
+            e = self.relax(e)
+            # Scale e to unit norm, as we are calculating eigenvectors.
             e /= norm(e)
+
+            if i % (num_sweeps // 10) == 0:
+                e0 = e[:, 0]
+                r_norm = scaled_norm(self.operator(e0))
+                _LOGGER.debug("{:5d} |e| {:.8e} |r| {:.8e} ({:.5f})".format(
+                    i, scaled_norm(e0), r_norm, r_norm / r_norm_old))
         return e
+
+
+def random_test_matrix(window_shape: Tuple[int], num_examples: int = None) -> np.ndarray:
+    """
+    Creates the initial test functions as random[-1, 1].
+
+    Args:
+        window_shape: domain size (#gridpoints in each dimension).
+        num_examples: number of test functions to generate.
+
+    Returns:
+        e: window_size x num_examples random test matrix.
+    """
+    if num_examples is None:
+        # By default, use more test functions than gridpoints so we have a sufficiently large test function sample.
+        num_examples = 4 * np.prod(window_shape)
+
+    # Start from random[-1,1] guess for each function.
+    e = 2 * np.random.random(window_shape + (num_examples,)) - 1
+    e /= norm(e)
+    return e

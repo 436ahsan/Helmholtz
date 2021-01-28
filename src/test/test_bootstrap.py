@@ -38,3 +38,11 @@ class TestBootstrap:
         assert coarse_level.r.shape == (8, 16)
         assert coarse_level.p.shape == (16, 8)
         coarse_level.print()
+
+    def test_run_2_level_relax_cycle(self):
+        n = 16
+        kh = 0.5
+
+        a = hm.linalg.helmholtz_1d_operator(kh, n)
+        e, multilevel = hm.bootstrap.generate_test_matrix(a)
+
