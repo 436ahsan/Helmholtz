@@ -9,35 +9,85 @@ from helmholtz.linalg import scaled_norm
 logger = logging.getLogger(__name__)
 
 
-def generate_test_functions(a: scipy.sparse.dia_matrix, aggregate_shape: int = 4, num_examples: int = None):
-    relaxer = hm.kaczmarz.KaczmarzRelaxer(a)
+def generate_test_matrix(a: scipy.sparse.dia_matrix, aggregate_size: int = 4, num_examples: int = None):
+    # TODO(oren): generalize the domain to the d-dimensional case. For now assuming 1D only.
+    domain_size = a.shape[0]
+    domain_shape = (domain_size, )
+    aggregate_shape = (aggregate_size, )
+    assert domain_size % aggregate_size == 0, \
+        "Aggregate shape must divide the domain shape in every dimension"
+    # assert all(ni % ai == 0 for ni, ai in zip(domain_shape, aggregate_shape)), \
+    #     "Aggregate shape must divide the domain shape in every dimension"
 
     # In 1D, we know there are two principal components.
     # TODO(oren): replace this by a dynamic number in general based on # large singular values.
-    num_aggregate_coarse_vars = 2
+    # # aggregate coarse vars.
+    nc = 2
 
     # Generate initial test functions by 1-level relaxation, starting from random[-1, 1].
-    num_sweeps = 10
+    num_sweeps = 100
     if num_examples is None:
         # By default, use more test functions than gridpoints so we have a sufficiently large test function sample.
-        num_examples = 4 * np.prod(aggregate_shape)
-    e = 2 * np.random.random((num_examples,) + aggregate_shape) - 1
-    logger.debug("{:5d} |e| {:.8e} |r| {:.8e}".format(0, scaled_norm(e[:, 0]), scaled_norm(a.dot(e[:, 0]))))
-    for i in range(1, num_sweeps + 1):
-        e = relaxer.step(e)
-        # A poor way of getting the last "column" of the tensor e.
-        e0 = e.reshape(-1, e.shape[-1])[:, 0].reshape(e.shape[:-1])
-        logger.debug("{:5d} |e| {:.8e} |r| {:.8e}".format(0, scaled_norm(e[:, 0]), scaled_norm(a.dot(e[:, 0]))))
-    # Scale e to unit norm to avoid underflow, as we are calculating approximate eigenvectors of A.
-    e /= norm(e)
+        num_examples = 3 * 4 * np.prod(aggregate_shape)
 
-    # Generate R (coarse variables). Columns = SVD principcal components over the aggregate.
-    e_matrix = np.reshape(e, [np.prod(aggregate_shape), num_examples])
-    _, s, vh = svd(e_matrix.transpose())
-    print(s)
-    r = vh[:num_aggregate_coarse_vars].transpose()
-    print(r.shape)
+    multilevel = hm.multilevel.Multilevel()
+    level = hm.multilevel.Level(a)
+    multilevel.level.append(level)
+    x = level.create_relaxed_test_matrix(domain_shape, num_examples, num_sweeps=num_sweeps)
+    x_aggregate_t = x[:aggregate_size].transpose()
+    r = create_coarse_vars(x_aggregate_t, domain_size, nc)
+    xc = r.dot(x)
+    xc_t = xc.transpose()
+    caliber = 2
+    p = create_interpolation(x_aggregate_t, xc_t, domain_size, nc, caliber)
+    ac = (r.dot(a)).dot(p)
+    coarse_level = hm.multilevel.Level(ac, r, p)
+    multilevel.level.append(coarse_level)
+    return x, multilevel
 
-    # Define interpolation by LS fitting.
 
-    return e
+def create_coarse_vars(x_aggregate_t, domain_size: int, nc: int) -> scipy.sparse.csr_matrix:
+    """Generates R (coarse variables). R of single aggregate = SVD principal components over an aggregate; global R =
+    tiling of the aggregate R over the domain."""
+    aggregate_size = x_aggregate_t.shape[1]
+    _, s, vh = svd(x_aggregate_t)
+    r = vh[:nc]
+    # Tile R of a single aggregate over the entire domain.
+    num_aggregates = domain_size // aggregate_size
+    r = scipy.sparse.block_diag(tuple(r for _ in range(num_aggregates))).tocsr()
+    return r
+
+
+def create_interpolation(x_aggregate_t: np.ndarray, xc_t: np.ndarray, domain_size: int, nc: int, caliber: int) -> \
+        scipy.sparse.csr_matrix:
+    """Defines interpolation to an aggregate by LS fitting to coarse neighbors of each fine var. The global
+    interpolation P is the tiling of the aggregate P over the domain."""
+
+    # Define nearest coarse neighbors of each fine variable.
+    aggregate_size = x_aggregate_t.shape[1]
+    num_aggregates = domain_size // aggregate_size
+    nbhr = hm.interpolation_nbhr.geometric_neighbors(domain_size, aggregate_size, nc)
+    nbhr = hm.interpolation_nbhr.sort_neighbors_by_similarity(x_aggregate_t, xc_t, nbhr)
+
+    # Fit interpolation over an aggregate.
+    alpha = np.array([0, 0.001, 0.01, 0.1, 1.0])
+    num_examples = x_aggregate_t.shape[0]
+    fitter = hm.interpolation_fit.InterpolationFitter(
+        x_aggregate_t, xc=xc_t, nbhr=nbhr,
+        fit_samples=num_examples // 3, val_samples=num_examples // 3, test_samples=num_examples // 3)
+    error, alpha_opt = fitter.optimized_relative_error(caliber, alpha, return_weights=True)
+    p_aggregate = (np.tile(np.arange(4)[:, None], 2).flatten(),
+                   np.concatenate([nbhr_i for nbhr_i in nbhr]),
+                   np.concatenate([pi for pi in error[:, 2:]]),)
+
+    # Tile P of a single aggregate over the entire domain.
+    row = np.concatenate([p_aggregate[0] + aggregate_size * ic for ic in range(num_aggregates)])
+    col = np.concatenate([p_aggregate[1] + nc * ic for ic in range(num_aggregates)])
+    data = np.tile(p_aggregate[2], num_aggregates)
+    p = scipy.sparse.coo_matrix((data, (row, col)), shape=(domain_size, nc * num_aggregates)).tocsr()
+    return p
+
+
+def period_double(a):
+    """Tiles the periodic B.C. operator on a twice-larger domain."""
+    pass

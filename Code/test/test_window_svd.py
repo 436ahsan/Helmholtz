@@ -14,7 +14,7 @@ class TestWindowSvd:
         a = hm.linalg.helmholtz_1d_operator(kh, n)
         relaxer = hm.kaczmarz.KaczmarzRelaxer(a)
 
-        s, vh = hm.window_svd.get_window_svd(a, relaxer, window_shape, num_sweeps=1000)
+        s, vh = hm.window_svd.get_window_svd(a, window_shape, num_sweeps=1000)
 
         # For sufficiently smooth test vectors, the SVD should reveal two large singular values (corresponding to the
         # sine and cosine null-space components / left- and right-travelling waves) and the rest are small.
