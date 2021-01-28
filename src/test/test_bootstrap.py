@@ -23,9 +23,9 @@ class TestBootstrap:
         kh = 0.5
 
         a = hm.linalg.helmholtz_1d_operator(kh, n)
-        e, multilevel = hm.bootstrap.generate_test_matrix(a)
+        x, multilevel = hm.bootstrap.generate_test_matrix(a)
 
-        assert e.shape == (16, 48)
+        assert x.shape == (16, 48)
 
         assert len(multilevel) == 2
 
@@ -42,7 +42,9 @@ class TestBootstrap:
     def test_run_2_level_relax_cycle(self):
         n = 16
         kh = 0.5
-
         a = hm.linalg.helmholtz_1d_operator(kh, n)
-        e, multilevel = hm.bootstrap.generate_test_matrix(a)
+        x, multilevel = hm.bootstrap.generate_test_matrix(a)
+
+        relax_cycle = lambda x: multilevel.relax(x, 2, 2, 4)
+        x = hm.multilevel.relax_test_matrix(multilevel.level[0].operator, relax_cycle, x, 100)
 

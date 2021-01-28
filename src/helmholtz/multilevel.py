@@ -18,35 +18,41 @@ class Multilevel:
     def __len__(self):
         return len(self.level)
 
-    def relax(self, x: np.array, nu_pre: int, nu_post: int) -> np.array:
+    def relax(self, x: np.array, nu_pre: int, nu_post: int, nu_coarsest: int) -> np.array:
         """
         Executes a relaxation V(nu_pre, nu_post) -cycle on A*x = 0.
 
         Args:
             x: initial guess. May be a vector of size n or a matrix of size n x m, where A is n x n.
-            nu_pre: number of relaxation cycles at a level before visiting coarser levels.
-            nu_post: number of relaxation cycles at a level after visiting coarser levels.
+            nu_pre: number of relaxation sweeps at a level before visiting coarser levels.
+            nu_post: number of relaxation sweeps at a level after visiting coarser levels.
+            nu_coarsest: number of relaxation sweeps to run at the coarsest level.
 
         Returns:
             x after the cycle.
         """
         # TODO(orenlivne): replace by a general-cycle-index, non-recursive loop.
-        return self._relax(0, x, nu_pre, nu_post)
+        return self._relax(0, x, nu_pre, nu_post, nu_coarsest)
 
-    def _relax(self, level_ind: int, x: np.array, nu_pre: int, nu_post: int) -> np.array:
+    def _relax(self, level_ind: int, x: np.array, nu_pre: int, nu_post: int, nu_coarsest: int) -> np.array:
         level = self.level[level_ind]
-
-        for _ in range(nu_pre):
-            x = level.relax(x)
-
         if level_ind == len(self) - 1:
-            coarse_level = self.level[level_ind + 1]
-            xc = coarse_level.r.dot(x)
-            xc = self._relax(level_ind + 1, xc, nu_pre, nu_post)
-            x = coarse_level.p.dot(xc)
+            # Coarsest level.
+            for _ in range(nu_coarsest):
+                x = level.relax(x)
+        else:
+            for _ in range(nu_pre):
+                x = level.relax(x)
 
-        for _ in range(nu_post):
-            x = level.relax.step(x)
+            if level_ind < len(self) - 1:
+                coarse_level = self.level[level_ind + 1]
+                xc = coarse_level.r.dot(x)
+                xc = self._relax(level_ind + 1, xc, nu_pre, nu_post, nu_coarsest)
+                x = coarse_level.p.dot(xc)
+
+            for _ in range(nu_post):
+                x = level.relax(x)
+
         return x
 
 
@@ -87,37 +93,40 @@ class Level:
         """
         return self._relaxer.step(x)
 
-    def relax_test_matrix(self, e: np.ndarray, num_sweeps: int = 30) -> np.ndarray:
-        """
-        Creates test functions (functions that approximately satisfy A*x=0) using single level relaxation.
 
-        Args:
-            e: test matrix initial approximation to the test functions.
-            num_sweeps: number of sweeps to execute.
+def relax_test_matrix(operator, method, e: np.ndarray, num_sweeps: int = 30) -> np.ndarray:
+    """
+    Creates test functions (functions that approximately satisfy A*x=0) using single level relaxation.
 
-        Returns:
-            e: relaxed test matrix.
-        """
-        # Print the error and residual norm of the first test function.
-        e0 = e[:, 0]
-        r_norm = scaled_norm(self.operator(e0))
-        _LOGGER.debug("{:5d} |e| {:.8e} |r| {:.8e}".format(0, scaled_norm(e0), r_norm))
+    Args:
+        operator: an object that can calculate residuals (action A*x).
+        method: iterative method functor (an iteration is a call to this method).
+        e: test matrix initial approximation to the test functions.
+        num_sweeps: number of sweeps to execute.
 
-        # Run 'num_sweeps' relaxation sweeps.
-        for i in range(1, num_sweeps + 1):
-            if i % (num_sweeps // 10) == 0:
-                r_norm_old = scaled_norm(self.operator(e0))
+    Returns:
+        e: relaxed test matrix.
+    """
+    # Print the error and residual norm of the first test function.
+    e0 = e[:, 0]
+    r_norm = scaled_norm(operator(e0))
+    _LOGGER.debug("{:5d} |e| {:.8e} |r| {:.8e}".format(0, scaled_norm(e0), r_norm))
 
-            e = self.relax(e)
-            # Scale e to unit norm, as we are calculating eigenvectors.
-            e /= norm(e)
+    # Run 'num_sweeps' relaxation sweeps.
+    for i in range(1, num_sweeps + 1):
+        if i % (num_sweeps // 10) == 0:
+            r_norm_old = scaled_norm(operator(e0))
 
-            if i % (num_sweeps // 10) == 0:
-                e0 = e[:, 0]
-                r_norm = scaled_norm(self.operator(e0))
-                _LOGGER.debug("{:5d} |e| {:.8e} |r| {:.8e} ({:.5f})".format(
-                    i, scaled_norm(e0), r_norm, r_norm / r_norm_old))
-        return e
+        e = method(e)
+        # Scale e to unit norm, as we are calculating eigenvectors.
+        e /= norm(e)
+
+        if i % (num_sweeps // 10) == 0:
+            e0 = e[:, 0]
+            r_norm = scaled_norm(operator(e0))
+            _LOGGER.debug("{:5d} |e| {:.8e} |r| {:.8e} ({:.5f})".format(
+                i, scaled_norm(e0), r_norm, r_norm / r_norm_old))
+    return e
 
 
 def random_test_matrix(window_shape: Tuple[int], num_examples: int = None) -> np.ndarray:
