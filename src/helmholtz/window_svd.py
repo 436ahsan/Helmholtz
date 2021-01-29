@@ -1,9 +1,11 @@
 """Calculates the SVD of a test matrix on a window, which gives us the coarse variables definition (R)."""
-import helmholtz as hm
 import logging
-import numpy as np
-from numpy.linalg import svd, norm
 from typing import Tuple
+
+import numpy as np
+from numpy.linalg import svd
+
+import helmholtz as hm
 
 logger = logging.getLogger(__name__)
 

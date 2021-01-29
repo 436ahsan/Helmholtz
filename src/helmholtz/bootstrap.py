@@ -1,10 +1,11 @@
 """Bootstrap AMG processes that generate test functions with low Helmholtz residuals on a periodic domain."""
-import helmholtz as hm
 import logging
+
 import numpy as np
 import scipy.sparse
-from numpy.linalg import svd, norm
-from helmholtz.linalg import scaled_norm
+from numpy.linalg import svd
+
+import helmholtz as hm
 
 _LOGGER = logging.getLogger(__name__)
 

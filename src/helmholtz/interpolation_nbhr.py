@@ -1,8 +1,6 @@
 """Fits interpolation to 1D Helmholtz test functions in particular (with specific coarse neighborhoods)."""
 import numpy as np
-import scipy.linalg
 import sklearn.metrics.pairwise
-from numpy.linalg import norm
 
 _SMALL_NUMBER = 1e-15
 
@@ -27,7 +25,7 @@ def geometric_neighbors(n: int, w: int, nc: int):
         else:
             # Use center aggregate and left neighboring aggregate.
             nbhr_aggregate = (center_aggregate + 1) % num_aggregates
-#        coarse_nbhrs = np.union1d(aggregate_coarse_vars[center_aggregate], aggregate_coarse_vars[nbhr_aggregate])
+        #        coarse_nbhrs = np.union1d(aggregate_coarse_vars[center_aggregate], aggregate_coarse_vars[nbhr_aggregate])
         coarse_nbhrs = aggregate_coarse_vars[center_aggregate]
         print(fine_var, center_aggregate, nbhr_aggregate, coarse_nbhrs)
         nbhr[fine_var] = coarse_nbhrs
@@ -45,8 +43,8 @@ def similarity(x, xc):
     ***DOES NOT ZERO OUT MEAN, which assumes intercept = False in fitting interpolation.***
     """
     # Calculate all pairwise correlation similarities between x and xc. Zero out mean here.
-    #x -= np.mean(x, axis=0)
-    #xc -= np.mean(xc, axis=0)
+    # x -= np.mean(x, axis=0)
+    # xc -= np.mean(xc, axis=0)
     # TODO(orenlivne): implement this ourselves instead of trying to fit it into sklearn's API?
     d = sklearn.metrics.pairwise.cosine_similarity(x.transpose(), xc.transpose())
     print(d)

@@ -1,11 +1,11 @@
 import logging
+import sys
+
 import numpy as np
-import helmholtz as hm
 import pytest
 import sklearn.metrics.pairwise
-import sys
-from numpy.ma.testutils import assert_array_almost_equal
-from numpy.linalg import norm
+
+import helmholtz as hm
 
 logger = logging.getLogger("nb")
 
@@ -55,11 +55,11 @@ class TestBootstrap:
         n = 16
         kh = 0.5
         a = hm.linalg.helmholtz_1d_operator(kh, n)
-        x, multilevel = hm.bootstrap.generate_test_matrix(a)
+        x, multilevel = hm.bootstrap.generate_test_matrix(a, num_sweeps=10, num_examples=8)
 
         relax_cycle = lambda x: multilevel.relax(x, 2, 2, 4)
         x, conv_factor = hm.multilevel.relax_test_matrix(multilevel.level[0].operator, relax_cycle, x, 100)
-        assert conv_factor == pytest.approx(0.869, 1e-3)
+        assert conv_factor == pytest.approx(0.868, 1e-3)
 
     def test_distances_between_window_and_coarse_vars(self):
         n = 32

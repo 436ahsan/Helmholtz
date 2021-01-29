@@ -1,17 +1,19 @@
 """Multilevel solver (producer of low-residual test functions of the Helmholtz operator."""
-import helmholtz as hm
 import logging
-import numpy as np
 from typing import Tuple
-from helmholtz.linalg import scaled_norm
+
+import numpy as np
 from numpy.linalg import norm
 
+import helmholtz as hm
+from helmholtz.linalg import scaled_norm
 
 _LOGGER = logging.getLogger(__name__)
 
 
 class Multilevel:
     """The multilevel hierarchy. Contains a sequence of levels."""
+
     def __init__(self):
         self.level = []
 
