@@ -16,10 +16,11 @@ class TestKaczmarz:
         relaxer = hm.kaczmarz.KaczmarzRelaxer(a)
 
         x = np.random.random((n, 5))
+        b = np.zeros_like(x)
         r_norm = norm(a.dot(x))
         for i in range(10):
             y = kaczmarz_relax_with_loop(kh, x)
-            x = relaxer.step(x)
+            x = relaxer.step(x, b)
             assert_array_almost_equal(x - x.mean(), y - y.mean())
             r_norm_new = norm(a.dot(x))
             assert r_norm_new < r_norm

@@ -6,10 +6,14 @@ import scipy.sparse
 from numpy.linalg import svd, norm
 from helmholtz.linalg import scaled_norm
 
-logger = logging.getLogger(__name__)
+_LOGGER = logging.getLogger(__name__)
 
 
-def generate_test_matrix(a: scipy.sparse.dia_matrix, aggregate_size: int = 4, num_examples: int = None):
+# In 1D, we know there are two principal components.
+# TODO(oren): replace nc by a dynamic number in general based on # large singular values.
+def generate_test_matrix(a: scipy.sparse.dia_matrix, aggregate_size: int = 4, num_examples: int = None,
+                         nc: int = 2,
+                         num_sweeps: int = 10000, print_frequency: int = None):
     # TODO(oren): generalize the domain to the d-dimensional case. For now assuming 1D only.
     domain_size = a.shape[0]
     domain_shape = (domain_size, )
@@ -19,13 +23,7 @@ def generate_test_matrix(a: scipy.sparse.dia_matrix, aggregate_size: int = 4, nu
     # assert all(ni % ai == 0 for ni, ai in zip(domain_shape, aggregate_shape)), \
     #     "Aggregate shape must divide the domain shape in every dimension"
 
-    # In 1D, we know there are two principal components.
-    # TODO(oren): replace this by a dynamic number in general based on # large singular values.
-    # # aggregate coarse vars.
-    nc = 2
-
     # Generate initial test functions by 1-level relaxation, starting from random[-1, 1].
-    num_sweeps = 100
     if num_examples is None:
         # By default, use more test functions than gridpoints so we have a sufficiently large test function sample.
         num_examples = 3 * 4 * np.prod(aggregate_shape)
@@ -34,9 +32,12 @@ def generate_test_matrix(a: scipy.sparse.dia_matrix, aggregate_size: int = 4, nu
     level = hm.multilevel.Level(a)
     multilevel.level.append(level)
     x = hm.multilevel.random_test_matrix(domain_shape, num_examples=num_examples)
-    x = hm.multilevel.relax_test_matrix(level.operator, level.relax, x, num_sweeps=num_sweeps)
+    b = np.zeros_like(x)
+    x = hm.multilevel.relax_test_matrix(level.operator, lambda x: level.relax(x, b), x, num_sweeps=num_sweeps,
+                                        print_frequency=print_frequency)
     x_aggregate_t = x[:aggregate_size].transpose()
-    r = create_coarse_vars(x_aggregate_t, domain_size, nc)
+    r, s = create_coarse_vars(x_aggregate_t, domain_size, nc)
+    _LOGGER.debug("Singular values {}".format(s))
     xc = r.dot(x)
     xc_t = xc.transpose()
     caliber = 2
@@ -56,7 +57,7 @@ def create_coarse_vars(x_aggregate_t, domain_size: int, nc: int) -> scipy.sparse
     # Tile R of a single aggregate over the entire domain.
     num_aggregates = domain_size // aggregate_size
     r = scipy.sparse.block_diag(tuple(r for _ in range(num_aggregates))).tocsr()
-    return r
+    return r, s
 
 
 def create_interpolation(x_aggregate_t: np.ndarray, xc_t: np.ndarray, domain_size: int, nc: int, caliber: int) -> \
@@ -77,9 +78,10 @@ def create_interpolation(x_aggregate_t: np.ndarray, xc_t: np.ndarray, domain_siz
         x_aggregate_t, xc=xc_t, nbhr=nbhr,
         fit_samples=num_examples // 3, val_samples=num_examples // 3, test_samples=num_examples // 3)
     error, alpha_opt = fitter.optimized_relative_error(caliber, alpha, return_weights=True)
-    p_aggregate = (np.tile(np.arange(4)[:, None], 2).flatten(),
+    p_aggregate = (np.tile(np.arange(aggregate_size)[:, None], nc).flatten(),
                    np.concatenate([nbhr_i for nbhr_i in nbhr]),
                    np.concatenate([pi for pi in error[:, 2:]]),)
+    print("Interpolation error", error[:, 1])
 
     # Tile P of a single aggregate over the entire domain.
     row = np.concatenate([p_aggregate[0] + aggregate_size * ic for ic in range(num_aggregates)])
