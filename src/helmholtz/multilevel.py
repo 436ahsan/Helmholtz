@@ -109,6 +109,7 @@ def relax_test_matrix(operator, method, e: np.ndarray, num_sweeps: int = 30, pri
 
     Returns:
         e: relaxed test matrix.
+        conv_factor: asymptotic convergence factor (of the last iteration).
     """
     # Print the error and residual norm of the first test function.
     e0 = e[:, 0]
@@ -119,20 +120,16 @@ def relax_test_matrix(operator, method, e: np.ndarray, num_sweeps: int = 30, pri
     if print_frequency is None:
         print_frequency = num_sweeps // 10
     for i in range(1, num_sweeps + 1):
-        if i % print_frequency == 0:
-            e0 = e[:, 0]
-            r_norm_old = scaled_norm(operator(e0))
-
+        r_norm_old = r_norm
         e = method(e)
-
+        e0 = e[:, 0]
+        r_norm = scaled_norm(operator(e0))
         if i % print_frequency == 0:
-            e0 = e[:, 0]
-            r_norm = scaled_norm(operator(e0))
             _LOGGER.debug("{:5d} |e| {:.8e} |r| {:.8e} ({:.5f})".format(
                 i, scaled_norm(e0), r_norm, r_norm / r_norm_old))
     # Scale e to unit norm, as we are calculating eigenvectors.
     e /= norm(e)
-    return e
+    return e, r_norm / r_norm_old
 
 
 def random_test_matrix(window_shape: Tuple[int], num_examples: int = None) -> np.ndarray:

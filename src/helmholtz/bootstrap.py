@@ -33,8 +33,8 @@ def generate_test_matrix(a: scipy.sparse.dia_matrix, aggregate_size: int = 4, nu
     multilevel.level.append(level)
     x = hm.multilevel.random_test_matrix(domain_shape, num_examples=num_examples)
     b = np.zeros_like(x)
-    x = hm.multilevel.relax_test_matrix(level.operator, lambda x: level.relax(x, b), x, num_sweeps=num_sweeps,
-                                        print_frequency=print_frequency)
+    x, _ = hm.multilevel.relax_test_matrix(level.operator, lambda x: level.relax(x, b), x, num_sweeps=num_sweeps,
+                                           print_frequency=print_frequency)
     x_aggregate_t = x[:aggregate_size].transpose()
     r, s = create_coarse_vars(x_aggregate_t, domain_size, nc)
     _LOGGER.debug("Singular values {}".format(s))

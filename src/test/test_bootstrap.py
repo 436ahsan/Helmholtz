@@ -1,6 +1,7 @@
 import logging
 import numpy as np
 import helmholtz as hm
+import pytest
 import sklearn.metrics.pairwise
 import sys
 from numpy.ma.testutils import assert_array_almost_equal
@@ -47,16 +48,18 @@ class TestBootstrap:
         level = hm.multilevel.Level(a)
         x = hm.multilevel.random_test_matrix((n, ))
         b = np.zeros_like(x)
-        x = hm.multilevel.relax_test_matrix(level.operator, lambda x: level.relax(x, b), x, 10)
+        x, conv_factor = hm.multilevel.relax_test_matrix(level.operator, lambda x: level.relax(x, b), x, 100)
+        assert conv_factor == pytest.approx(0.995, 1e-3)
 
-    def test_run_2_level_relax_cycle(self):
+    def test_2_level_relax_cycle_faster_than_1_level(self):
         n = 16
         kh = 0.5
         a = hm.linalg.helmholtz_1d_operator(kh, n)
         x, multilevel = hm.bootstrap.generate_test_matrix(a)
 
         relax_cycle = lambda x: multilevel.relax(x, 2, 2, 4)
-        x = hm.multilevel.relax_test_matrix(multilevel.level[0].operator, relax_cycle, x, 100)
+        x, conv_factor = hm.multilevel.relax_test_matrix(multilevel.level[0].operator, relax_cycle, x, 100)
+        assert conv_factor == pytest.approx(0.869, 1e-3)
 
     def test_distances_between_window_and_coarse_vars(self):
         n = 32
@@ -70,7 +73,7 @@ class TestBootstrap:
         level = hm.multilevel.Level(a)
         x = hm.multilevel.random_test_matrix((n, ))
         b = np.zeros_like(x)
-        x = hm.multilevel.relax_test_matrix(level.operator, lambda x: level.relax(x, b), x, num_sweeps=num_sweeps)
+        x, _ = hm.multilevel.relax_test_matrix(level.operator, lambda x: level.relax(x, b), x, num_sweeps=num_sweeps)
 
         # Generate coarse variables (R) based on a window of x.
         x_aggregate_t = x[:aggregate_size].transpose()
