@@ -5,7 +5,7 @@ AMG Helmholtz project with Achi, Oren, James, Jacob and Ahsan.
 - `src`: source code.
 - `src/helmholtz`: Python Helmholtz code.
 - `src/test`: unit tests.
-- `src/notebooks`: Juypter notebooks.
+- `notebooks`: Juypter notebooks.
 
 ## Installation
 - Install conda.
