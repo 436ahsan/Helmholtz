@@ -6,17 +6,18 @@ import scipy.sparse.linalg
 
 class KaczmarzRelaxer:
     """Implements Kaczmarz relaxation for A*x = 0."""
-    def __init__(self, a: scipy.sparse.dia_matrix) -> None:
+    def __init__(self, a: scipy.sparse.spmatrix) -> None:
         """
         Creates a Kaczmarz relaxer.
         Args:
             a: left-hand-side matrix.
         """
-        self._a = a
+        self._a = a.tocsr()
         self._at = a.transpose()
         # Storing M = lower triangular part of A*A^T in CSR format (the Kaczmarz splitting matrix) for linear solve
         # efficiency.
         self._m = scipy.sparse.tril(a.dot(self._at)).tocsr()
+        self._at = self._at.tocsr()
 
     def step(self, x: np.array, b: np.array) -> np.array:
         """
