@@ -41,7 +41,7 @@ def sparse_circulant(vals: np.array, offsets: np.array, n: int) -> scipy.sparse.
     return scipy.sparse.diags(dupvals, dupoffsets, shape=(n, n))
 
 
-def periodic_tile(a, n) -> scipy.sparse.coo_matrix:
+def periodic_tile(a: scipy.sparse.csr_matrix, n: int) -> scipy.sparse.csr_matrix:
     """
     Tiles the periodic B.C. operator on a n-times larger domain.
 
@@ -52,16 +52,31 @@ def periodic_tile(a, n) -> scipy.sparse.coo_matrix:
     Returns:
         a on an n-times larger periodic domain.
     """
-    n_row, n_col = a.shape[0]
+    n_row, n_col = a.shape
     row, col = a.nonzero()
     data = a.data
     # Calculate the positions of stencil neighbors relative to the stencil center.
     relative_col = col - row
+    relative_col[relative_col >= n_col // 2] -= n_col
+    relative_col[relative_col < -(n_col // 2)] += n_col
+
     # Tile the data into the ranges [0..n_col-1],[n_col,...,2*n_col-1],...[(n-1)*n_col,...,n*n_col-1].
     tiled_data = np.tile(data, n)
     tiled_row = np.concatenate([row + i * n_col for i in range(n)])
     tiled_col = np.concatenate([(row + relative_col + i * n_col) % (n * n_col) for i in range(n)])
-    return scipy.sparse.coo_matrix((tiled_data, (tiled_row, tiled_col)), shape=(n * n_row, n * n_col))
+    return scipy.sparse.coo_matrix((tiled_data, (tiled_row, tiled_col)), shape=(n * n_row, n * n_col)).tocsr()
+
+
+def tile_dense(r: np.ndarray, n: int) -> scipy.sparse.csr_matrix:
+    """
+    Tiles a dense matrix (e.g., the restriction R over an aggregate) over a domain of non-overlapping aggregates.
+    Args:
+        r: aggregate matrix.
+        n: number of times to tile a.
+
+    Returns: r, tiled n over n aggregates.
+    """
+    return scipy.sparse.block_diag(tuple(r for _ in range(n))).tocsr()
 
 
 def helmholtz_1d_operator(kh: float, n: int) -> scipy.sparse.dia_matrix:

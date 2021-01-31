@@ -11,18 +11,20 @@ import helmholtz as hm
 _LOGGER = logging.getLogger(__name__)
 
 
-def generate_test_functions(a_coarsest: scipy.sparse.spmatrix, num_growth_steps: int,
+def generate_test_functions(a: scipy.sparse.spmatrix, num_growth_steps: int,
                             growth_factor: int = 2,
-                            num_bootstrap_steps: int = 1) -> Tuple[nd.ndarray, hm.multilevel.Multilevel]:
+                            num_bootstrap_steps: int = 1,
+                            aggregate_size: int = 4) -> Tuple[np.ndarray, hm.multilevel.Multilevel]:
     """
     Creates low-residual test functions and multilevel hierarchy on a large domain from the operator on a small window
     (the coarsest domain). This is similar to a full multigrid algorithm.
 
     Args:
-        a_coarsest: the operator on the coarsest domain.
+        a: the operator on the coarsest domain.
         num_growth_steps: number of steps to increase the domain.
         growth_factor: by how much to increase the domain size at each growth step.
         num_bootstrap_steps: number of bootstrap steps to perform on each domain.
+        aggregate_size: aggregate size = #fine vars per aggregate
 
     Returns:
         x: test matrix on the largest (final) domain.
@@ -38,57 +40,69 @@ def generate_test_functions(a_coarsest: scipy.sparse.spmatrix, num_growth_steps:
         x, multilevel = bootstap(x, multilevel)
 
     for l in range(num_growth_steps):
+        _LOGGER.info("Growing domain to level {}, size {}".format(l, growth_factor * x.shape[0]))
         # Tile solution and hierarchy on the twice larger domain.
         x = hm.linalg.periodic_tile(x, growth_factor)
         multilevel = multilevel.periodic_tile(growth_factor)
         # Bootstrap at the current level.
         for i in range(num_bootstrap_steps):
-            x, multilevel = bootstap(x, multilevel)
+            x, multilevel = bootstap(x, multilevel, aggregate_size=aggregate_size)
 
     return x, multilevel
 
 
-class BootstrapMultilevelBuilder:
-    """Builds a multilevel hierarchy on a fixed-size domain using bootstrapping."""
+def bootstap(x, multilevel, aggregate_size: int = 4, nc: int = 2):
+    """
+    Improves test functions and a multilevel hierarchy on a fixed-size domain by bootstrapping.
+    Args:
+        x: test matrix.
+        multilevel: multilevel hierarchy.
+        aggregate_size: aggregate size = #fine vars per aggregate.
+        nc: number of coarse variables per aggregate. In 1D at the finest level, we know there are two principal
+        components, so nc=2 makes sense there.
 
-    def __init__(self, a: scipy.sparse.spmatrix):
-        """
-        Creates a bootstrap multilevel builder (setup) object.
-        Args:
-            a: finest-level operator.
-        """
-        self.multilevel = hm.multilevel.Multilevel()
-        level = hm.multilevel.Level(a)
-        self.multilevel.level.append(level)
-        # Initialize test matrix to random.
-        self.x = hm.multilevel.random_test_matrix(domain_shape, num_examples=num_examples)
+    Returns:
+        improved x, multilevel hierarchy with the same number of levels.
+    """
+    # At the finest level, use a multilevel cycle to improve x.
+    level = multilevel.level[0]
+    num_levels = len(multilevel)
+    b = np.zeros_like(x)
+    # TODO(orenlivne): update parameters of relaxation cycle to reasonable values if needed.
+    relax_cycle = lambda x: multilevel.relax(x, 2, 2, 4) if num_levels > 1 else level.relax
+    x, _ = hm.multilevel.relax_test_matrix(level.operator, relax_cycle, x, 100)
 
-    def relax_test_matrix(self, num_sweeps: int = 10000, print_frequency: int = None):
-        b = np.zeros_like(x)
-        self.x, conv_factor = hm.multilevel.relax_test_matrix(
-            level.operator, lambda x: level.relax(x, b), self.x, num_sweeps=num_sweeps, print_frequency=print_frequency)
-        return conv_factor
+    # Recreate all coarse levels. One down-pass, relaxing at each level, hopefully starting from improved x so the
+    # process improves all levels.
+    # TODO(orenlivne): add nested bootstrap cycles if needed.
+    new_multilevel = hm.multilevel.Multilevel()
+    new_multilevel.append(level)
+    for l in range(num_levels):
+        _LOGGER.info("Coarsening level {}->{}".format(l - 1, l))
+        level = create_coarse_level(level, x, aggregate_size=aggregate_size, num_examples=num_examples, nc=nc)
+        new_multilevel.append(level)
+        x = level.r.dot(x)
+        x = hm.multilevel.relax_test_matrix(
+            level.operator, lambda x: level.relax(x, b), x, num_sweeps=num_sweeps, print_frequency=print_frequency)
+    return x, new_multilevel
 
 
-# In 1D, we know there are two principal components.
 # TODO(oren): replace nc by a dynamic number in general based on # large singular values.
-def create_coarse_level(level, x, aggregate_size: int = 4, num_examples: int = None, nc: int = 2):
+def create_coarse_level(level, x, aggregate_size: int = 4, nc: int = 2, caliber: int = 2):
     """
     Coarsens a level.
     Args:
-        level:
-        x:
-        aggregate_size:
-        num_examples:
-        nc:
+        level: fine level to be coarsened.
+        x: fine-level test matrix.
+        aggregate_size: aggregate size = #fine vars per aggregate
+        nc: number of coarse variables per aggregate. In 1D at the finest level, we know there are two principal
+        components, so nc=2 makes sense there.
+        caliber: interpolation caliber.
 
-    Returns:
-
+    Returns: coarse level obtained by fitting P, R to x.
     """
     # TODO(oren): generalize the domain to the d-dimensional case. For now assuming 1D only.
     domain_size = a.shape[0]
-    domain_shape = (domain_size, )
-    aggregate_shape = (aggregate_size, )
     assert domain_size % aggregate_size == 0, \
         "Aggregate shape must divide the domain shape in every dimension"
     # assert all(ni % ai == 0 for ni, ai in zip(domain_shape, aggregate_shape)), \
@@ -99,7 +113,6 @@ def create_coarse_level(level, x, aggregate_size: int = 4, num_examples: int = N
     _LOGGER.debug("Singular values {}".format(s))
     xc = r.dot(x)
     xc_t = xc.transpose()
-    caliber = 2
     p = create_interpolation(x_aggregate_t, xc_t, domain_size, nc, caliber)
     ac = (r.dot(a)).dot(p)
     coarse_level = hm.multilevel.Level(ac, r, p)
@@ -113,9 +126,7 @@ def create_coarse_vars(x_aggregate_t, domain_size: int, nc: int) -> scipy.sparse
     aggregate_size = x_aggregate_t.shape[1]
     _, s, vh = svd(x_aggregate_t)
     r = vh[:nc]
-    # Tile R of a single aggregate over the entire domain.
-    num_aggregates = domain_size // aggregate_size
-    r = scipy.sparse.block_diag(tuple(r for _ in range(num_aggregates))).tocsr()
+    r = hm.linalg.tile_dense(r, domain_size // aggregate_size)
     return r, s
 
 

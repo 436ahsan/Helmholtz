@@ -48,11 +48,13 @@ class Multilevel:
 
             if level_ind < len(self) - 1:
                 coarse_level = self.level[level_ind + 1]
-                bc = coarse_level.r.dot(b - level.operator(x))
-                xc = np.zeros((coarse_level.r.shape[0], x.shape[1]))
+                # Full Approximation Scheme (FAS).
+                xc_initial = coarse_level.r.dot(x)
+                bc = coarse_level.r.dot(b - level.operator(x)) + coarse_level.operator(xc_initial)
+                #xc = np.zeros((coarse_level.r.shape[0], x.shape[1]))
                 #xc = coarse_level.r.dot(x)
                 xc = self._relax(level_ind + 1, xc, nu_pre, nu_post, nu_coarsest, bc)
-                x += coarse_level.p.dot(xc)
+                x += coarse_level.p.dot(xc - xc_initial)
 
             for _ in range(nu_post):
                 x = level.relax(x, b)
