@@ -45,8 +45,8 @@ class TestBootstrap:
         n = 16
         kh = 0.5
         a = hm.linalg.helmholtz_1d_operator(kh, n)
-        level = hm.multilevel.Level(a)
-        x = hm.multilevel.random_test_matrix((n, ))
+        level = hm.multilevel.Level.create_finest_level(a)
+        x = hm.multilevel.random_test_matrix((n,))
         b = np.zeros_like(x)
         x, conv_factor = hm.multilevel.relax_test_matrix(level.operator, lambda x: level.relax(x, b), x, 100)
         assert conv_factor == pytest.approx(0.995, 1e-3)
@@ -70,8 +70,8 @@ class TestBootstrap:
         a = hm.linalg.helmholtz_1d_operator(kh, n)
 
         # Generate relaxed test matrix.
-        level = hm.multilevel.Level(a)
-        x = hm.multilevel.random_test_matrix((n, ))
+        level = hm.multilevel.Level.create_finest_level(a)
+        x = hm.multilevel.random_test_matrix((n,))
         b = np.zeros_like(x)
         x, _ = hm.multilevel.relax_test_matrix(level.operator, lambda x: level.relax(x, b), x, num_sweeps=num_sweeps)
 

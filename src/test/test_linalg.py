@@ -1,7 +1,8 @@
 import numpy as np
-import helmholtz as hm
 import scipy.sparse
 from numpy.ma.testutils import assert_array_almost_equal
+
+import helmholtz as hm
 
 
 class TestLinalg:
@@ -57,14 +58,32 @@ class TestLinalg:
             a_tiled_expected = hm.linalg.helmholtz_1d_operator(kh, growth_factor * n).tocsr()
             assert_array_almost_equal(a_tiled.toarray(), a_tiled_expected.toarray())
 
-    def test_tile_array(self):
-        a = np.array([[1, 2], [3, 4], [5, 6]])
+    def test_tile_csr_matrix_level2_operator(self):
+        a = scipy.sparse.csr_matrix(
+            [[-1.75, 1., 0., 1.],
+             [1., -1.75, 1., 0.],
+             [0., 1., -1.75, 1.],
+             [1., 0., 1., -1.75]])
+
         a_tiled = hm.linalg.tile_array(a, 2)
 
         a_tiled_expected = np.array([[1, 2, 0, 0],
-             [3, 4, 0, 0],
-             [5, 6, 0, 0],
-             [0, 0, 1, 2],
+                                     [3, 4, 0, 0],
+                                     [5, 6, 0, 0],
+                                     [0, 0, 1, 2],
+                                     [0, 0, 3, 4],
+                                     [0, 0, 5, 6]])
+        assert_array_almost_equal(a_tiled.toarray(), a_tiled_expected)
+
+    def test_tile_array(self):
+        a = np.array([[1, 2], [3, 4], [5, 6]])
+
+        a_tiled = hm.linalg.tile_array(a, 2)
+
+        a_tiled_expected = np.array([[1, 2, 0, 0],
+                                     [3, 4, 0, 0],
+                                     [5, 6, 0, 0],
+                                     [0, 0, 1, 2],
              [0, 0, 3, 4],
              [0, 0, 5, 6]])
         assert_array_almost_equal(a_tiled.toarray(), a_tiled_expected)

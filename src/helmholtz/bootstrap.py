@@ -1,10 +1,9 @@
 """Bootstrap AMG processes that generate test functions with low Helmholtz residuals on a periodic domain."""
 import logging
+from typing import Tuple
 
 import numpy as np
 import scipy.sparse
-from numpy.linalg import svd
-from typing import Tuple
 
 import helmholtz as hm
 
@@ -32,7 +31,7 @@ def generate_test_functions(a: scipy.sparse.spmatrix, num_growth_steps: int,
     """
     # Initialize test functions (to random) and hierarchy at coarsest level.
     multilevel = hm.multilevel.Multilevel()
-    level = hm.multilevel.Level(a)
+    level = hm.multilevel.Level.create_finest_level(a)
     multilevel.level.append(level)
     x = hm.multilevel.random_test_matrix(domain_shape, num_examples=num_examples)
     # Bootstrap at the current level.
@@ -90,7 +89,6 @@ def bootstap(x, multilevel, aggregate_size: int = 4, nc: int = 2):
     return x, new_multilevel
 
 
-# TODO(oren): replace nc by a dynamic number in general based on # large singular values.
 def create_coarse_level(x, domain_size: int, aggregate_size: int, threshold: float = 0.1, caliber: int = 2):
     """
     Coarsens a level.
@@ -111,12 +109,9 @@ def create_coarse_level(x, domain_size: int, aggregate_size: int, threshold: flo
     num_aggregates = domain_size // aggregate_size
 
     x_aggregate_t = x[:aggregate_size].transpose()
-    r = hm.restriction.create_restriction(x_aggregate_t)
-    _LOGGER.debug("Singular values {}".format(s))
+    r, s = hm.restriction.create_restriction(x_aggregate_t, threshold)
+    _LOGGER.debug("Singular values {}, nc {}".format(s, r.shape[0]))
     xc = r.dot(x)
     p = hm.interpolation.create_interpolation(
-        r.asarray(threshold), x_aggregate_t,  xc.transpose(), domain_size, nc, caliber)
-    r_csr = r.tile(num_aggregates, threshold)
-    p_csr = p.tile(num_aggregates)
-    ac = (r_csr.dot(a)).dot(p_csr)
-    return hm.multilevel.Level(ac, r, p, r_csr, p_csr)
+        r.asarray(threshold), x_aggregate_t, xc.transpose(), domain_size, nc, caliber)
+    return hm.multilevel.Level.create_coarse_level(ac, r, p)

@@ -64,13 +64,26 @@ class Multilevel:
 
 class Level:
     """A single level in the multilevel hierarchy."""
-    def __init__(self, a, r=None, p=None, r_csr=None, p_csr=None):
+
+    def __init__(self, a, r, p, r_csr, p_csr):
         self.a = a
         self.r = r
         self.p = p
         self._r_csr = r_csr
         self._p_csr = p_csr
         self._relaxer = hm.kaczmarz.KaczmarzRelaxer(a)
+
+    @staticmethod
+    def create_finest_level(a):
+        return Level(a, None, None, None, None)
+
+    @staticmethod
+    def create_coarse_level(a, r, p):
+        num_aggregates = a.shape[0] // r.shape[1]
+        ac = (r_csr.dot(a)).dot(p_csr)
+        r_csr = r.tile(num_aggregates)
+        p_csr = p.tile(num_aggregates)
+        return Level(ac, r, p, r_csr, p_csr)
 
     def print(self):
         _LOGGER.info("a = \n" + str(self.a.toarray()))

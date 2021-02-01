@@ -1,53 +1,51 @@
 """Restriction (R) construction routines. Based on SVD on an aggregate."""
 import numpy as np
 import scipy.sparse
-import sklearn.metrics.pairwise
 
 
 class Restrictor:
     """
     Encapsulates the restruction operator as both a full array over an aggregate (for easy tiling) and sparse CSR matrix
     format. Assumes non-overlapping aggregate (block sparsity) structure."""
-    def __init__(self, r: np.ndarray, s: np.ndarray):
+
+    def __init__(self, r: np.ndarray):
         """
         Creates an interpolation into a window (aggregate).
         Args:
             r: {aggregate_size} x {aggregate_size} coarse variable definition over an aggregate. Includes all possible
                 coarse vars, out of which we select nc based on an energy threshold in tile().
-            s: array-like, [N,] singular values of a matrix. Saved for debugging printouts or for dynamically changing
-            nc, if needed.
         """
-        self.r = r
-        self.s = s
+        self._r = r
 
-    def asarray(self, threshold: float) -> scipy.sparse.csr_matrix:
-        """
-        Returns a restriction based on a relative reconstruction error.
-        Args:
-            threshold: array-like, [K] list of relative reconstruction error thresholds (values of t). Determines nc.
+    def asarray(self) -> scipy.sparse.csr_matrix:
+        """ Returns the dense restriction matrix on an aggregate."""
+        return self._r
 
-        Returns: the sparse CSR interpolation matrix.
-        """
-        nc = _get_interpolation_caliber(np.array([threshold]))[0]
-        return self.r[:nc]
-
-    def tile(self, n: int, threshold: float) -> scipy.sparse.csr_matrix:
+    def tile(self, n: int) -> scipy.sparse.csr_matrix:
         """
         Returns a tiled restriction over an n-times larger periodic domain, as a CSR matrix.
         Args:
             n: number of times to tile the interpolation = #aggregates in the domain.
-            threshold: relative reconstruction error threshold. Determines nc.
 
         Returns: the sparse CSR interpolation matrix.
         """
-        return hm.linalg.tile_array(self.asarray(threshold, n))
+        return hm.linalg.tile_array(self.asarray(), n)
 
 
-def create_restriction(x_aggregate_t) -> scipy.sparse.csr_matrix:
-    """Generates R (coarse variables). R of single aggregate = SVD principal components over an aggregate; global R =
-    tiling of the aggregate R over the domain."""
+def create_restriction(x_aggregate_t, threshold: float) -> scipy.sparse.csr_matrix:
+    """
+    Generates R (coarse variables) on an aggregate from  SVD principcal components.
+
+    Args:
+        x_aggregate_t: fine-level test matrix on an aggregate, transposed.
+        threshold: relative reconstruction error threshold. Determines nc.
+
+    Returns:
+        restriction operator nc x {aggregate_size}, list of all singular values on aggregate.
+    """
     _, s, vh = svd(x_aggregate_t)
-    return Restrictor(r, s)
+    nc = _get_interpolation_caliber(np.array([threshold]))[0]
+    return Restrictor(r[:nc]), s
 
 
 def _relative_reconstruction_error(s):
