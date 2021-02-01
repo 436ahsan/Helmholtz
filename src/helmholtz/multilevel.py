@@ -147,6 +147,7 @@ def relax_test_matrix(operator, method, e: np.ndarray, num_sweeps: int = 30, pri
         method: iterative method functor (an iteration is a call to this method).
         e: test matrix initial approximation to the test functions.
         num_sweeps: number of sweeps to execute.
+        print_frequency: print debugging convergence statements per this number of sweeps. None means no printouts.
 
     Returns:
         e: relaxed test matrix.

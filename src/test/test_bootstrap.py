@@ -25,7 +25,7 @@ class TestBootstrap:
         kh = 0.5
 
         a = hm.linalg.helmholtz_1d_operator(kh, n)
-        x, multilevel = hm.bootstrap.generate_test_matrix(a, num_sweeps=100)
+        x, multilevel = hm.bootstrap.generate_test_matrix(a, 2, num_sweeps=100)
 
         assert x.shape == (16, 48)
 
@@ -55,33 +55,8 @@ class TestBootstrap:
         n = 16
         kh = 0.5
         a = hm.linalg.helmholtz_1d_operator(kh, n)
-        x, multilevel = hm.bootstrap.generate_test_matrix(a, num_sweeps=10, num_examples=8)
+        x, multilevel = hm.bootstrap.generate_test_matrix(a, 2, num_sweeps=10, num_examples=8)
 
         relax_cycle = lambda x: multilevel.relax(x, 2, 2, 4)
         x, conv_factor = hm.multilevel.relax_test_matrix(multilevel.level[0].operator, relax_cycle, x, 100)
         assert conv_factor == pytest.approx(0.868, 1e-3)
-
-    def test_distances_between_window_and_coarse_vars(self):
-        n = 32
-        kh = 0.6
-        nc = 1
-        num_sweeps = 100
-        aggregate_size = 4
-        a = hm.linalg.helmholtz_1d_operator(kh, n)
-
-        # Generate relaxed test matrix.
-        level = hm.multilevel.Level.create_finest_level(a)
-        x = hm.multilevel.random_test_matrix((n,))
-        b = np.zeros_like(x)
-        x, _ = hm.multilevel.relax_test_matrix(level.operator, lambda x: level.relax(x, b), x, num_sweeps=num_sweeps)
-
-        # Generate coarse variables (R) based on a window of x.
-        x_aggregate_t = x[:aggregate_size].transpose()
-        r, _ = hm.bootstrap.create_coarse_vars(x_aggregate_t, n, nc)
-        xc = r.dot(x)
-        xc_t = xc.transpose()
-
-        # Measure distance between x of an aggregate and xc.
-        d = sklearn.metrics.pairwise.cosine_similarity(x_aggregate_t.transpose(), xc_t.transpose())
-
-        assert d.shape == (4, 8)

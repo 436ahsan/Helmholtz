@@ -84,6 +84,6 @@ class TestLinalg:
                                      [3, 4, 0, 0],
                                      [5, 6, 0, 0],
                                      [0, 0, 1, 2],
-             [0, 0, 3, 4],
-             [0, 0, 5, 6]])
+                                     [0, 0, 3, 4],
+                                     [0, 0, 5, 6]])
         assert_array_almost_equal(a_tiled.toarray(), a_tiled_expected)

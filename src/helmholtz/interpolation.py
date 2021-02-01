@@ -4,6 +4,8 @@ import numpy as np
 import scipy.sparse
 import sklearn.metrics.pairwise
 
+import helmholtz as hm
+
 
 class Interpolator:
     """
@@ -51,7 +53,7 @@ class Interpolator:
 
 
 def create_interpolation(method: str, r: np.ndarray, x_aggregate_t: np.ndarray, xc_t: np.ndarray, domain_size: int,
-                         nc: int, caliber: int) -> hm.interpolator.Interpolator:
+                         nc: int, caliber: int) -> Interpolator:
     """
     Creates an interpolation operator.
     Args:
@@ -76,7 +78,7 @@ def create_interpolation(method: str, r: np.ndarray, x_aggregate_t: np.ndarray, 
 
 
 def _create_interpolation_ls(x_aggregate_t: np.ndarray, xc_t: np.ndarray, domain_size: int, nc: int, caliber: int) -> \
-        hm.interpolator.Interpolator:
+        Interpolator:
     """Defines interpolation to an aggregate by LS fitting to coarse neighbors of each fine var. The global
     interpolation P is the tiling of the aggregate P over the domain."""
 

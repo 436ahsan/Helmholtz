@@ -1,6 +1,9 @@
 """Restriction (R) construction routines. Based on SVD on an aggregate."""
 import numpy as np
 import scipy.sparse
+from numpy.linalg import svd
+
+import helmholtz as hm
 
 
 class Restrictor:
@@ -44,8 +47,8 @@ def create_restriction(x_aggregate_t, threshold: float) -> scipy.sparse.csr_matr
         restriction operator nc x {aggregate_size}, list of all singular values on aggregate.
     """
     _, s, vh = svd(x_aggregate_t)
-    nc = _get_interpolation_caliber(np.array([threshold]))[0]
-    return Restrictor(r[:nc]), s
+    nc = _get_interpolation_caliber(s, np.array([threshold]))[0]
+    return Restrictor(vh[:nc]), s
 
 
 def _relative_reconstruction_error(s):
