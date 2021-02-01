@@ -157,9 +157,9 @@ def relax_test_matrix(operator, method, x: np.ndarray, num_sweeps: int = 30, pri
     """
     # Print the error and residual norm of the first test function.
     x0 = x[:, 0]
+    x_norm = scaled_norm(x0)
     r_norm = scaled_norm(operator(x0))
-    _LOGGER.debug("{:5d} |e| {:.8e} |r| {:.8e}".format(0, scaled_norm(x0), r_norm))
-
+    _LOGGER.debug("{:5d} |e| {:.8e} |r| {:.8e} ratio {:.3f}".format(0, x_norm, r_norm, r_norm / x_norm))
     # Run 'num_sweeps' relaxation sweeps.
     if print_frequency is None:
         print_frequency = num_sweeps // 10
@@ -167,11 +167,12 @@ def relax_test_matrix(operator, method, x: np.ndarray, num_sweeps: int = 30, pri
         r_norm_old = r_norm
         x = method(x)
         x0 = x[:, 0]
+        x_norm = scaled_norm(x0)
         r_norm = scaled_norm(operator(x0))
         if i % print_frequency == 0:
-            _LOGGER.debug("{:5d} |e| {:.8e} |r| {:.8e} ({:.5f})".format(
-                i, scaled_norm(x0), r_norm, r_norm / r_norm_old))
-    # Scale e to unit norm, as we are calculating eigenvectors.
+            _LOGGER.debug("{:5d} |e| {:.8e} |r| {:.8e} ratio {:.3f} ({:.5f})".format(
+                i, scaled_norm(x0), r_norm, r_norm / x_norm, r_norm / r_norm_old))
+    # Scale x to unit norm, as we are calculating eigenvectors.
     x /= norm(x)
     return x, r_norm / r_norm_old
 
