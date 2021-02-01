@@ -26,6 +26,8 @@ def generate_test_matrix(a: scipy.sparse.spmatrix, num_growth_steps: int, growth
         aggregate_size: aggregate size = #fine vars per aggregate
         num_sweeps: number of relaxations or cycles to run on fine-level vectors to improve them.
         num_examples: number of test functions to generate. If None, uses 4 * np.prod(window_shape).
+        print_frequency: print debugging convergence statements per this number of relaxation cycles/sweeps.
+          None means no printouts.
 
     Returns:
         x: test matrix on the largest (final) domain.
