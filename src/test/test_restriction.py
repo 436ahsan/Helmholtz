@@ -30,7 +30,8 @@ class TestRestriction:
         level = hm.multilevel.Level.create_finest_level(a)
         x = hm.multilevel.random_test_matrix((n,))
         b = np.zeros_like(x)
-        x, _ = hm.multilevel.relax_test_matrix(level.operator, lambda x: level.relax(x, b), x, num_sweeps=num_sweeps)
+        x, _ = hm.multilevel.relax_test_matrix(level.operator, level.rq,
+                                               lambda x: level.relax(x, b), x, num_sweeps=num_sweeps)
 
         # Generate coarse variables (R) based on a window of x.
         x_aggregate_t = x[:aggregate_size].transpose()

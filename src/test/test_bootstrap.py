@@ -65,13 +65,13 @@ class TestBootstrap:
 
         relax_cycle = lambda x: multilevel.relax_cycle(x, 2, 2, 4)
         level = multilevel.level[0]
-        x, conv_factor = hm.multilevel.relax_test_matrix(level.operator, level.rq, relax_cycle, x, 10)
+        x, conv_factor = hm.multilevel.relax_test_matrix(level.operator, level.rq, relax_cycle, x, 100)
         assert np.mean([level.rq(x[:, i]) for i in range(x.shape[1])]) == pytest.approx(0.09770, 1e-3)
         assert (hm.linalg.scaled_norm_of_matrix(a.dot(x)) / hm.linalg.scaled_norm_of_matrix(x)).mean() == \
                pytest.approx(0.098258, 1e-3)
         # TODO(orenlivne): measure convergence factor differrently - how fast we converge to the eigenvalue seems to
         # be noisy.
-    #        assert conv_factor == pytest.approx(0.879, 1e-3)
+        assert conv_factor == pytest.approx(0.879, 1e-3)
 
     def test_2_level_bootstrap_improves_2_level_convergence(self):
         n = 16
