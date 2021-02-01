@@ -59,20 +59,24 @@ class TestLinalg:
             assert_array_almost_equal(a_tiled.toarray(), a_tiled_expected.toarray())
 
     def test_tile_csr_matrix_level2_operator(self):
-        a = scipy.sparse.csr_matrix(
-            [[-1.75, 1., 0., 1.],
-             [1., -1.75, 1., 0.],
-             [0., 1., -1.75, 1.],
-             [1., 0., 1., -1.75]])
+        a = np.array([
+            [-0.16, 0.05, 0.18, 0.35, 0., 0., 0.18, -0.21],
+             [0.05, -1.22, -0.21, -0.42, 0., 0., 0.35, -0.42],
+             [0.18, -0.21, -0.16, 0.05, 0.18, 0.35, 0., 0.],
+             [0.35, -0.42, 0.05, -1.22, -0.21, -0.42, 0., 0.],
+             [0., 0., 0.18, -0.21, -0.16, 0.05, 0.18, 0.35],
+             [0., 0., 0.35, -0.42, 0.05, -1.22, -0.21, -0.42],
+             [0.18, 0.35, 0., 0., 0.18, -0.21, -0.16, 0.05],
+             [-0.21, -0.42, 0., 0., 0.35, -0.42, 0.05, -1.22]
+        ])
 
-        a_tiled = hm.linalg.tile_array(a, 2)
+        a_tiled = hm.linalg.tile_csr_matrix(scipy.sparse.csr_matrix(a), 2)
 
-        a_tiled_expected = np.array([[1, 2, 0, 0],
-                                     [3, 4, 0, 0],
-                                     [5, 6, 0, 0],
-                                     [0, 0, 1, 2],
-                                     [0, 0, 3, 4],
-                                     [0, 0, 5, 6]])
+        # The tiled operator should have blocks of of 2 6-point stencils that are periodic on 16 points.
+        wrapped_around = np.zeros_like(a)
+        wrapped_around[-2:, :2] = a[-2:, :2]
+        wrapped_around[:2, -2:] = a[:2, -2:]
+        a_tiled_expected = np.block([[a - wrapped_around, wrapped_around], [wrapped_around, a - wrapped_around]])
         assert_array_almost_equal(a_tiled.toarray(), a_tiled_expected)
 
     def test_tile_array(self):

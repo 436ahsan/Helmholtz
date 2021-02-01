@@ -59,4 +59,5 @@ class TestBootstrap:
 
         relax_cycle = lambda x: multilevel.relax_cycle(x, 2, 2, 4)
         x, conv_factor = hm.multilevel.relax_test_matrix(multilevel.level[0].operator, relax_cycle, x, 100)
+
         assert conv_factor == pytest.approx(0.879, 1e-3)
