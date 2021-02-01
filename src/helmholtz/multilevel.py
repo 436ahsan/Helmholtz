@@ -20,7 +20,7 @@ class Multilevel:
     def __len__(self):
         return len(self.level)
 
-    def relax(self, x: np.array, nu_pre: int, nu_post: int, nu_coarsest: int) -> np.array:
+    def relax_cycle(self, x: np.array, nu_pre: int, nu_post: int, nu_coarsest: int) -> np.array:
         """
         Executes a relaxation V(nu_pre, nu_post) -cycle on A*x = 0.
 
@@ -34,9 +34,10 @@ class Multilevel:
             x after the cycle.
         """
         # TODO(orenlivne): replace by a general-cycle-index, non-recursive loop.
-        return self._relax(0, x, nu_pre, nu_post, nu_coarsest, np.zeros_like(x))
+        return self._relax_cycle(0, x, nu_pre, nu_post, nu_coarsest, np.zeros_like(x))
 
-    def _relax(self, level_ind: int, x: np.array, nu_pre: int, nu_post: int, nu_coarsest: int, b: np.ndarray) -> np.array:
+    def _relax_cycle(self, level_ind: int, x: np.array, nu_pre: int, nu_post: int, nu_coarsest: int, b: np.ndarray) -> \
+            np.array:
         level = self.level[level_ind]
         if level_ind == len(self) - 1:
             # Coarsest level.
@@ -53,7 +54,7 @@ class Multilevel:
                 bc = coarse_level.r.dot(b - level.operator(x)) + coarse_level.operator(xc_initial)
                 #xc = np.zeros((coarse_level.r.shape[0], x.shape[1]))
                 #xc = coarse_level.r.dot(x)
-                xc = self._relax(level_ind + 1, xc, nu_pre, nu_post, nu_coarsest, bc)
+                xc = self._relax_cycle(level_ind + 1, xc, nu_pre, nu_post, nu_coarsest, bc)
                 x += coarse_level.p.dot(xc - xc_initial)
 
             for _ in range(nu_post):
@@ -79,18 +80,19 @@ class Level:
 
     @staticmethod
     def create_coarse_level(a, r, p):
-        num_aggregates = a.shape[0] // r.shape[1]
-        ac = (r_csr.dot(a)).dot(p_csr)
+        num_aggregates = a.shape[0] // r.asarray().shape[1]
         r_csr = r.tile(num_aggregates)
         p_csr = p.tile(num_aggregates)
+        # Form Galerkin coarse-level operator.
+        ac = (r_csr.dot(a)).dot(p_csr)
         return Level(ac, r, p, r_csr, p_csr)
 
     def print(self):
         _LOGGER.info("a = \n" + str(self.a.toarray()))
         if self.r is not None:
-            _LOGGER.info("r = \n" + str(r))
+            _LOGGER.info("r = \n" + str(self.r))
         if self.p is not None:
-            _LOGGER.info("p = \n" + str(p))
+            _LOGGER.info("p = \n" + str(self.p))
 
     def operator(self, x: np.array) -> np.array:
         """
@@ -103,7 +105,7 @@ class Level:
         """
         return self.a.dot(x)
 
-    def relax(self, x: np.array,  b: np.array) -> np.array:
+    def relax(self, x: np.array, b: np.array) -> np.array:
         """
         Executes a relaxation sweep on A*x = 0 at this level.
         Args:
@@ -126,7 +128,7 @@ class Level:
         """
         return self._r_csr.dot(x)
 
-    def restrict(self, xc: np.array) -> np.array:
+    def interpolate(self, xc: np.array) -> np.array:
         """
         Returns the interpolation action R*x.
         Args:
@@ -138,14 +140,14 @@ class Level:
         return self._p_csr.dot(xc)
 
 
-def relax_test_matrix(operator, method, e: np.ndarray, num_sweeps: int = 30, print_frequency: int = None) -> np.ndarray:
+def relax_test_matrix(operator, method, x: np.ndarray, num_sweeps: int = 30, print_frequency: int = None) -> np.ndarray:
     """
     Creates test functions (functions that approximately satisfy A*x=0) using single level relaxation.
 
     Args:
         operator: an object that can calculate residuals (action A*x).
         method: iterative method functor (an iteration is a call to this method).
-        e: test matrix initial approximation to the test functions.
+        x: test matrix initial approximation to the test functions.
         num_sweeps: number of sweeps to execute.
         print_frequency: print debugging convergence statements per this number of sweeps. None means no printouts.
 
@@ -154,24 +156,24 @@ def relax_test_matrix(operator, method, e: np.ndarray, num_sweeps: int = 30, pri
         conv_factor: asymptotic convergence factor (of the last iteration).
     """
     # Print the error and residual norm of the first test function.
-    e0 = e[:, 0]
-    r_norm = scaled_norm(operator(e0))
-    _LOGGER.debug("{:5d} |e| {:.8e} |r| {:.8e}".format(0, scaled_norm(e0), r_norm))
+    x0 = x[:, 0]
+    r_norm = scaled_norm(operator(x0))
+    _LOGGER.debug("{:5d} |e| {:.8e} |r| {:.8e}".format(0, scaled_norm(x0), r_norm))
 
     # Run 'num_sweeps' relaxation sweeps.
     if print_frequency is None:
         print_frequency = num_sweeps // 10
     for i in range(1, num_sweeps + 1):
         r_norm_old = r_norm
-        e = method(e)
-        e0 = e[:, 0]
-        r_norm = scaled_norm(operator(e0))
+        x = method(x)
+        x0 = x[:, 0]
+        r_norm = scaled_norm(operator(x0))
         if i % print_frequency == 0:
             _LOGGER.debug("{:5d} |e| {:.8e} |r| {:.8e} ({:.5f})".format(
-                i, scaled_norm(e0), r_norm, r_norm / r_norm_old))
+                i, scaled_norm(x0), r_norm, r_norm / r_norm_old))
     # Scale e to unit norm, as we are calculating eigenvectors.
-    e /= norm(e)
-    return e, r_norm / r_norm_old
+    x /= norm(x)
+    return x, r_norm / r_norm_old
 
 
 def random_test_matrix(window_shape: Tuple[int], num_examples: int = None) -> np.ndarray:

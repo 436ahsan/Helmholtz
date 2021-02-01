@@ -20,14 +20,14 @@ class TestBootstrap:
                             datefmt="%a, %d %b %Y %H:%M:%S")
         np.random.seed(0)
 
-    def test_generate_test_matrix(self):
+    def test_bootstrap_1level(self):
         n = 16
         kh = 0.5
 
         a = hm.linalg.helmholtz_1d_operator(kh, n)
-        x, multilevel = hm.bootstrap.generate_test_matrix(a, 2, num_sweeps=100)
+        x, multilevel = hm.bootstrap.generate_test_matrix(a, 0, num_sweeps=100)
 
-        assert x.shape == (16, 48)
+        assert x.shape == (16, 64)
 
         assert len(multilevel) == 2
 
@@ -37,8 +37,8 @@ class TestBootstrap:
 
         coarse_level = multilevel.level[1]
         assert coarse_level.a.shape == (8, 8)
-        assert coarse_level.r.shape == (8, 16)
-        assert coarse_level.p.shape == (16, 8)
+        assert coarse_level._r_csr.shape == (8, 16)
+        assert coarse_level._p_csr.shape == (16, 8)
         coarse_level.print()
 
     def test_run_1_level_relax(self):
@@ -57,6 +57,6 @@ class TestBootstrap:
         a = hm.linalg.helmholtz_1d_operator(kh, n)
         x, multilevel = hm.bootstrap.generate_test_matrix(a, 2, num_sweeps=10, num_examples=8)
 
-        relax_cycle = lambda x: multilevel.relax(x, 2, 2, 4)
+        relax_cycle = lambda x: multilevel.relax_cycle(x, 2, 2, 4)
         x, conv_factor = hm.multilevel.relax_test_matrix(multilevel.level[0].operator, relax_cycle, x, 100)
         assert conv_factor == pytest.approx(0.868, 1e-3)

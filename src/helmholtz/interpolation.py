@@ -40,16 +40,16 @@ class Interpolator:
         # Build P sparsity arrays for a single aggregate.
         nc = self._nc
         aggregate_size = len(self)
-        row = np.tile(np.arange(aggregate_size)[:, None], nc).flatten(),
-        col = np.concatenate([nbhr_i for nbhr_i in nbhr])
+        row = np.tile(np.arange(aggregate_size)[:, None], nc).flatten()
+        col = np.concatenate([nbhr_i for nbhr_i in self._nbhr])
 
         # Tile P of a single aggregate over the entire domain.
         tiled_row = np.concatenate([row + aggregate_size * ic for ic in range(n)])
         tiled_col = np.concatenate([col + nc * ic for ic in range(n)])
-        tiled_data = np.tile(self._data, n)
+        tiled_data = np.tile(self._data.flatten(), n)
         domain_size = aggregate_size * n
         return scipy.sparse.coo_matrix((tiled_data, (tiled_row, tiled_col)),
-                                       shape=(domain_size, nc * num_aggregates)).tocsr()
+                                       shape=(domain_size, nc * n)).tocsr()
 
 
 def create_interpolation(method: str, r: np.ndarray, x_aggregate_t: np.ndarray, xc_t: np.ndarray, domain_size: int,
@@ -69,9 +69,10 @@ def create_interpolation(method: str, r: np.ndarray, x_aggregate_t: np.ndarray, 
     Returns:
         interpolation object.
     """
-    if kind == "svd":
-        return hm.interpolator.Interpolator(np.tile(np.arange(nc, dtype=int), x_aggregate_t.shape[1]), r.flatten())
-    elif kind == "ls":
+    if method == "svd":
+        return Interpolator(np.tile(np.arange(nc, dtype=int)[:, None], x_aggregate_t.shape[1]).transpose(),
+                            r.transpose(), nc)
+    elif method == "ls":
         return _create_interpolation_ls(x_aggregate_t, xc_t, domain_size, nc, caliber)
     else:
         raise Exception("Unsupported interpolation method '{}'".format(method))
