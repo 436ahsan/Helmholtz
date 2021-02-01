@@ -64,22 +64,24 @@ class Multilevel:
 
 class Level:
     """A single level in the multilevel hierarchy."""
-    def __init__(self, a, r=None, p=None):
+    def __init__(self, a, r=None, p=None, r_csr=None, p_csr=None):
         self.a = a
         self.r = r
         self.p = p
+        self._r_csr = r_csr
+        self._p_csr = p_csr
         self._relaxer = hm.kaczmarz.KaczmarzRelaxer(a)
 
     def print(self):
         _LOGGER.info("a = \n" + str(self.a.toarray()))
         if self.r is not None:
-            _LOGGER.info("r = \n" + str(self.r.toarray()))
+            _LOGGER.info("r = \n" + str(r))
         if self.p is not None:
-            _LOGGER.info("p = \n" + str(self.p.toarray()))
+            _LOGGER.info("p = \n" + str(p))
 
     def operator(self, x: np.array) -> np.array:
         """
-        Returns the operator action A*x..
+        Returns the operator action A*x.
         Args:
             x: vector of size n or a matrix of size n x m, where A is n x n.
 
@@ -99,6 +101,28 @@ class Level:
             x after relaxation.
         """
         return self._relaxer.step(x, b)
+
+    def restrict(self, x: np.array) -> np.array:
+        """
+        Returns the restriction action R*x.
+        Args:
+            x: vector of size n or a matrix of size n x m.
+
+        Returns:
+            x^c = R*x.
+        """
+        return self._r_csr.dot(x)
+
+    def restrict(self, xc: np.array) -> np.array:
+        """
+        Returns the interpolation action R*x.
+        Args:
+            xc: vector of size n or a matrix of size nc x m.
+
+        Returns:
+            x = P*x^c.
+        """
+        return self._p_csr.dot(xc)
 
 
 def relax_test_matrix(operator, method, e: np.ndarray, num_sweeps: int = 30, print_frequency: int = None) -> np.ndarray:

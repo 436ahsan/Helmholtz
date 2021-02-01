@@ -41,7 +41,7 @@ def sparse_circulant(vals: np.array, offsets: np.array, n: int) -> scipy.sparse.
     return scipy.sparse.diags(dupvals, dupoffsets, shape=(n, n))
 
 
-def periodic_tile(a: scipy.sparse.csr_matrix, n: int) -> scipy.sparse.csr_matrix:
+def tile_csr_matrix(a: scipy.sparse.csr_matrix, n: int) -> scipy.sparse.csr_matrix:
     """
     Tiles the periodic B.C. operator on a n-times larger domain.
 
@@ -67,7 +67,7 @@ def periodic_tile(a: scipy.sparse.csr_matrix, n: int) -> scipy.sparse.csr_matrix
     return scipy.sparse.coo_matrix((tiled_data, (tiled_row, tiled_col)), shape=(n * n_row, n * n_col)).tocsr()
 
 
-def tile_dense(r: np.ndarray, n: int) -> scipy.sparse.csr_matrix:
+def tile_array(r: np.ndarray, n: int) -> scipy.sparse.csr_matrix:
     """
     Tiles a dense matrix (e.g., the restriction R over an aggregate) over a domain of non-overlapping aggregates.
     Args:
