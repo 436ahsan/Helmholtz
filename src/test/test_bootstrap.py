@@ -55,8 +55,8 @@ class TestBootstrap:
         n = 16
         kh = 0.5
         a = hm.linalg.helmholtz_1d_operator(kh, n)
-        x, multilevel = hm.bootstrap.generate_test_matrix(a, 2, num_sweeps=10, num_examples=8)
+        x, multilevel = hm.bootstrap.generate_test_matrix(a, 0, num_sweeps=10, num_examples=8)
 
         relax_cycle = lambda x: multilevel.relax_cycle(x, 2, 2, 4)
         x, conv_factor = hm.multilevel.relax_test_matrix(multilevel.level[0].operator, relax_cycle, x, 100)
-        assert conv_factor == pytest.approx(0.868, 1e-3)
+        assert conv_factor == pytest.approx(0.879, 1e-3)

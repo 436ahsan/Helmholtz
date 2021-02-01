@@ -50,12 +50,12 @@ class Multilevel:
             if level_ind < len(self) - 1:
                 coarse_level = self.level[level_ind + 1]
                 # Full Approximation Scheme (FAS).
-                xc_initial = coarse_level.r.dot(x)
-                bc = coarse_level.r.dot(b - level.operator(x)) + coarse_level.operator(xc_initial)
+                xc_initial = coarse_level.restrict(x)
+                bc = coarse_level.restrict(b - level.operator(x)) + coarse_level.operator(xc_initial)
                 #xc = np.zeros((coarse_level.r.shape[0], x.shape[1]))
                 #xc = coarse_level.r.dot(x)
-                xc = self._relax_cycle(level_ind + 1, xc, nu_pre, nu_post, nu_coarsest, bc)
-                x += coarse_level.p.dot(xc - xc_initial)
+                xc = self._relax_cycle(level_ind + 1, xc_initial, nu_pre, nu_post, nu_coarsest, bc)
+                x += coarse_level.interpolate(xc - xc_initial)
 
             for _ in range(nu_post):
                 x = level.relax(x, b)
