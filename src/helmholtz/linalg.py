@@ -20,6 +20,22 @@ def scaled_norm(e: np.ndarray) -> float:
     return norm(e) / np.prod(e.shape) ** 0.5
 
 
+def scaled_norm_of_matrix(e: np.ndarray) -> float:
+    """
+    Returns the scaled L2 norm of each test function e in a test matrix:
+
+     [ sum(e[i1,...,id] ** 2 for all (i1,...,id)) / np.prod(e.shape) ] ** 0.5
+
+    Args:
+        e: test matrix, where e.shape[d] = #gridpoints in dimension d and e.shape[num_dims] = #test functions.
+
+    Returns:
+        The scaled L2 norm of e.
+    """
+    num_dims = e.ndim - 1
+    return norm(e, axis=tuple(range(num_dims))) / np.prod(e.shape[:num_dims]) ** 0.5
+
+
 def sparse_circulant(vals: np.array, offsets: np.array, n: int) -> scipy.sparse.dia_matrix:
     """
     Creates a sparse square circulant matrix from a stencil.

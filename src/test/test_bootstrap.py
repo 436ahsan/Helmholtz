@@ -49,6 +49,9 @@ class TestBootstrap:
         x = hm.multilevel.random_test_matrix((n,))
         b = np.zeros_like(x)
         x, conv_factor = hm.multilevel.relax_test_matrix(level.operator, lambda x: level.relax(x, b), x, 100)
+        print(hm.linalg.scaled_norm_of_matrix(a.dot(x)) / hm.linalg.scaled_norm_of_matrix(x))
+        #assert hm.linalg.scaled_norm_of_matrix(x).mean() == pytest.approx(0.028129, 1e-3)
+
         assert conv_factor == pytest.approx(0.995, 1e-3)
 
     def test_2_level_relax_cycle_faster_than_1_level(self):
@@ -60,4 +63,17 @@ class TestBootstrap:
         relax_cycle = lambda x: multilevel.relax_cycle(x, 2, 2, 4)
         x, conv_factor = hm.multilevel.relax_test_matrix(multilevel.level[0].operator, relax_cycle, x, 100)
 
+        print(hm.linalg.scaled_norm_of_matrix(a.dot(x)) / hm.linalg.scaled_norm_of_matrix(x))
         assert conv_factor == pytest.approx(0.879, 1e-3)
+
+    def test_2_level_bootstrap_improves_2_level_convergence(self):
+        n = 16
+        kh = 0.5
+        a = hm.linalg.helmholtz_1d_operator(kh, n)
+        x, multilevel = hm.bootstrap.generate_test_matrix(a, 0, num_sweeps=10, num_examples=8, num_bootstrap_steps=2)
+
+        relax_cycle = lambda x: multilevel.relax_cycle(x, 2, 2, 4)
+        x, conv_factor = hm.multilevel.relax_test_matrix(multilevel.level[0].operator, relax_cycle, x, 100)
+
+        print(hm.linalg.scaled_norm_of_matrix(a.dot(x)) / hm.linalg.scaled_norm_of_matrix(x))
+        assert conv_factor == pytest.approx(0.735, 1e-3)
