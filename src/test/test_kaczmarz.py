@@ -1,8 +1,9 @@
 import numpy as np
-import helmholtz as hm
-import unittest
-from numpy.ma.testutils import assert_array_almost_equal
+import scipy.sparse
 from numpy.linalg import norm
+from numpy.ma.testutils import assert_array_almost_equal
+
+import helmholtz as hm
 
 
 class TestKaczmarz:
@@ -13,7 +14,7 @@ class TestKaczmarz:
         n = 16
         kh = 0.5
         a = hm.linalg.helmholtz_1d_operator(kh, n)
-        relaxer = hm.kaczmarz.KaczmarzRelaxer(a)
+        relaxer = hm.relax.KaczmarzRelaxer(a, scipy.sparse.eye(a.shape[0]))
 
         x = np.random.random((n, 5))
         b = np.zeros_like(x)

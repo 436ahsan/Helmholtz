@@ -3,6 +3,7 @@ import logging
 from typing import Tuple
 
 import numpy as np
+import scipy.sparse
 from numpy.linalg import norm
 
 import helmholtz as hm
@@ -34,15 +35,21 @@ class Multilevel:
             x after the cycle.
         """
         # TODO(orenlivne): replace by a general-cycle-index, non-recursive loop.
-        return self._relax_cycle(0, x, nu_pre, nu_post, nu_coarsest, np.zeros_like(x))
+        return self._relax_cycle(0, x, np.ones(x.shape[1], ), nu_pre, nu_post, nu_coarsest, np.zeros_like(x))
 
-    def _relax_cycle(self, level_ind: int, x: np.array, nu_pre: int, nu_post: int, nu_coarsest: int, b: np.ndarray) -> \
-            np.array:
+    def _relax_cycle(self, level_ind: int, x: np.array, sigma: float,
+                     nu_pre: int, nu_post: int, nu_coarsest: int, b: np.ndarray) -> np.array:
         level = self.level[level_ind]
         if level_ind == len(self) - 1:
             # Coarsest level.
             for _ in range(nu_coarsest):
                 x = level.relax(x, b)
+                # TODO(orenlivne): update lambda + normalize only once per several relaxations.
+                eta = level.normalization(x)
+                for i in range(x.shape[1]):
+                    x[:, i] *= (sigma[i] / eta[i]) ** 0.5
+#                level.global_params.lam = level.rq(x[:, 0])
+                level.global_params.lam = np.mean([level.rq(x[:, i]) for i in range(x.shape[1])])
         else:
             for _ in range(nu_pre):
                 x = level.relax(x, b)
@@ -52,40 +59,49 @@ class Multilevel:
                 # Full Approximation Scheme (FAS).
                 xc_initial = coarse_level.restrict(x)
                 bc = coarse_level.restrict(b - level.operator(x)) + coarse_level.operator(xc_initial)
-                #xc = np.zeros((coarse_level.r.shape[0], x.shape[1]))
-                #xc = coarse_level.r.dot(x)
-                xc = self._relax_cycle(level_ind + 1, xc_initial, nu_pre, nu_post, nu_coarsest, bc)
+                sigma_c = sigma - level.normalization(x) + coarse_level.normalization(xc_initial)
+                xc = self._relax_cycle(level_ind + 1, xc_initial, sigma_c, nu_pre, nu_post, nu_coarsest, bc)
                 x += coarse_level.interpolate(xc - xc_initial)
 
             for _ in range(nu_post):
                 x = level.relax(x, b)
-
         return x
+
+
+class GlobalParams:
+    """Parameters shared by all levels of the multilevel hierarchy."""
+
+    def __init__(self):
+        # Eigenvalue.
+        self.lam = 0
 
 
 class Level:
     """A single level in the multilevel hierarchy."""
 
-    def __init__(self, a, r, p, r_csr, p_csr):
+    def __init__(self, a, b, global_params, r, p, r_csr, p_csr):
         self.a = a
+        self.b = b
         self.r = r
         self.p = p
+        self.global_params = global_params
         self._r_csr = r_csr
         self._p_csr = p_csr
-        self._relaxer = hm.kaczmarz.KaczmarzRelaxer(a)
+        self._relaxer = hm.relax.KaczmarzRelaxer(a, b)
 
     @staticmethod
     def create_finest_level(a):
-        return Level(a, None, None, None, None)
+        return Level(a, scipy.sparse.eye(a.shape[0]), GlobalParams(), None, None, None, None)
 
     @staticmethod
-    def create_coarse_level(a, r, p):
+    def create_coarse_level(a, b, global_params, r, p):
         num_aggregates = a.shape[0] // r.asarray().shape[1]
         r_csr = r.tile(num_aggregates)
         p_csr = p.tile(num_aggregates)
         # Form Galerkin coarse-level operator.
         ac = (r_csr.dot(a)).dot(p_csr)
-        return Level(ac, r, p, r_csr, p_csr)
+        bc = (r_csr.dot(b)).dot(p_csr)
+        return Level(ac, bc, global_params, r, p, r_csr, p_csr)
 
     def print(self):
         _LOGGER.info("a = \n" + str(self.a.toarray()))
@@ -94,7 +110,7 @@ class Level:
         if self.p is not None:
             _LOGGER.info("p = \n" + str(self.p))
 
-    def operator(self, x: np.array) -> np.array:
+    def stiffness_operator(self, x: np.array) -> np.array:
         """
         Returns the operator action A*x.
         Args:
@@ -104,6 +120,50 @@ class Level:
             A*x.
         """
         return self.a.dot(x)
+
+    def mass_operator(self, x: np.array) -> np.array:
+        """
+        Returns the operator action B*x.
+        Args:
+            x: vector of size n or a matrix of size n x m, where B is n x n.
+
+        Returns:
+            B*x.
+        """
+        return self.b.dot(x)
+
+    def operator(self, x: np.array) -> np.array:
+        """
+        Returns the operator action (A-lam*B)*x. lam is the global eigenvalue value in level.global_params.
+        Args:
+            x: vector of size n or a matrix of size n x m, where A, B are n x n.
+
+        Returns:
+            (A-B*lam)*x.
+        """
+        return self.a.dot(x) - self.global_params.lam * self.b.dot(x)
+
+    def normalization(self, x: np.array) -> np.array:
+        """
+        Returns the eigen-normalization functional (Bx, x).
+        Args:
+            x: vector of size n or a matrix of size n x m, where A, B are n x n.
+
+        Returns:
+           (Bx, x) for each column of x.
+        """
+        return np.array([(self.b.dot(x[:, i])).dot(x[:, i]) for i in range(x.shape[1])])
+
+    def rq(self, x: np.array) -> np.array:
+        """
+        Returns the Rayleigh Quotient of x.
+        Args:
+            x: vector of size n or a matrix of size n x m, where A, B are n x n.
+
+        Returns:
+           (Ax, x) / (Bx, x)
+        """
+        return (self.a.dot(x)).dot(x) / (self.b.dot(x)).dot(x)
 
     def relax(self, x: np.array, b: np.array) -> np.array:
         """
@@ -115,7 +175,7 @@ class Level:
         Returns:
             x after relaxation.
         """
-        return self._relaxer.step(x, b)
+        return self._relaxer.step(x, b, lam=self.global_params.lam)
 
     def restrict(self, x: np.array) -> np.array:
         """
@@ -140,12 +200,14 @@ class Level:
         return self._p_csr.dot(xc)
 
 
-def relax_test_matrix(operator, method, x: np.ndarray, num_sweeps: int = 30, print_frequency: int = None) -> np.ndarray:
+def relax_test_matrix(operator, rq, method, x: np.ndarray, num_sweeps: int = 30, print_frequency: int = None) \
+        -> np.ndarray:
     """
     Creates test functions (functions that approximately satisfy A*x=0) using single level relaxation.
 
     Args:
         operator: an object that can calculate residuals (action A*x).
+        rq: Rayleigh-quotient functor.
         method: iterative method functor (an iteration is a call to this method).
         x: test matrix initial approximation to the test functions.
         num_sweeps: number of sweeps to execute.
@@ -159,19 +221,25 @@ def relax_test_matrix(operator, method, x: np.ndarray, num_sweeps: int = 30, pri
     x0 = x[:, 0]
     x_norm = scaled_norm(x0)
     r_norm = scaled_norm(operator(x0))
-    _LOGGER.debug("{:5d} |e| {:.8e} |r| {:.8e} ratio {:.3f}".format(0, x_norm, r_norm, r_norm / x_norm))
+    lam = rq(x0)
+    lam_error = 1
+    _LOGGER.debug("{:5d} |e| {:.8e} |r| {:.8e} lam {:.5f}".format(0, x_norm, r_norm, lam))
     # Run 'num_sweeps' relaxation sweeps.
     if print_frequency is None:
         print_frequency = num_sweeps // 10
     for i in range(1, num_sweeps + 1):
         r_norm_old = r_norm
+        lam_old = lam
+        lam_error_old = lam_error
         x = method(x)
         x0 = x[:, 0]
         x_norm = scaled_norm(x0)
         r_norm = scaled_norm(operator(x0))
+        lam = rq(x0)
+        lam_error = np.abs(lam - lam_old)
         if i % print_frequency == 0:
-            _LOGGER.debug("{:5d} |e| {:.8e} |r| {:.8e} ratio {:.3f} ({:.5f})".format(
-                i, scaled_norm(x0), r_norm, r_norm / x_norm, r_norm / r_norm_old))
+            _LOGGER.debug("{:5d} |e| {:.8e} |r| {:.8e} lam {:.5f} ({:.5f})".format(
+                i, scaled_norm(x0), r_norm, lam, lam_error / lam_error_old))
     # Scale x to unit norm, as we are calculating eigenvectors.
     x /= norm(x)
     return x, r_norm / r_norm_old

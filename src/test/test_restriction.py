@@ -2,9 +2,6 @@ import logging
 import sys
 
 import numpy as np
-import pytest
-import sklearn.metrics.pairwise
-from numpy.ma.testutils import assert_array_almost_equal
 
 import helmholtz as hm
 
@@ -21,7 +18,7 @@ class TestRestriction:
                             datefmt="%a, %d %b %Y %H:%M:%S")
         np.random.seed(0)
 
-    def test_resrtriction(self):
+    def test_restriction(self):
         n = 32
         kh = 0.6
         nc = 1

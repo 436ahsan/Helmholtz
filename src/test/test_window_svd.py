@@ -1,8 +1,6 @@
-import numpy as np
+import scipy.sparse
+
 import helmholtz as hm
-import unittest
-from numpy.ma.testutils import assert_array_almost_equal
-from numpy.linalg import norm
 
 
 class TestWindowSvd:
@@ -12,7 +10,7 @@ class TestWindowSvd:
         kh = 0.5
         window_shape = (n, )
         a = hm.linalg.helmholtz_1d_operator(kh, n)
-        relaxer = hm.kaczmarz.KaczmarzRelaxer(a)
+        relaxer = hm.relax.KaczmarzRelaxer(a, scipy.sparse.eye(a.shape[0]))
 
         s, vh = hm.window_svd.get_window_svd(a, window_shape, num_sweeps=1000)
 

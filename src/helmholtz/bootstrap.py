@@ -90,8 +90,7 @@ def bootstap(x, multilevel: hm.multilevel.Multilevel, aggregate_size: int = 4, n
     else:
         def relax_cycle(x):
             return multilevel.relax_cycle(x, 2, 2, 4)
-#    relax_cycle = lambda x: multilevel.relax(x, 2, 2, 4) if num_levels > 1 else lambda x: level.relax(x, b)
-    x, _ = hm.multilevel.relax_test_matrix(level.operator, relax_cycle, x, num_sweeps)
+    x, _ = hm.multilevel.relax_test_matrix(level.operator, level.rq, relax_cycle, x, num_sweeps)
 
     # Recreate all coarse levels. One down-pass, relaxing at each level, hopefully starting from improved x so the
     # process improves all levels.
@@ -107,13 +106,12 @@ def bootstap(x, multilevel: hm.multilevel.Multilevel, aggregate_size: int = 4, n
                                          aggregate_size=aggregate_size, threshold=threshold, caliber=caliber,
                                          interpolation_method=interpolation_method)
         # 'level' now becomes the next coarser level and x_level the corresponding test matrix.
-        level = hm.multilevel.Level.create_coarse_level(level.a, r, p)
+        level = hm.multilevel.Level.create_coarse_level(level.a, level.b, level.global_params, r, p)
         new_multilevel.level.append(level)
         x_level = level.restrict(x_level)
         b = np.zeros_like(x_level)
-        x_level, _ = hm.multilevel.relax_test_matrix(
-            level.operator, lambda x: level.relax(x, b), x_level, num_sweeps=num_sweeps,
-            print_frequency=print_frequency)
+        x_level, _ = hm.multilevel.relax_test_matrix(level.operator, level.rq, lambda x: level.relax(x, b), x_level,
+                                                     num_sweeps=num_sweeps, print_frequency=print_frequency)
 
     return x, new_multilevel
 
