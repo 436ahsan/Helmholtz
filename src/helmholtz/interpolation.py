@@ -96,7 +96,7 @@ def _create_interpolation_ls(x_aggregate_t: np.ndarray, xc_t: np.ndarray, domain
         x_aggregate_t, xc=xc_t, nbhr=nbhr,
         fit_samples=num_examples // 3, val_samples=num_examples // 3, test_samples=num_examples // 3)
     error, alpha_opt = fitter.optimized_relative_error(caliber, alpha, return_weights=True)
-    print("Interpolation error", error[:, 1])
+    # Interpolation validation error = error[:, 1]
     data = np.concatenate([pi for pi in error[:, 2:]])
     return hm.interpolator.Interpolator(nbhr, data, nc)
 
@@ -133,7 +133,7 @@ def _geometric_neighbors(w: int, nc: int):
         # coarse_nbhrs = np.union1d(aggregate_coarse_vars[center_aggregate], aggregate_coarse_vars[nbhr_aggregate])
         # Use center aggregate only.
         coarse_nbhrs = aggregate_coarse_vars[center_aggregate]
-        print(fine_var, center_aggregate, nbhr_aggregate, coarse_nbhrs)
+        #print(fine_var, center_aggregate, nbhr_aggregate, coarse_nbhrs)
         nbhr[fine_var] = coarse_nbhrs
     return nbhr
 

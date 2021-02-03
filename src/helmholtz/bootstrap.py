@@ -88,7 +88,7 @@ def bootstap(x, multilevel: hm.multilevel.Multilevel, max_levels: int, aggregate
     # TODO(orenlivne): update parameters of relaxation cycle to reasonable values if needed.
     if len(multilevel) == 1:
         def relax_cycle(x):
-            return level.relax(x, b)
+            return multilevel.relax_cycle(x, None, None, 5)
     else:
         def relax_cycle(x):
             return multilevel.relax_cycle(x, 2, 2, 4)
