@@ -43,7 +43,7 @@ class Multilevel:
             _LOGGER.debug("-" * 80)
         sigma = np.ones(x.shape[1], )
         b = np.zeros_like(x)
-        x = self._relax_cycle(finest_level_ind, x, sigma, nu_pre, nu_post, nu_coarsest, b, debug, False)
+        x = self._relax_cycle(finest_level_ind, x, sigma, nu_pre, nu_post, nu_coarsest, b, debug, update_lam)
         if update_lam == "finest":
             x = self._update_global_constraints(x, sigma, b, self.level[finest_level_ind])
         return x
@@ -239,7 +239,7 @@ class Level:
 
 
 def relax_test_matrix(operator, rq, method, x: np.ndarray, num_sweeps: int = 30, print_frequency: int = None,
-                      residual_stop_value: float = 1e-10, lam_stop_value: float = 1e-14) \
+                      residual_stop_value: float = 1e-10, lam_stop_value: float = 1e-15) \
         -> np.ndarray:
     """
     Creates test functions (functions that approximately satisfy A*x=0) using single level relaxation.
