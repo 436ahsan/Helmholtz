@@ -37,6 +37,8 @@ class KaczmarzRelaxer:
             x after relaxation.
         """
         r = b - self._a.dot(x) + lam * self._b.dot(x)
+        # TODO(orenlivne): determine if it is better to do 3 tril solves and add them up instead of adding up the
+        # matrices and doing one as done here.
         delta = scipy.sparse.linalg.spsolve(self._ma - lam * self._m_cross + lam ** 2 * self._mb, r)
         if delta.ndim < x.ndim:
             delta = delta[:, None]

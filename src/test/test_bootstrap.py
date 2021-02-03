@@ -16,8 +16,7 @@ class TestBootstrap:
         """Fixed random seed for deterministic results."""
         np.set_printoptions(precision=6, linewidth=1000)
         for handler in logging.root.handlers[:]: logging.root.removeHandler(handler)
-        logging.basicConfig(stream=sys.stdout, level=logging.DEBUG, format="%(levelname)-8s %(message)s",
-                            datefmt="%a, %d %b %Y %H:%M:%S")
+        logging.basicConfig(stream=sys.stdout, level=logging.DEBUG, format="%(message)s")
         np.random.seed(0)
 
     def test_bootstrap_1level(self):
@@ -78,14 +77,21 @@ class TestBootstrap:
         kh = 0.5
         a = hm.linalg.helmholtz_1d_operator(kh, n)
         x, multilevel = hm.bootstrap.generate_test_matrix(a, 0, num_sweeps=10, num_examples=8, num_bootstrap_steps=2)
+        assert len(multilevel) == 2
 
-        relax_cycle = lambda x: multilevel.relax_cycle(x, 2, 2, 4)
+        relax_cycle = lambda x: multilevel.relax_cycle(x, 1, 1, 100, debug=False, update_lam=False)
         level = multilevel.level[0]
-        x, conv_factor = hm.multilevel.relax_test_matrix(level.operator, level.rq, relax_cycle, x, 10)
+#        x = hm.multilevel.random_test_matrix((n,))
+        x = x[:, 0][:, None]
 
-        #print(hm.linalg.scaled_norm_of_matrix(a.dot(x)) / hm.linalg.scaled_norm_of_matrix(x))
-        assert level.global_params.lam == pytest.approx(0.097481, 1e-3)
+        import scipy.linalg
+        level.global_params.lam = np.sort(np.real(scipy.linalg.eig(a.toarray())[0]))[-2]
+        print("exact lam", level.global_params.lam)
+
+        x, conv_factor = hm.multilevel.relax_test_matrix(level.operator, level.rq, relax_cycle, x, 20, print_frequency=1)
+
+        assert level.global_params.lam == pytest.approx(0.0977590650225, 1e-3)
         assert np.mean([level.rq(x[:, i]) for i in range(x.shape[1])]) == pytest.approx(0.097759, 1e-3)
         # TODO(orenlivne): measure convergence factor differrently - how fast we converge to the eigenvalue seems to
         # be noisy.
-#        assert conv_factor == pytest.approx(0.735, 1e-3)
+        assert conv_factor == pytest.approx(0.735, 1e-3)

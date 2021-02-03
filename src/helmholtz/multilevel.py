@@ -4,6 +4,7 @@ from typing import Tuple
 
 import numpy as np
 import scipy.sparse
+import scipy.sparse.linalg
 from numpy.linalg import norm
 
 import helmholtz as hm
@@ -21,7 +22,8 @@ class Multilevel:
     def __len__(self):
         return len(self.level)
 
-    def relax_cycle(self, x: np.array, nu_pre: int, nu_post: int, nu_coarsest: int) -> np.array:
+    def relax_cycle(self, x: np.array, nu_pre: int, nu_post: int, nu_coarsest: int, debug: bool = False,
+                    update_lam=True) -> np.array:
         """
         Executes a relaxation V(nu_pre, nu_post) -cycle on A*x = 0.
 
@@ -30,41 +32,57 @@ class Multilevel:
             nu_pre: number of relaxation sweeps at a level before visiting coarser levels.
             nu_post: number of relaxation sweeps at a level after visiting coarser levels.
             nu_coarsest: number of relaxation sweeps to run at the coarsest level.
+            debug: print logging debugging printouts or not.
 
         Returns:
             x after the cycle.
         """
-        # TODO(orenlivne): replace by a general-cycle-index, non-recursive loop.
-        return self._relax_cycle(0, x, np.ones(x.shape[1], ), nu_pre, nu_post, nu_coarsest, np.zeros_like(x))
+        # TODO(orenlivne): replace by a general-cycle-index, non-recursive loop. Move relaxation, transfers logic
+        # to a processor separate from the cycle.
+        if debug:
+            _LOGGER.debug("-" * 80)
+        return self._relax_cycle(0, x, np.ones(x.shape[1], ), nu_pre, nu_post, nu_coarsest, np.zeros_like(x), debug,
+                                 update_lam)
 
     def _relax_cycle(self, level_ind: int, x: np.array, sigma: float,
-                     nu_pre: int, nu_post: int, nu_coarsest: int, b: np.ndarray) -> np.array:
+                     nu_pre: int, nu_post: int, nu_coarsest: int, b: np.ndarray, debug: bool, update_lam) -> np.array:
         level = self.level[level_ind]
+        def print_state(title):
+            if debug:
+                _LOGGER.debug("{:2d} {:<15} {:.4e} {:.4e}".format(
+                    level_ind, title, scaled_norm(b[:, 0] - level.operator(x[:, 0])),
+                    np.abs(sigma - level.normalization(x))[0]))
+
+        print_state("initial")
         if level_ind == len(self) - 1:
             # Coarsest level.
             for _ in range(nu_coarsest):
-                x = level.relax(x, b)
-                # TODO(orenlivne): update lambda + normalize only once per several relaxations.
+                for _ in range(1):
+                    x = level.relax(x, b)
+                #x = scipy.sparse.linalg.spsolve(level.a - level.global_params.lam * level.b, b)
+
+                # Update lambda + normalize only once per several relaxations.
                 eta = level.normalization(x)
                 for i in range(x.shape[1]):
                     x[:, i] *= (sigma[i] / eta[i]) ** 0.5
-#                level.global_params.lam = level.rq(x[:, 0])
-                level.global_params.lam = np.mean([level.rq(x[:, i]) for i in range(x.shape[1])])
+                if update_lam:
+                    level.global_params.lam = np.mean([level.rq(x[:, i], b) for i in range(x.shape[1])])
+            print_state("coarsest ({})".format(nu_coarsest))
         else:
-            for _ in range(nu_pre):
-                x = level.relax(x, b)
-
+            print_state("relax {}".format(nu_pre))
             if level_ind < len(self) - 1:
                 coarse_level = self.level[level_ind + 1]
                 # Full Approximation Scheme (FAS).
                 xc_initial = coarse_level.restrict(x)
                 bc = coarse_level.restrict(b - level.operator(x)) + coarse_level.operator(xc_initial)
                 sigma_c = sigma - level.normalization(x) + coarse_level.normalization(xc_initial)
-                xc = self._relax_cycle(level_ind + 1, xc_initial, sigma_c, nu_pre, nu_post, nu_coarsest, bc)
+                xc = self._relax_cycle(level_ind + 1, xc_initial, sigma_c, nu_pre, nu_post, nu_coarsest, bc, debug, update_lam)
                 x += coarse_level.interpolate(xc - xc_initial)
+                print_state("correction {}".format(nu_pre))
 
             for _ in range(nu_post):
                 x = level.relax(x, b)
+            print_state("relax {}".format(nu_post))
         return x
 
 
@@ -154,16 +172,20 @@ class Level:
         """
         return np.array([(self.b.dot(x[:, i])).dot(x[:, i]) for i in range(x.shape[1])])
 
-    def rq(self, x: np.array) -> np.array:
+    def rq(self, x: np.array, b: np.array = None) -> np.array:
         """
         Returns the Rayleigh Quotient of x.
         Args:
             x: vector of size n or a matrix of size n x m, where A, B are n x n.
+            b: RHS vector, for FAS coarse problems.
 
         Returns:
-           (Ax, x) / (Bx, x)
+           (Ax, x) / (Bx, x) or ((Ax - b), x) / (Bx, x) if b is not None.
         """
-        return (self.a.dot(x)).dot(x) / (self.b.dot(x)).dot(x)
+        if b is None:
+            return (self.a.dot(x)).dot(x) / (self.b.dot(x)).dot(x)
+        else:
+            return (self.a.dot(x) - b).dot(x) / (self.b.dot(x)).dot(x)
 
     def relax(self, x: np.array, b: np.array) -> np.array:
         """

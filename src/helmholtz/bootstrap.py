@@ -41,26 +41,29 @@ def generate_test_matrix(a: scipy.sparse.spmatrix, num_growth_steps: int, growth
     domain_shape = (a.shape[0], )
     x = hm.multilevel.random_test_matrix(domain_shape, num_examples=num_examples)
     # Bootstrap at the current level.
+    max_levels = 2
     for i in range(num_bootstrap_steps):
         x, multilevel = bootstap(
-            x, multilevel, aggregate_size=aggregate_size, num_sweeps=num_sweeps, num_examples=num_examples,
+            x, multilevel, max_levels, aggregate_size=aggregate_size, num_sweeps=num_sweeps, num_examples=num_examples,
             print_frequency=print_frequency)
 
     for l in range(num_growth_steps):
-        _LOGGER.info("Growing domain to level {}, size {}".format(l, growth_factor * x.shape[0]))
+        _LOGGER.info("Growing domain to level {}, size {}, max_levels {}".format(
+            l, growth_factor * x.shape[0], max_levels))
         # Tile solution and hierarchy on the twice larger domain.
         x = hm.linalg.tile_matrix(x, growth_factor)
         multilevel = multilevel.tile_csr_matrix(growth_factor)
         # Bootstrap at the current level.
         for i in range(num_bootstrap_steps):
             x, multilevel = bootstap(
-                x, multilevel, aggregate_size=aggregate_size, num_sweeps=num_sweeps, num_examples=num_examples,
-                print_frequency=print_frequency)
+                x, multilevel, max_levels, aggregate_size=aggregate_size, num_sweeps=num_sweeps,
+                num_examples=num_examples, print_frequency=print_frequency)
+        max_levels += 1
 
     return x, multilevel
 
 
-def bootstap(x, multilevel: hm.multilevel.Multilevel, aggregate_size: int = 4, num_sweeps: int = 10,
+def bootstap(x, multilevel: hm.multilevel.Multilevel, max_levels: int, aggregate_size: int = 4, num_sweeps: int = 10,
              threshold: float = 0.1, caliber: int = 2, interpolation_method: str = "svd",
              num_examples: int = None, print_frequency: int = None) -> \
         Tuple[np.ndarray, hm.multilevel.Multilevel]:
@@ -81,10 +84,9 @@ def bootstap(x, multilevel: hm.multilevel.Multilevel, aggregate_size: int = 4, n
     """
     # At the finest level, use the current multilevel hierarchy to run 'num_sweeps' cycles to improve x.
     level = multilevel.level[0]
-    num_levels = len(multilevel)
     b = np.zeros_like(x)
     # TODO(orenlivne): update parameters of relaxation cycle to reasonable values if needed.
-    if num_levels == 1:
+    if len(multilevel) == 1:
         def relax_cycle(x):
             return level.relax(x, b)
     else:
@@ -99,7 +101,7 @@ def bootstap(x, multilevel: hm.multilevel.Multilevel, aggregate_size: int = 4, n
     new_multilevel.level.append(level)
     # Keep the x's of coarser levels in x_level; keep 'x' pointing to the finest test matrix.
     x_level = x
-    for l in range(1, num_levels + 1):
+    for l in range(1, max_levels):
         _LOGGER.info("Coarsening level {}->{}".format(l - 1, l))
         domain_size = level.a.shape[0]
         r, p = create_transfer_operators(x_level, domain_size,
