@@ -71,7 +71,7 @@ class TestBootstrap:
         level = multilevel.level[0]
 
         # Convergence speed test.
-        relax_cycle = lambda x: multilevel.relax_cycle(x, 1, 1, 100, debug=False, update_lam="finest")
+        relax_cycle = lambda x: multilevel.relax_cycle(x, 1, 1, 100, debug=False, update_lam="coarsest")
         # FMG start so (x, lambda) has a reasonable initial guess.
         x = hm.multilevel.random_test_matrix((n // 2,), num_examples=1)
         level.global_params.lam = 0
@@ -86,7 +86,7 @@ class TestBootstrap:
 
         assert level.global_params.lam == pytest.approx(0.0977590650225, 1e-3)
         assert np.mean([level.rq(x[:, i]) for i in range(x.shape[1])]) == pytest.approx(0.097759, 1e-3)
-        assert conv_factor == pytest.approx(0.45055035, 1e-2)
+        assert conv_factor == pytest.approx(0.46, 1e-2)
 
     def test_2_level_two_bootstrap_steps_same_speed_as_one(self):
         n = 16
@@ -98,12 +98,12 @@ class TestBootstrap:
         level = multilevel.level[0]
 
         # Convergence speed test.
-        relax_cycle = lambda x: multilevel.relax_cycle(x, 1, 1, 100, debug=False, update_lam="finest")
+        relax_cycle = lambda x: multilevel.relax_cycle(x, 1, 1, 100, debug=False, update_lam="coarsest")
         # FMG start so (x, lambda) has a reasonable initial guess.
         x = hm.multilevel.random_test_matrix((n // 2,), num_examples=1)
         level.global_params.lam = 0
         logger.debug("Level 1 lam {}".format(level.global_params.lam))
-        for _ in range(100):
+        for _ in range(1):
             x = multilevel.relax_cycle(x, None, None, 10, finest_level_ind=1)
         x = multilevel.level[1].interpolate(x)
         logger.debug("Level 0 lam {}".format(level.global_params.lam))
@@ -111,4 +111,4 @@ class TestBootstrap:
 
         assert level.global_params.lam == pytest.approx(0.0977590650225, 1e-3)
         assert np.mean([level.rq(x[:, i]) for i in range(x.shape[1])]) == pytest.approx(0.097759, 1e-3)
-        assert conv_factor == pytest.approx(0.46037, 1e-2)
+        assert conv_factor == pytest.approx(0.42, 1e-2)

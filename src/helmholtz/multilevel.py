@@ -286,8 +286,8 @@ def relax_test_matrix(operator, rq, method, x: np.ndarray, num_sweeps: int = 30,
             r_norm_history = r_norm_history[:i + 1]
             break
     #return x, r_norm / r_norm_old
-    # Average convergence factor over the last 5 steps.
-    last_steps = min(5, len(r_norm_history) - 1)
+    # Average convergence factor over the last 5 steps. Exclude first cycle.
+    last_steps = min(5, len(r_norm_history) - 2)
     return x, (r_norm_history[-1] / r_norm_history[-last_steps-1]) ** (1 / last_steps)
 
 
