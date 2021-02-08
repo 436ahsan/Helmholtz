@@ -10,7 +10,7 @@ from numpy.linalg import norm
 import helmholtz as hm
 from helmholtz.linalg import scaled_norm
 
-_LOGGER = logging.getLogger(__name__)
+_LOGGER = logging.getLogger("multilevel")
 
 
 class Multilevel:
@@ -22,9 +22,9 @@ class Multilevel:
     def __len__(self):
         return len(self.level)
 
-    def relax_cycle(self, x: np.array, nu_pre: int, nu_post: int, nu_coarsest: int, debug: bool = False,
-                    update_lam: str = "finest", finest_level_ind: int = 0, cycle_index: int = 1,
-                    max_levels: int = 10000) -> np.array:
+    def relax_cycle(self, x: np.array, nu_pre: int, nu_post: int, nu_coarsest: int,
+                    debug: bool = False, update_lam: str = "coarsest", finest_level_ind: int = 0, cycle_index: int = 1,
+                    max_levels: int = 10000, relax_coarsest: int = 5) -> np.array:
         """
         Executes a relaxation V(nu_pre, nu_post) -cycle on A*x = 0.
 
@@ -42,12 +42,14 @@ class Multilevel:
         # to a processor separate from the cycle.
         if debug:
             _LOGGER.debug("-" * 80)
+            _LOGGER.debug("{:<5}    {:<15}    {:<10}    {:<10}    {:<10}".format(
+                "Level", "Operation", "|R|", "|R_norm|", "lambda"))
         sigma = np.ones(x.shape[1], )
         b = np.zeros_like(x)
-        x = self._relax_cycle(finest_level_ind, x, sigma, nu_pre, nu_post, nu_coarsest, b, debug, update_lam,
-                              cycle_index, max_levels)
-        if update_lam == "finest":
-            x = self._update_global_constraints(x, sigma, b, self.level[finest_level_ind])
+        x = self._relax_cycle(finest_level_ind, x, sigma, nu_pre, nu_post, nu_coarsest, relax_coarsest,
+                              b, debug, update_lam, cycle_index, max_levels)
+        # if update_lam == "finest":
+        #     x = self._update_global_constraints(x, sigma, b, self.level[finest_level_ind])
         return x
 
     def _update_global_constraints(self, x, sigma, b, level):
@@ -67,21 +69,21 @@ class Multilevel:
         return x
 
     def _relax_cycle(self, level_ind: int, x: np.array, sigma: float,
-                     nu_pre: int, nu_post: int, nu_coarsest: int, b: np.ndarray, debug: bool,
+                     nu_pre: int, nu_post: int, nu_coarsest: int, relax_coarsest: int, b: np.ndarray, debug: bool,
                      update_lam: str, cycle_index: int, max_levels: int) -> np.array:
         level = self.level[level_ind]
 
         def print_state(title):
             if debug:
-                _LOGGER.debug("{:2d} {:<15} {:.4e} {:.4e}".format(
+                _LOGGER.debug("{:<5d}    {:<15}    {:.4e}    {:.4e}    {:.8f}".format(
                     level_ind, title, scaled_norm(b[:, 0] - level.operator(x[:, 0])),
-                    np.abs(sigma - level.normalization(x))[0]))
+                    np.abs(sigma - level.normalization(x))[0], level.global_params.lam))
 
         print_state("initial")
         if level_ind == min(len(self), max_levels) - 1:
             # Coarsest level.
             for _ in range(nu_coarsest):
-                for _ in range(1 if len(self) == 1 else 5):
+                for _ in range(relax_coarsest):
                     x = level.relax(x, b)
                 if update_lam == "coarsest":
                     # Update lambda + normalize only once per several relaxations if multilevel and updating lambda
@@ -89,7 +91,10 @@ class Multilevel:
                     x = self._update_global_constraints(x, sigma, b, level)
             print_state("coarsest ({})".format(nu_coarsest))
         else:
-            print_state("relax {}".format(nu_pre))
+            if nu_pre > 0:
+                for _ in range(nu_pre):
+                    x = level.relax(x, b)
+                print_state("relax {}".format(nu_pre))
             if level_ind < len(self) - 1:
                 coarse_level = self.level[level_ind + 1]
                 # Full Approximation Scheme (FAS).
@@ -97,14 +102,16 @@ class Multilevel:
                 bc = coarse_level.restrict(b - level.operator(x)) + coarse_level.operator(xc_initial)
                 sigma_c = sigma - level.normalization(x) + coarse_level.normalization(xc_initial)
                 for _ in range(cycle_index):
-                    xc = self._relax_cycle(level_ind + 1, xc_initial, sigma_c, nu_pre, nu_post, nu_coarsest, bc, debug,
+                    xc = self._relax_cycle(level_ind + 1, xc_initial, sigma_c, nu_pre, nu_post, nu_coarsest,
+                                           relax_coarsest, bc, debug,
                                            update_lam, cycle_index, max_levels)
                 x += coarse_level.interpolate(xc - xc_initial)
                 print_state("correction {}".format(nu_pre))
 
-            for _ in range(nu_post):
-                x = level.relax(x, b)
-            print_state("relax {}".format(nu_post))
+            if nu_post > 0:
+                for _ in range(nu_post):
+                    x = level.relax(x, b)
+                print_state("relax {}".format(nu_post))
         return x
 
 
@@ -274,6 +281,7 @@ def relax_test_matrix(operator, rq, method, x: np.ndarray, num_sweeps: int = 30,
         print_frequency = num_sweeps // 10
     r_norm_history = [None] * (num_sweeps + 1)
     r_norm_history[0] = r_norm
+    min_sweeps = 5
     for i in range(1, num_sweeps + 1):
         r_norm_old = r_norm
         lam_old = lam
@@ -286,9 +294,9 @@ def relax_test_matrix(operator, rq, method, x: np.ndarray, num_sweeps: int = 30,
         lam_error = np.abs(lam - lam_old)
         if i % print_frequency == 0:
             _LOGGER.debug("{:5d} |r| {:.8e} ({:.5f}) rq {:.5f} ({:.5f})".format(
-                i, r_norm, r_norm / r_norm_old, lam, lam_error / lam_error_old))
+                i, r_norm, r_norm / max(1e-30, r_norm_old), lam, lam_error / max(1e-30, lam_error_old)))
         r_norm_history[i] = r_norm
-        if r_norm < residual_stop_value or lam_error < lam_stop_value:
+        if i >= min_sweeps and (r_norm < residual_stop_value or lam_error < lam_stop_value):
             r_norm_history = r_norm_history[:i + 1]
             break
     # return x, r_norm / r_norm_old

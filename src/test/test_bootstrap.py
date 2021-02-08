@@ -58,8 +58,8 @@ class TestBootstrap:
         assert np.mean([level.rq(x[:, i]) for i in range(x.shape[1])]) == pytest.approx(0.09770, 1e-3)
         assert (hm.linalg.scaled_norm_of_matrix(a.dot(x)) / hm.linalg.scaled_norm_of_matrix(x)).mean() == \
                pytest.approx(0.0977884, 1e-3)
-        # nu relaxations + lambda update convergence factor.
-        assert conv_factor == pytest.approx(0.958, 1e-3)
+        # (nu relaxations + lambda update) convergence factor, so not very impressive.
+        assert conv_factor == pytest.approx(0.807, 1e-3)
 
     def test_2_level_one_bootstrap_step_improves_convergence(self):
         n = 16
@@ -79,7 +79,7 @@ class TestBootstrap:
 
         assert level.global_params.lam == pytest.approx(0.0977590650225, 1e-3)
         assert np.mean([level.rq(x[:, i]) for i in range(x.shape[1])]) == pytest.approx(0.097759, 1e-3)
-        assert conv_factor == pytest.approx(0.45, 1e-2)
+        assert conv_factor == pytest.approx(0.313, 1e-2)
 
     def test_2_level_two_bootstrap_steps_same_speed_as_one(self):
         n = 16
@@ -100,18 +100,13 @@ class TestBootstrap:
         # x += 0.1 * np.random.random(x.shape)
         # multilevel.level[0].global_params.lam *= 1.01
 
-        # Check that (3,3) is at least as fast as (3,2). Print conv factor vs. nu1, nu2.
-        x, lam = exact_eigenpair(multilevel.level[0].a)
-        x = x[:, None]
-        multilevel.level[0].global_params.lam = lam
-
         x, conv_factor = hm.multilevel.relax_test_matrix(level.operator, level.rq, relax_cycle, x, 20,
                                                          print_frequency=1,
                                                          residual_stop_value=1e-11, lam_stop_value=1e-20)
 
         assert level.global_params.lam == pytest.approx(0.0977590650225, 1e-3)
         assert np.mean([level.rq(x[:, i]) for i in range(x.shape[1])]) == pytest.approx(0.097759, 1e-3)
-        assert conv_factor == pytest.approx(0.46, 1e-2)
+        assert conv_factor == pytest.approx(0.304, 1e-2)
 
     def test_3_level_fixed_domain(self):
         n = 16
@@ -126,9 +121,9 @@ class TestBootstrap:
         # Convergence speed test.
         # FMG start so (x, lambda) has a reasonable initial guess.
         x_init = hm.bootstrap.fmg(multilevel, num_cycles_finest=0, num_cycles=1)
-        level.global_params.lam = exact_eigenpair(level.a)
+#        level.global_params.lam = exact_eigenpair(level.a)
 
-        relax_cycle = lambda x: multilevel.relax_cycle(x, 1, 1, 100, max_levels=3, update_lam=True)
+        relax_cycle = lambda x: multilevel.relax_cycle(x, 1, 1, 100, max_levels=3)
         x, conv_factor = hm.multilevel.relax_test_matrix(level.operator, level.rq, relax_cycle, x_init, 15)
         assert level.global_params.lam == pytest.approx(0.0977590650225, 1e-3)
         assert np.mean([level.rq(x[:, i]) for i in range(x.shape[1])]) == pytest.approx(0.097759, 1e-3)

@@ -93,12 +93,13 @@ def bootstap(x, multilevel: hm.multilevel.Multilevel, max_levels: int, aggregate
     # TODO(orenlivne): update parameters of relaxation cycle to reasonable values if needed.
     if len(multilevel) == 1:
         def relax_cycle(x):
-            return multilevel.relax_cycle(x, None, None, 5)
+            return multilevel.relax_cycle(x, None, None, 1)
     else:
         def relax_cycle(x):
-            return multilevel.relax_cycle(x, 2, 2, 4)
+            return multilevel.relax_cycle(x, 2, 2, 30)
     _LOGGER.info("{} at level {}".format("Relax" if len(multilevel) == 1 else "Cycle", finest))
     x, _ = hm.multilevel.relax_test_matrix(level.operator, level.rq, relax_cycle, x, num_sweeps)
+    _LOGGER.info("lambda {}".format(multilevel.level[0].global_params.lam))
 
     # Recreate all coarse levels. One down-pass, relaxing at each level, hopefully starting from improved x so the
     # process improves all levels.
@@ -121,6 +122,7 @@ def bootstap(x, multilevel: hm.multilevel.Multilevel, max_levels: int, aggregate
         _LOGGER.info("Relax at level {}".format(l))
         x_level, _ = hm.multilevel.relax_test_matrix(level.operator, level.rq, lambda x: level.relax(x, b), x_level,
                                                      num_sweeps=num_sweeps, print_frequency=print_frequency)
+        _LOGGER.info("lambda {}".format(multilevel.level[0].global_params.lam))
 
     return x, new_multilevel
 
@@ -187,7 +189,7 @@ def create_transfer_operators(x, domain_size: int, aggregate_size: int, threshol
     x_aggregate_t = x[:aggregate_size].transpose()
     r, s = hm.restriction.create_restriction(x_aggregate_t, threshold)
     nc = r.asarray().shape[0]
-    _LOGGER.debug("Singular values {}, nc {} interpolation error {}".format(
+    _LOGGER.debug("Singular vals {}, nc {} interpolation error {:.3f}".format(
         s, nc, (sum(s[nc:] ** 2) / sum(s ** 2)) ** 0.5))
     r_csr = r.tile(num_aggregates)
     xc = r_csr.dot(x)
