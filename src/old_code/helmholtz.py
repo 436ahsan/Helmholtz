@@ -1,6 +1,5 @@
 """Relaxation for the homogenous Laplacian."""
 import numpy as np
-from numpy.linalg import norm
 
 
 class Solver:

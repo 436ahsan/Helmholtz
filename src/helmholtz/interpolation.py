@@ -12,6 +12,7 @@ class Interpolator:
     Encapsulates the interpolation as both relative-location neighbor list (for easy tiling) and sparse CSR matrix
     format. In contrast to the restriction operator, which is assumed to be non-overlapping and thus a simple CSR
     matrix, this object gives us greater flexibility in interpolating from neighboring aggregates."""
+
     def __init__(self, nbhr: np.ndarray, data: np.ndarray, nc: int):
         """
         Creates an interpolation into a window (aggregate).
@@ -133,7 +134,7 @@ def _geometric_neighbors(w: int, nc: int):
         # coarse_nbhrs = np.union1d(aggregate_coarse_vars[center_aggregate], aggregate_coarse_vars[nbhr_aggregate])
         # Use center aggregate only.
         coarse_nbhrs = aggregate_coarse_vars[center_aggregate]
-        #print(fine_var, center_aggregate, nbhr_aggregate, coarse_nbhrs)
+        # print(fine_var, center_aggregate, nbhr_aggregate, coarse_nbhrs)
         nbhr[fine_var] = coarse_nbhrs
     return nbhr
 

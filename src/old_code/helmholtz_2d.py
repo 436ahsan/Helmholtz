@@ -6,6 +6,7 @@ import numpy as np
 class Helmholtz2d:
     """Basic solver (residual, relaxation) of the 1D Helmholtz operator with Homogeneous RHS, periodic B.C. and
     constant k."""
+
     def __init__(self, k: float, h: float):
         """
         Constructs a 1D Helmholtz operator with homogeneous RHS and periodic B.C.. Note that we do not specify the
@@ -34,8 +35,8 @@ class Helmholtz2d:
         diagonal = 4 - self.k2 * self.h ** 2
         for i in range(m):
             for j in range(n):
-                a[i, j] = -u[(i - 1) % m, j] -u[(i + 1) % m, j] -u[i, (j - 1) % n] \
-                          -u[i, (j + 1) % n] + diagonal * u[i, j]
+                a[i, j] = -u[(i - 1) % m, j] - u[(i + 1) % m, j] - u[i, (j - 1) % n] \
+                          - u[i, (j + 1) % n] + diagonal * u[i, j]
         return a
 
     def relax_kaczmarz(self, u: np.ndarray) -> None:
@@ -52,8 +53,8 @@ class Helmholtz2d:
         diagonal = 4 - self.k2 * self.h ** 2
         for i in range(m):
             for j in range(n):
-                r = -(-u[(i - 1) % m, j] -u[(i + 1) % m, j] -u[i, (j - 1) % n]\
-                      -u[i, (j + 1) % n] + diagonal * u[i, j])
+                r = -(-u[(i - 1) % m, j] - u[(i + 1) % m, j] - u[i, (j - 1) % n] \
+                      - u[i, (j + 1) % n] + diagonal * u[i, j])
                 delta = r / (diagonal ** 2 + 4)
                 u[i, j] += diagonal * delta
                 u[(i - 1) % m, j] -= delta
@@ -77,4 +78,4 @@ class Helmholtz2d:
         for i in range(m):
             for j in range(n):
                 u[i, j] = (u[(i - 1) % m, j] + u[(i + 1) % m, j] +
-                          u[i, (j - 1) % n] + u[i, (j + 1) % n]) / diagonal
+                           u[i, (j - 1) % n] + u[i, (j + 1) % n]) / diagonal

@@ -13,6 +13,7 @@ class InterpolationFitter:
     Fits interpolation from X[:, n[0]],...,X[:, n[k-1]], i's k nearest neighbors, to X[:, i] using
     Ridge regression. Determines the optimal Ridge parameter by cross-validation.
     """
+
     def __init__(self,
                  x: np.ndarray,
                  xc: np.ndarray = None,
@@ -89,7 +90,8 @@ class InterpolationFitter:
             neighbors = self._nbhr[i, :k]
             return fit_interpolation(xc_fit[:, neighbors], x_fit[:, i],
                                      xc_val[:, neighbors], x_val[:, i],
-                                     alpha_values,  intercept=intercept, return_weights=return_weights)
+                                     alpha_values, intercept=intercept, return_weights=return_weights)
+
         # TODO(oren): parallelize this if we fit interpolation to many fine variables.
         error = [_interpolation_error(i) for i in self._fine_vars()]
         return np.array(error)

@@ -1,9 +1,9 @@
 import logging
 import sys
+from scipy.linalg import eig
 
 import numpy as np
 import pytest
-import sklearn.metrics.pairwise
 
 import helmholtz as hm
 
@@ -47,7 +47,7 @@ class TestBootstrap:
         level = hm.multilevel.Level.create_finest_level(a)
         x = hm.multilevel.random_test_matrix((n,), num_examples=1)
         b = np.zeros_like(x)
-#        method = lambda x: level.relax(x, b)
+        #        method = lambda x: level.relax(x, b)
         multilevel = hm.multilevel.Multilevel()
         multilevel.level.append(level)
         # Run enough Kaczmarz relaxations per lambda update (not just 1 relaxation) so we converge to the minimal one.
@@ -65,50 +65,80 @@ class TestBootstrap:
         n = 16
         kh = 0.5
         a = hm.linalg.helmholtz_1d_operator(kh, n)
-        x, multilevel = hm.bootstrap.generate_test_matrix(a, 0, num_sweeps=10, num_examples=8, num_bootstrap_steps=1)
+        x, multilevel = hm.bootstrap.generate_test_matrix(a, 0, num_examples=8)
         assert len(multilevel) == 2
 
         level = multilevel.level[0]
 
         # Convergence speed test.
-        relax_cycle = lambda x: multilevel.relax_cycle(x, 1, 1, 100, debug=False, update_lam="coarsest")
+        relax_cycle = lambda x: multilevel.relax_cycle(x, 1, 1, 100)
         # FMG start so (x, lambda) has a reasonable initial guess.
-        x = hm.multilevel.random_test_matrix((n // 2,), num_examples=1)
-        level.global_params.lam = 0
-        logger.info("Level 1")
-        logger.info("lam {}".format(level.global_params.lam))
-        for _ in range(100):
-            x = multilevel.relax_cycle(x, None, None, 10, finest_level_ind=1)
-        x = multilevel.level[1].interpolate(x)
-        logger.info("Level 0")
-        logger.info("lam {}".format(level.global_params.lam))
-        x, conv_factor = hm.multilevel.relax_test_matrix(level.operator, level.rq, relax_cycle, x, 20, print_frequency=1)
+        x = hm.bootstrap.fmg(multilevel, num_cycles_finest=0)
+        x, conv_factor = hm.multilevel.relax_test_matrix(level.operator, level.rq, relax_cycle, x, 20,
+                                                         print_frequency=1)
 
         assert level.global_params.lam == pytest.approx(0.0977590650225, 1e-3)
         assert np.mean([level.rq(x[:, i]) for i in range(x.shape[1])]) == pytest.approx(0.097759, 1e-3)
-        assert conv_factor == pytest.approx(0.46, 1e-2)
+        assert conv_factor == pytest.approx(0.45, 1e-2)
 
     def test_2_level_two_bootstrap_steps_same_speed_as_one(self):
         n = 16
         kh = 0.5
         a = hm.linalg.helmholtz_1d_operator(kh, n)
-        x, multilevel = hm.bootstrap.generate_test_matrix(a, 0, num_sweeps=10, num_examples=8, num_bootstrap_steps=2)
+        x, multilevel = hm.bootstrap.generate_test_matrix(a, 0, num_examples=8, num_bootstrap_steps=2)
         assert len(multilevel) == 2
 
         level = multilevel.level[0]
 
         # Convergence speed test.
-        relax_cycle = lambda x: multilevel.relax_cycle(x, 1, 1, 100, debug=False, update_lam="coarsest")
+        relax_cycle = lambda x: multilevel.relax_cycle(x, 4, 3, 100, update_lam="coarsest")
         # FMG start so (x, lambda) has a reasonable initial guess.
-        x = hm.multilevel.random_test_matrix((n // 2,), num_examples=1)
-        level.global_params.lam = 0
-        logger.debug("Level 1 lam {}".format(level.global_params.lam))
-        for _ in range(1):
-            x = multilevel.relax_cycle(x, None, None, 10, finest_level_ind=1)
-        x = multilevel.level[1].interpolate(x)
-        logger.debug("Level 0 lam {}".format(level.global_params.lam))
-        x, conv_factor = hm.multilevel.relax_test_matrix(level.operator, level.rq, relax_cycle, x, 20, print_frequency=1)
+        logger.info("2-level convergence test")
+        x = hm.bootstrap.fmg(multilevel, num_cycles_finest=0)
+
+        # Add some random noise but still stay near a reasonable initial guess.
+        # x += 0.1 * np.random.random(x.shape)
+        # multilevel.level[0].global_params.lam *= 1.01
+
+        # Check that (3,3) is at least as fast as (3,2). Print conv factor vs. nu1, nu2.
+        x, lam = exact_eigenpair(multilevel.level[0].a)
+        x = x[:, None]
+        multilevel.level[0].global_params.lam = lam
+
+        x, conv_factor = hm.multilevel.relax_test_matrix(level.operator, level.rq, relax_cycle, x, 20,
+                                                         print_frequency=1,
+                                                         residual_stop_value=1e-11, lam_stop_value=1e-20)
 
         assert level.global_params.lam == pytest.approx(0.0977590650225, 1e-3)
         assert np.mean([level.rq(x[:, i]) for i in range(x.shape[1])]) == pytest.approx(0.097759, 1e-3)
-        assert conv_factor == pytest.approx(0.42, 1e-2)
+        assert conv_factor == pytest.approx(0.46, 1e-2)
+
+    def test_3_level_fixed_domain(self):
+        n = 16
+        kh = 0.5
+        a = hm.linalg.helmholtz_1d_operator(kh, n)
+        x, multilevel = hm.bootstrap.generate_test_matrix(a, 0, num_sweeps=10, num_examples=20, num_bootstrap_steps=1,
+                                                          initial_max_levels=3)
+        assert len(multilevel) == 3
+
+        level = multilevel.level[0]
+
+        # Convergence speed test.
+        # FMG start so (x, lambda) has a reasonable initial guess.
+        x_init = hm.bootstrap.fmg(multilevel, num_cycles_finest=0, num_cycles=1)
+        level.global_params.lam = exact_eigenpair(level.a)
+
+        relax_cycle = lambda x: multilevel.relax_cycle(x, 1, 1, 100, max_levels=3, update_lam=True)
+        x, conv_factor = hm.multilevel.relax_test_matrix(level.operator, level.rq, relax_cycle, x_init, 15)
+        assert level.global_params.lam == pytest.approx(0.0977590650225, 1e-3)
+        assert np.mean([level.rq(x[:, i]) for i in range(x.shape[1])]) == pytest.approx(0.097759, 1e-3)
+        assert conv_factor == pytest.approx(0.32, 1e-2)
+
+
+def exact_eigenpair(a):
+    """Returns the exact minimum norm eigenvalue of the matrix a, for debugging."""
+    lam, v = eig(a.toarray())
+    lam = np.real(lam)
+    ind = np.argsort(lam)
+    lam = lam[ind]
+    return v[:, ind[-2]], lam[-2]

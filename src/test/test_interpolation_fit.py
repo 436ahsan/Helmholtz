@@ -1,8 +1,8 @@
-import helmholtz as hm
 import numpy as np
 import pytest
-import time
 from numpy.linalg import norm, lstsq
+
+import helmholtz as hm
 
 
 class TestInterpolation:

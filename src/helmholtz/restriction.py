@@ -68,4 +68,4 @@ def _get_interpolation_caliber(s: np.ndarray, threshold: float) -> np.ndarray:
 
     Returns: IW: array, [K], Number of principal components corresponding to each element of 'threshold'.
     """
-    return np.array([np.where( _relative_reconstruction_error(s) <= t)[0][0] for t in threshold])
+    return np.array([np.where(_relative_reconstruction_error(s) <= t)[0][0] for t in threshold])

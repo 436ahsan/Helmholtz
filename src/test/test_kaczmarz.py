@@ -42,7 +42,7 @@ def kaczmarz_relax_with_loop(kh, x: np.ndarray) -> np.ndarray:
     n = u.shape[0]
     diagonal = 2 - kh ** 2
     for i in range(n):
-        r = -(-u[(i - 1) % n] -u[(i + 1) % n] + diagonal * u[i])
+        r = -(-u[(i - 1) % n] - u[(i + 1) % n] + diagonal * u[i])
         delta = r / (diagonal ** 2 + 2)
         u[i] += diagonal * delta
         u[(i - 1) % n] -= delta

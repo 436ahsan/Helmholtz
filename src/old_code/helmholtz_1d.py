@@ -6,6 +6,7 @@ import numpy as np
 class Helmholtz1d:
     """Basic solver (residual, relaxation) of the 1D Helmholtz operator with Homogeneous RHS, periodic B.C. and
     constant k."""
+
     def __init__(self, k: float, h: float):
         """
         Constructs a 1D Helmholtz operator with homogeneous RHS and periodic B.C.. Note that we do not specify the
@@ -34,7 +35,7 @@ class Helmholtz1d:
         a = np.zeros(u.shape)
         diagonal = 2 - self.k2 * self.h ** 2
         for i in range(m):
-            a[i] = -u[(i - 1) % m] -u[(i + 1) % m] + diagonal * u[i]
+            a[i] = -u[(i - 1) % m] - u[(i + 1) % m] + diagonal * u[i]
         return a
 
     def relax_kaczmarz(self, u: np.ndarray) -> None:
@@ -50,12 +51,12 @@ class Helmholtz1d:
         m = u.shape[0]
         diagonal = 2 - self.k2 * self.h ** 2
         for i in range(m):
-            r = -(-u[(i - 1) % m] -u[(i + 1) % m] + diagonal * u[i])
+            r = -(-u[(i - 1) % m] - u[(i + 1) % m] + diagonal * u[i])
             delta = r / (diagonal ** 2 + 2)
             u[i] += diagonal * delta
             u[(i - 1) % m] -= delta
             u[(i + 1) % m] -= delta
-            r = -(-u[(i - 1) % m] -u[(i + 1) % m] + diagonal * u[i])
+            r = -(-u[(i - 1) % m] - u[(i + 1) % m] + diagonal * u[i])
 
     def relax_gs(self, u: np.ndarray) -> None:
         """

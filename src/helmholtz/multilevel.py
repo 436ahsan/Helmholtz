@@ -23,7 +23,8 @@ class Multilevel:
         return len(self.level)
 
     def relax_cycle(self, x: np.array, nu_pre: int, nu_post: int, nu_coarsest: int, debug: bool = False,
-                    update_lam: str = "finest", finest_level_ind: int = 0) -> np.array:
+                    update_lam: str = "finest", finest_level_ind: int = 0, cycle_index: int = 1,
+                    max_levels: int = 10000) -> np.array:
         """
         Executes a relaxation V(nu_pre, nu_post) -cycle on A*x = 0.
 
@@ -43,7 +44,8 @@ class Multilevel:
             _LOGGER.debug("-" * 80)
         sigma = np.ones(x.shape[1], )
         b = np.zeros_like(x)
-        x = self._relax_cycle(finest_level_ind, x, sigma, nu_pre, nu_post, nu_coarsest, b, debug, update_lam)
+        x = self._relax_cycle(finest_level_ind, x, sigma, nu_pre, nu_post, nu_coarsest, b, debug, update_lam,
+                              cycle_index, max_levels)
         if update_lam == "finest":
             x = self._update_global_constraints(x, sigma, b, self.level[finest_level_ind])
         return x
@@ -55,7 +57,7 @@ class Multilevel:
             x:
 
         Returns:
-            Updated x. Global lambda also updated.
+            Updated x. Global lambda also updated to the mean of RQ of all test functions.
         """
         eta = level.normalization(x)
         # TODO(orenlivne): vectorize the following expressions.
@@ -65,8 +67,10 @@ class Multilevel:
         return x
 
     def _relax_cycle(self, level_ind: int, x: np.array, sigma: float,
-                     nu_pre: int, nu_post: int, nu_coarsest: int, b: np.ndarray, debug: bool, update_lam: str) -> np.array:
+                     nu_pre: int, nu_post: int, nu_coarsest: int, b: np.ndarray, debug: bool,
+                     update_lam: str, cycle_index: int, max_levels: int) -> np.array:
         level = self.level[level_ind]
+
         def print_state(title):
             if debug:
                 _LOGGER.debug("{:2d} {:<15} {:.4e} {:.4e}".format(
@@ -74,7 +78,7 @@ class Multilevel:
                     np.abs(sigma - level.normalization(x))[0]))
 
         print_state("initial")
-        if level_ind == len(self) - 1:
+        if level_ind == min(len(self), max_levels) - 1:
             # Coarsest level.
             for _ in range(nu_coarsest):
                 for _ in range(1 if len(self) == 1 else 5):
@@ -92,7 +96,9 @@ class Multilevel:
                 xc_initial = coarse_level.restrict(x)
                 bc = coarse_level.restrict(b - level.operator(x)) + coarse_level.operator(xc_initial)
                 sigma_c = sigma - level.normalization(x) + coarse_level.normalization(xc_initial)
-                xc = self._relax_cycle(level_ind + 1, xc_initial, sigma_c, nu_pre, nu_post, nu_coarsest, bc, debug, update_lam)
+                for _ in range(cycle_index):
+                    xc = self._relax_cycle(level_ind + 1, xc_initial, sigma_c, nu_pre, nu_post, nu_coarsest, bc, debug,
+                                           update_lam, cycle_index, max_levels)
                 x += coarse_level.interpolate(xc - xc_initial)
                 print_state("correction {}".format(nu_pre))
 
@@ -262,7 +268,7 @@ def relax_test_matrix(operator, rq, method, x: np.ndarray, num_sweeps: int = 30,
     r_norm = scaled_norm(operator(x0))
     lam = rq(x0)
     lam_error = 1
-    _LOGGER.debug("{:5d} |e| {:.8e} |r| {:.8e} lam {:.5f}".format(0, x_norm, r_norm, lam))
+    _LOGGER.debug("{:5d} |r| {:.8e} rq {:.5f}".format(0, r_norm, lam))
     # Run 'num_sweeps' relaxation sweeps.
     if print_frequency is None:
         print_frequency = num_sweeps // 10
@@ -279,16 +285,16 @@ def relax_test_matrix(operator, rq, method, x: np.ndarray, num_sweeps: int = 30,
         lam = rq(x0)
         lam_error = np.abs(lam - lam_old)
         if i % print_frequency == 0:
-            _LOGGER.debug("{:5d} |e| {:.8e} |r| {:.8e} ({:.5f}) lam {:.5f} ({:.5f})".format(
-                i, scaled_norm(x0), r_norm, r_norm / r_norm_old, lam, lam_error / lam_error_old))
+            _LOGGER.debug("{:5d} |r| {:.8e} ({:.5f}) rq {:.5f} ({:.5f})".format(
+                i, r_norm, r_norm / r_norm_old, lam, lam_error / lam_error_old))
         r_norm_history[i] = r_norm
         if r_norm < residual_stop_value or lam_error < lam_stop_value:
             r_norm_history = r_norm_history[:i + 1]
             break
-    #return x, r_norm / r_norm_old
+    # return x, r_norm / r_norm_old
     # Average convergence factor over the last 5 steps. Exclude first cycle.
     last_steps = min(5, len(r_norm_history) - 2)
-    return x, (r_norm_history[-1] / r_norm_history[-last_steps-1]) ** (1 / last_steps)
+    return x, (r_norm_history[-1] / r_norm_history[-last_steps - 1]) ** (1 / last_steps)
 
 
 def random_test_matrix(window_shape: Tuple[int], num_examples: int = None) -> np.ndarray:

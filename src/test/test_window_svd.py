@@ -8,7 +8,7 @@ class TestWindowSvd:
     def test_window_svd_1d_helmholtz(self):
         n = 16
         kh = 0.5
-        window_shape = (n, )
+        window_shape = (n,)
         a = hm.linalg.helmholtz_1d_operator(kh, n)
         relaxer = hm.relax.KaczmarzRelaxer(a, scipy.sparse.eye(a.shape[0]))
 
