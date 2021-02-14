@@ -46,7 +46,7 @@ def create_restriction(x_aggregate_t, threshold: float) -> scipy.sparse.csr_matr
     Returns:
         restriction operator nc x {aggregate_size}, list of all singular values on aggregate.
     """
-    _, s, vh = svd(x_aggregate_t)
+    u, s, vh = svd(x_aggregate_t)
     nc = _get_interpolation_caliber(s, np.array([threshold]))[0]
     return Restrictor(vh[:nc]), s
 
