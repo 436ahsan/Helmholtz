@@ -57,20 +57,14 @@ class TestRestriction:
                                                lambda x: level.relax(x, b), x, num_sweeps=num_sweeps)
 
         # Generate coarse variables (R) based on different windows of x.
+        # Note: all restrictions and singular values will be almost identical except the two windows (offset = 29, 30)
+        # due to Kaczmarz stopping at point 31 (thus 30, 31, 1 are co-linear).
         r_by_offset = np.array([normalized_restriction(
-            hm.restriction.create_restriction(get_window(x, aggregate_size, offset).transpose(), 0.1)[0])
+            hm.restriction.create_restriction(hm.linalg.get_window(x, offset, aggregate_size).transpose(), 0.1)[0])
             for offset in range(len(x))])
         # R should not change much across different windows.
-        mean_entry_errror = np.mean(np.abs((np.std(r_by_offset, axis=0) / np.mean(r_by_offset, axis=0)).flatten()))
-        assert mean_entry_errror <= 0.07
-
-
-def get_window(x, aggregate_size, offset):
-    # Wrap around window since we're on a periodic domain.
-    x_aggregate = x[offset:min(offset + aggregate_size, len(x))]
-    if offset + aggregate_size > len(x):
-        x_aggregate = np.concatenate((x_aggregate, x[:offset + aggregate_size - len(x)]), axis=0)
-    return x_aggregate
+        mean_entry_error = np.mean(np.abs((np.std(r_by_offset, axis=0) / np.mean(r_by_offset, axis=0)).flatten()))
+        assert mean_entry_error <= 0.07
 
 
 def normalized_restriction(r):

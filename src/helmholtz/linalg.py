@@ -5,6 +5,24 @@ import scipy.sparse.linalg
 from numpy.linalg import norm
 
 
+def get_window(x: np.ndarray, offset: int, aggregate_size: int) -> np.ndarray:
+    """
+    Returns a periodic window x[offset:offset+aggregate_size].
+
+    Args:
+        x: vector or matrix.
+        offset: window start.
+        aggregate_size: window size.
+
+    Returns: x[offset:offset+aggregate_size]. Wraps around if out of bounds.
+    """
+    # Wrap around window since we're on a periodic domain.
+    x_aggregate = x[offset:min(offset + aggregate_size, len(x))]
+    if offset + aggregate_size > len(x):
+        x_aggregate = np.concatenate((x_aggregate, x[:offset + aggregate_size - len(x)]), axis=0)
+    return x_aggregate
+
+
 def scaled_norm(e: np.ndarray) -> float:
     """
     Returns the scaled L2 norm of a test function e:
