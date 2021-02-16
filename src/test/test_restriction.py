@@ -59,14 +59,10 @@ class TestRestriction:
         # Generate coarse variables (R) based on different windows of x.
         # Note: all restrictions and singular values will be almost identical except the two windows (offset = 29, 30)
         # due to Kaczmarz stopping at point 31 (thus 30, 31, 1 are co-linear).
-        r_by_offset = np.array([normalized_restriction(
-            hm.restriction.create_restriction(hm.linalg.get_window(x, offset, aggregate_size).transpose(), 0.1)[0])
+        r_by_offset = np.array([hm.linalg.normalize_signs(
+            hm.restriction.create_restriction(
+                hm.linalg.get_window(x, offset, aggregate_size).transpose(), 0.1)[0].asarray())
             for offset in range(len(x))])
         # R should not change much across different windows.
         mean_entry_error = np.mean(np.abs((np.std(r_by_offset, axis=0) / np.mean(r_by_offset, axis=0)).flatten()))
         assert mean_entry_error <= 0.07
-
-
-def normalized_restriction(r):
-    r_array = r.asarray()
-    return r_array * np.sign(r_array[:, 0])[:, None]

@@ -1,5 +1,7 @@
 import numpy as np
+import scipy.linalg
 import scipy.sparse
+from numpy.linalg import norm
 from numpy.ma.testutils import assert_array_almost_equal
 
 import helmholtz as hm
@@ -91,3 +93,31 @@ class TestLinalg:
                                      [0, 0, 3, 4],
                                      [0, 0, 5, 6]])
         assert_array_almost_equal(a_tiled.toarray(), a_tiled_expected)
+
+    def test_gram_schmidt(self):
+        a = np.random.random((10, 4))
+
+        q = hm.linalg.gram_schmidt(a)
+
+        q_expected = gram_schmidt_explicit(a)
+        assert_array_almost_equal(hm.linalg.normalize_signs(q, axis=1),
+                                  hm.linalg.normalize_signs(q_expected, axis=1))
+
+
+def gram_schmidt_explicit(a: np.ndarray) -> np.ndarray:
+    """
+    Performs a Gram-Schmidt orthonormalization on matrix columns. Does not use the QR factorization but an
+    explicit implementation.
+
+    Args:
+        a: original matrix.
+
+    Returns: orthonormalized matrix a.
+    """
+    a = a.copy()
+    a[:, 0] /= norm(a[:, 0])
+    for i in range(1, a.shape[1]):
+        ai = a[:, i]
+        ai -= sum((ai.dot(a[:, j])) * a[:, j] for j in range(i))
+        a[:, i] = ai / norm(ai)
+    return a

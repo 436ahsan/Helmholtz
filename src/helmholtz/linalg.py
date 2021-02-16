@@ -5,6 +5,24 @@ import scipy.sparse.linalg
 from numpy.linalg import norm
 
 
+def normalize_signs(r, axis=0):
+    """
+    Multiplies r by a diagonal matrix with entries +1 or -1 so that the signs of the first row (or column)
+    are all positive.
+
+    Args:
+        r:
+        axis: axis to normalize signs along. If axis=0, normalizes rows to positive first element (i.e., the
+        first column will be normalized to all positive numbers). If axis=1, normalizes columns instead.
+
+    Returns: sign-normalized matrix.
+    """
+    if axis == 0:
+        return r * np.sign(r[:, 0])[:, None]
+    else:
+        return r * np.sign(r[0])[None, :]
+
+
 def get_window(x: np.ndarray, offset: int, aggregate_size: int) -> np.ndarray:
     """
     Returns a periodic window x[offset:offset+aggregate_size].
@@ -126,3 +144,16 @@ def helmholtz_1d_operator(kh: float, n: int) -> scipy.sparse.dia_matrix:
         Helmholtz operator (as a sparse matrix).
     """
     return sparse_circulant(np.array([1, -2 + kh ** 2, 1]), np.array([-1, 0, 1]), n)
+
+
+def gram_schmidt(a: np.ndarray) -> np.ndarray:
+    """
+    Performs a Gram-Schmidt orthonormalization on matrix columns. Uses the QR factorization, which is more
+    numerically stable than the explicit Gram-Schmidt algorithm.
+
+    Args:
+        a: original matrix.
+
+    Returns: orthonormalized matrix a.
+    """
+    return scipy.linalg.qr(a, mode="economic")[0]

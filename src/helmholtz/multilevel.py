@@ -38,8 +38,8 @@ class Multilevel:
         Returns:
             x after the cycle.
         """
-        # TODO(orenlivne): replace by a general-cycle-index, non-recursive loop. Move relaxation, transfers logic
-        # to a processor separate from the cycle.
+        # TODO(orenlivne): replace by a general-cycle-index, non-recursive loop. Move relaxation, transfers,
+        #  ritz, etc. logic to a processor -- separate from the cycle -- separate frm the Multilevel object.
         if debug:
             _LOGGER.debug("-" * 80)
             _LOGGER.debug("{:<5}    {:<15}    {:<10}    {:<10}    {:<10}".format(
@@ -51,6 +51,10 @@ class Multilevel:
         # if update_lam == "finest":
         #     x = self._update_global_constraints(x, sigma, b, self.level[finest_level_ind])
         return x
+
+    def _ritz(self, x):
+        level = self._m
+        self._leel
 
     def _update_global_constraints(self, x, sigma, b, level):
         """
