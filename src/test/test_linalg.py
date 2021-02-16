@@ -99,12 +99,37 @@ class TestLinalg:
 
         q = hm.linalg.gram_schmidt(a)
 
-        q_expected = gram_schmidt_explicit(a)
+        q_expected = _gram_schmidt_explicit(a)
         assert_array_almost_equal(hm.linalg.normalize_signs(q, axis=1),
                                   hm.linalg.normalize_signs(q_expected, axis=1))
 
+    def test_ritz(self):
+        n = 16
+        kh = 0
+        a = hm.linalg.helmholtz_1d_operator(kh, n)
+        x = np.random.random((n, 4))
+        action = lambda x: a.dot(x)
 
-def gram_schmidt_explicit(a: np.ndarray) -> np.ndarray:
+        y, lam_y = hm.linalg.ritz(x, action)
+
+        lam_y_expected = np.array([_rq(y[:, k], action) for k in range(y.shape[1])])
+        assert_array_almost_equal(lam_y, lam_y_expected)
+
+        assert y.shape == x.shape
+        r = action(y)
+        r = np.array([r[:, k] - lam_y[k] * y[:, k] for k in range(y.shape[1])])
+
+        assert norm(r.dot(x)) < 1e-14
+
+
+def _rq(x, action):
+    """
+    Returns the Rayleigh-Quotient (x,action(x))/(x,x) of the vector x.
+    """
+    return (action(x)).dot(x) / (x.dot(x))
+
+
+def _gram_schmidt_explicit(a: np.ndarray) -> np.ndarray:
     """
     Performs a Gram-Schmidt orthonormalization on matrix columns. Does not use the QR factorization but an
     explicit implementation.

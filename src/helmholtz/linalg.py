@@ -3,6 +3,8 @@ import numpy as np
 import scipy.sparse
 import scipy.sparse.linalg
 from numpy.linalg import norm
+from scipy.linalg import eig
+from typing import Tuple
 
 
 def normalize_signs(r, axis=0):
@@ -157,3 +159,26 @@ def gram_schmidt(a: np.ndarray) -> np.ndarray:
     Returns: orthonormalized matrix a.
     """
     return scipy.linalg.qr(a, mode="economic")[0]
+
+
+def ritz(x: np.ndarray, action) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Performs a Ritz projection on matrix columns.
+
+    Args:
+        x: original matrix (n x k).
+        action: a functor of the action L(x) of the operator L (n x k matrix -> n x k matrix).
+
+    Returns: tuple of (Ritz-projected matrix a, vector of corresponding eigenvalues).
+    """
+    # Make x an orthogonal projection onto the space X spanned by the original x columns.
+    x = gram_schmidt(x)
+    # Form the Gram matrix.
+    g = x.transpose().dot(action(x))
+    # Solve the eigenproblem g*z = lam*z for the coefficients z of the Ritz projection x*z.
+    lam, z = eig(g)
+    # Convert back to the original coordinates (x).
+    lam = np.real(lam)
+    ind = np.argsort(np.abs(lam))
+    x_projected = x.dot(z)
+    return x_projected[:, ind], lam[ind]

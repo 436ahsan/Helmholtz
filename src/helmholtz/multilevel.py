@@ -52,10 +52,6 @@ class Multilevel:
         #     x = self._update_global_constraints(x, sigma, b, self.level[finest_level_ind])
         return x
 
-    def _ritz(self, x):
-        level = self._m
-        self._leel
-
     def _update_global_constraints(self, x, sigma, b, level):
         """
         Updates lambda + normalize at level 'level'.
