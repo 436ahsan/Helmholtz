@@ -1,1 +1,2 @@
-from . import linalg, interpolation_fit, interpolation, restriction, relax, window_svd, multilevel, bootstrap
+from . import linalg, processor, cycle, interpolation_fit, interpolation, restriction, relax, window_svd, \
+    multilevel, bootstrap
