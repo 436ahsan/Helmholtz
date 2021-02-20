@@ -92,10 +92,12 @@ def bootstap(x, multilevel: hm.multilevel.Multilevel, max_levels: int, aggregate
     # TODO(orenlivne): update parameters of relaxation cycle to reasonable values if needed.
     if len(multilevel) == 1:
         def relax_cycle(x):
-            return multilevel.relax_cycle(x, None, None, 1)
+            lam = multilevel.lam
+            return hm.eigensolver.eigen_cycle(multilevel, 1.0, None, None, 1).run((x, lam))
     else:
         def relax_cycle(x):
-            return multilevel.relax_cycle(x, 2, 2, 30)
+            lam = multilevel.lam
+            return hm.eigensolver.eigen_cycle(multilevel, 1.0, 2, 2, 30).run((x, lam))
     _LOGGER.info("{} at level {}".format("Relax" if len(multilevel) == 1 else "Cycle", finest))
     x, _ = hm.run.relax_test_matrix(level.operator, level.rq, relax_cycle, x, num_sweeps)
     _LOGGER.info("lambda {}".format(multilevel.level[0].global_params.lam))
@@ -126,7 +128,7 @@ def bootstap(x, multilevel: hm.multilevel.Multilevel, max_levels: int, aggregate
 
 
 def fmg(multilevel, nu_pre: int = 1, nu_post: int = 1, nu_coarsest: int = 10, num_cycles: int = 1,
-        num_examples: int = 1, num_cycles_finest: int = 1, finest: int = 0):
+        cycle_index: float = 1.0,  num_examples: int = 1, num_cycles_finest: int = 1, finest: int = 0):
     """Runs an num_cycles-FMG algorithm to get an initial guess at the finest level of the multilevel hierarchy.
     Runs 'num_cycles' at the finest level and 'num_cycles' at all other levels"""
     coarsest = len(multilevel) - 1
@@ -136,13 +138,16 @@ def fmg(multilevel, nu_pre: int = 1, nu_post: int = 1, nu_coarsest: int = 10, nu
     x = hm.run.random_test_matrix((level.a.shape[0],), num_examples=num_examples)
     level.global_params.lam = 0
 
+    lam = multilevel.lam
+    processor = hm.eigensolver.EigenProcessor(multilevel, nu_pre, nu_post, nu_coarsest)
     for l in range(coarsest, finest, -1):
         level = multilevel.level[l]
         x0 = x[:, 0]
         r_norm = scaled_norm(level.operator(x0))
         _LOGGER.debug("FMG level {} init |r| {:.8e} lam {:.5f}".format(l, r_norm, level.global_params.lam))
+        cycle = hm.cycle.Cycle(processor, cycle_index, l - coarsest + 1, finest=l)
         for _ in range(num_cycles):
-            x = multilevel.relax_cycle(x, nu_pre, nu_post, nu_coarsest, finest_level_ind=l)
+            x = cycle.run((x, lam))
 
         x = level.interpolate(x)
         level = multilevel.level[l - 1]

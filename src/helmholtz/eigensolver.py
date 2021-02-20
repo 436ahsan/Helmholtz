@@ -16,12 +16,12 @@ def eigen_cycle(multilevel: hm.multilevel.Multilevel,
                 num_levels: int = None):
     if num_levels is None:
         num_levels = len(multilevel)
-    processor = _EigenProcessor(multilevel, nu_pre, nu_post, nu_coarsest, debug=debug, update_lam=update_lam,
-                                relax_coarsest=relax_coarsest)
+    processor = EigenProcessor(multilevel, nu_pre, nu_post, nu_coarsest, debug=debug, update_lam=update_lam,
+                               relax_coarsest=relax_coarsest)
     return hm.cycle.Cycle(processor, cycle_index, num_levels)
 
 
-class _EigenProcessor(hm.processor.Processor):
+class EigenProcessor(hm.processor.Processor):
     """
     Eigensolver cycle processor. Executes am eigensolver Cycle(nu_pre, nu_post, nu_coarsest) on A*x = lam*x.
     """
@@ -52,36 +52,36 @@ class _EigenProcessor(hm.processor.Processor):
         self._sigma = None
 
     def initialize(self, l, num_levels, initial_guess):
-        if debug:
+        if self._debug:
             _LOGGER.debug("-" * 80)
             _LOGGER.debug("{:<5}    {:<15}    {:<10}    {:<10}    {:<10}".format(
                 "Level", "Operation", "|R|", "|R_norm|", "lambda"))
         x, lam = initial_guess
         # Allocate quantities at all levels.
-        self._x = [None] * num_levels
-        self._b = [None] * num_levels
+        self._x = [None] * len(self._multilevel)
+        self._b = [None] * len(self._multilevel)
         self._sigma = np.ones(x.shape[1], )
-        self._x_initial = [None] * num_levels
+        self._x_initial = [None] * len(self._multilevel)
         # Initialize finest-level quantities.
         self._x[l] = x
         self._b[l] = np.zeros_like(x)
 
     def process_coarsest(self, l):
-        self._print_state("initial")
+        self._print_state(l, "initial")
         level = self._multilevel.level[l]
-        for _ in range(nu_coarsest):
-            for _ in range(relax_coarsest):
+        for _ in range(self._nu_coarsest):
+            for _ in range(self._relax_coarsest):
                 self._x[l] = level.relax(self._x[l], self._b[l])
             if self._update_lam == "coarsest":
                 # Update lambda + normalize only once per several relaxations if multilevel and updating lambda
                 # at the coarsest level.
                 self._x[l] = self._update_global_constraints(l, self._x[l])
-        self._print_state("coarsest ({})".format(nu_coarsest))
+        self._print_state(l, "coarsest ({})".format(self._nu_coarsest))
 
     def pre_process(self, l):
         # Execute at level L right before switching to the next-coarser level L+1.
         level = self._multilevel.level[l]
-        self._print_state("initial")
+        self._print_state(l, "initial")
         self._relax(l, self._nu_pre)
 
         # Full Approximation Scheme (FAS).
@@ -103,7 +103,7 @@ class _EigenProcessor(hm.processor.Processor):
         if num_sweeps > 0:
             for _ in range(num_sweeps):
                 self._x[l] = level.relax(self._x[l], self._b[l])
-            self._print_state("relax {}".format(num_sweeps))
+            self._print_state(l, "relax {}".format(num_sweeps))
 
     def post_cycle(self, l):
         # Executes at the finest level L at the end of the cycle. A hook.
@@ -114,7 +114,7 @@ class _EigenProcessor(hm.processor.Processor):
         # Returns the cycle result X at level l. Normally called by Cycle with l=finest level.
         return self._x[l]
 
-    def _print_state(self, title, level_ind):
+    def _print_state(self, level_ind, title):
         level = self._multilevel.level[level_ind]
         if self._debug:
             _LOGGER.debug("{:<5d}    {:<15}    {:.4e}    {:.4e}    {:.8f}".format(
@@ -131,6 +131,7 @@ class _EigenProcessor(hm.processor.Processor):
             Updated x. Global lambda also updated to the mean of RQ of all test functions.
         """
         level = self._multilevel.level[l]
+        b = self._b[l]
         eta = level.normalization(x)
         # TODO(orenlivne): vectorize the following expressions.
         for i in range(x.shape[1]):

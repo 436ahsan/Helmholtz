@@ -52,7 +52,8 @@ class TestBootstrap:
         multilevel = hm.multilevel.Multilevel(level)
         # Run enough Kaczmarz relaxations per lambda update (not just 1 relaxation) so we converge to the minimal one.
         nu = 5
-        method = lambda x: hm.eigensolver.eigen_cycle(multilevel, 1.0, None, None, nu).run(x)
+        lam = 0
+        method = lambda x: hm.eigensolver.eigen_cycle(multilevel, 1.0, None, None, nu).run((x, lam))
         x, conv_factor = hm.run.relax_test_matrix(level.operator, level.rq, method, x, 100)
 
         assert np.mean([level.rq(x[:, i]) for i in range(x.shape[1])]) == pytest.approx(0.09770, 1e-3)

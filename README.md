@@ -14,3 +14,6 @@ AMG Helmholtz project with Achi, Oren, James, Jacob and Ahsan.
 
 ## Testing
 The project contains Pytest unit tests for the main modules. To run all tests, run `cd src; pytest test`.
+
+## TODO List
+* Replace GlobalParams by passing the lambda array with x from level to level within the cycle.
