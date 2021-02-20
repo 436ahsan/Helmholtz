@@ -93,14 +93,14 @@ def bootstap(x, multilevel: hm.multilevel.Multilevel, max_levels: int, aggregate
     if len(multilevel) == 1:
         def relax_cycle(x):
             lam = multilevel.lam
-            return hm.eigensolver.eigen_cycle(multilevel, 1.0, None, None, 1).run((x, lam))
+            return hm.eigensolver.eigen_cycle(multilevel, 1.0, None, None, 5).run((x, lam))
     else:
         def relax_cycle(x):
             lam = multilevel.lam
             return hm.eigensolver.eigen_cycle(multilevel, 1.0, 2, 2, 30).run((x, lam))
     _LOGGER.info("{} at level {}".format("Relax" if len(multilevel) == 1 else "Cycle", finest))
     x, _ = hm.run.relax_test_matrix(level.operator, level.rq, relax_cycle, x, num_sweeps)
-    _LOGGER.info("lambda {}".format(multilevel.level[0].global_params.lam))
+    _LOGGER.info("lambda {}".format(multilevel.finest_level.global_params.lam))
 
     # Recreate all coarse levels. One down-pass, relaxing at each level, hopefully starting from improved x so the
     # process improves all levels.
@@ -122,7 +122,7 @@ def bootstap(x, multilevel: hm.multilevel.Multilevel, max_levels: int, aggregate
         _LOGGER.info("Relax at level {}".format(l))
         x_level, _ = hm.run.relax_test_matrix(level.operator, level.rq, lambda x: level.relax(x, b), x_level,
                                                      num_sweeps=num_sweeps, print_frequency=print_frequency)
-        _LOGGER.info("lambda {}".format(multilevel.level[0].global_params.lam))
+        _LOGGER.info("lambda {}".format(multilevel.finest_level.global_params.lam))
 
     return x, new_multilevel
 
@@ -145,9 +145,9 @@ def fmg(multilevel, nu_pre: int = 1, nu_post: int = 1, nu_coarsest: int = 10, nu
         x0 = x[:, 0]
         r_norm = scaled_norm(level.operator(x0))
         _LOGGER.debug("FMG level {} init |r| {:.8e} lam {:.5f}".format(l, r_norm, level.global_params.lam))
-        cycle = hm.cycle.Cycle(processor, cycle_index, l - coarsest + 1, finest=l)
+        eigen_cycle = hm.cycle.Cycle(processor, cycle_index, coarsest - l + 1, finest=l)
         for _ in range(num_cycles):
-            x = cycle.run((x, lam))
+            x = eigen_cycle.run((x, lam))
 
         x = level.interpolate(x)
         level = multilevel.level[l - 1]
@@ -159,8 +159,9 @@ def fmg(multilevel, nu_pre: int = 1, nu_post: int = 1, nu_coarsest: int = 10, nu
     x0 = x[:, 0]
     r_norm = scaled_norm(level.operator(x0))
     _LOGGER.debug("FMG level {} init |r| {:.8e} lam {:.5f}".format(l, r_norm, level.global_params.lam))
+    eigen_cycle = hm.eigensolver.eigen_cycle(multilevel, cycle_index, nu_pre, nu_post, nu_coarsest, finest=l)
     for _ in range(num_cycles_finest):
-        x = multilevel.relax_cycle(x, nu_pre, nu_post, nu_coarsest, finest_level_ind=l)
+        x = eigen_cycle.run()
     x0 = x[:, 0]
     r_norm = scaled_norm(level.operator(x0))
     _LOGGER.debug("FMG level {} cycles {} |r| {:.8e} lam {:.5f}".format(l, num_cycles_finest, r_norm, level.global_params.lam))
