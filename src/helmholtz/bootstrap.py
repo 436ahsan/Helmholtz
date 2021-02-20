@@ -35,12 +35,11 @@ def generate_test_matrix(a: scipy.sparse.spmatrix, num_growth_steps: int, growth
         multilevel: multilevel hierarchy on the largest (final) domain.
     """
     # Initialize test functions (to random) and hierarchy at coarsest level.
-    multilevel = hm.multilevel.Multilevel()
     level = hm.multilevel.Level.create_finest_level(a)
-    multilevel.level.append(level)
+    multilevel = hm.multilevel.Multilevel(level)
     # TODO(orenlivne): generalize to d-dimensions. This is specific to 1D.
     domain_shape = (a.shape[0],)
-    x = hm.multilevel.random_test_matrix(domain_shape, num_examples=num_examples)
+    x = hm.run.random_test_matrix(domain_shape, num_examples=num_examples)
     # Bootstrap at the current level.
     max_levels = initial_max_levels
     _LOGGER.info("Smallest domain size {}, bootstrap with {} levels".format(x.shape[0], max_levels))
@@ -98,14 +97,13 @@ def bootstap(x, multilevel: hm.multilevel.Multilevel, max_levels: int, aggregate
         def relax_cycle(x):
             return multilevel.relax_cycle(x, 2, 2, 30)
     _LOGGER.info("{} at level {}".format("Relax" if len(multilevel) == 1 else "Cycle", finest))
-    x, _ = hm.multilevel.relax_test_matrix(level.operator, level.rq, relax_cycle, x, num_sweeps)
+    x, _ = hm.run.relax_test_matrix(level.operator, level.rq, relax_cycle, x, num_sweeps)
     _LOGGER.info("lambda {}".format(multilevel.level[0].global_params.lam))
 
     # Recreate all coarse levels. One down-pass, relaxing at each level, hopefully starting from improved x so the
     # process improves all levels.
     # TODO(orenlivne): add nested bootstrap cycles if needed.
-    new_multilevel = hm.multilevel.Multilevel()
-    new_multilevel.level.append(level)
+    new_multilevel = hm.multilevel.Multilevel(level)
     # Keep the x's of coarser levels in x_level; keep 'x' pointing to the finest test matrix.
     x_level = x
     for l in range(1, max_levels):
@@ -120,7 +118,7 @@ def bootstap(x, multilevel: hm.multilevel.Multilevel, max_levels: int, aggregate
         x_level = level.restrict(x_level)
         b = np.zeros_like(x_level)
         _LOGGER.info("Relax at level {}".format(l))
-        x_level, _ = hm.multilevel.relax_test_matrix(level.operator, level.rq, lambda x: level.relax(x, b), x_level,
+        x_level, _ = hm.run.relax_test_matrix(level.operator, level.rq, lambda x: level.relax(x, b), x_level,
                                                      num_sweeps=num_sweeps, print_frequency=print_frequency)
         _LOGGER.info("lambda {}".format(multilevel.level[0].global_params.lam))
 
@@ -135,7 +133,7 @@ def fmg(multilevel, nu_pre: int = 1, nu_post: int = 1, nu_coarsest: int = 10, nu
 
     # Coarsest level initial guess.
     level = multilevel.level[coarsest]
-    x = hm.multilevel.random_test_matrix((level.a.shape[0],), num_examples=num_examples)
+    x = hm.run.random_test_matrix((level.a.shape[0],), num_examples=num_examples)
     level.global_params.lam = 0
 
     for l in range(coarsest, finest, -1):

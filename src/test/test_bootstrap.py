@@ -45,15 +45,15 @@ class TestBootstrap:
         kh = 0.5
         a = hm.linalg.helmholtz_1d_operator(kh, n)
         level = hm.multilevel.Level.create_finest_level(a)
-        x = hm.multilevel.random_test_matrix((n,), num_examples=1)
+        multilevel = hm.multilevel.Multilevel(level)
+        x = hm.run.random_test_matrix((n,), num_examples=1)
         b = np.zeros_like(x)
         #        method = lambda x: level.relax(x, b)
-        multilevel = hm.multilevel.Multilevel()
-        multilevel.level.append(level)
+        multilevel = hm.multilevel.Multilevel(level)
         # Run enough Kaczmarz relaxations per lambda update (not just 1 relaxation) so we converge to the minimal one.
         nu = 5
-        method = lambda x: multilevel.relax_cycle(x, None, None, nu)
-        x, conv_factor = hm.multilevel.relax_test_matrix(level.operator, level.rq, method, x, 100)
+        method = lambda x: hm.eigensolver.eigen_cycle(multilevel, 1.0, None, None, nu).run(x)
+        x, conv_factor = hm.run.relax_test_matrix(level.operator, level.rq, method, x, 100)
 
         assert np.mean([level.rq(x[:, i]) for i in range(x.shape[1])]) == pytest.approx(0.09770, 1e-3)
         assert (hm.linalg.scaled_norm_of_matrix(a.dot(x)) / hm.linalg.scaled_norm_of_matrix(x)).mean() == \
@@ -74,7 +74,7 @@ class TestBootstrap:
         relax_cycle = lambda x: multilevel.relax_cycle(x, 1, 1, 100)
         # FMG start so (x, lambda) has a reasonable initial guess.
         x = hm.bootstrap.fmg(multilevel, num_cycles_finest=0)
-        x, conv_factor = hm.multilevel.relax_test_matrix(level.operator, level.rq, relax_cycle, x, 20,
+        x, conv_factor = hm.run.relax_test_matrix(level.operator, level.rq, relax_cycle, x, 20,
                                                          print_frequency=1)
 
         assert level.global_params.lam == pytest.approx(0.0977590650225, 1e-3)
@@ -100,9 +100,9 @@ class TestBootstrap:
         # x += 0.1 * np.random.random(x.shape)
         # multilevel.level[0].global_params.lam *= 1.01
 
-        x, conv_factor = hm.multilevel.relax_test_matrix(level.operator, level.rq, relax_cycle, x, 20,
+        x, conv_factor = hm.run.relax_test_matrix(level.operator, level.rq, relax_cycle, x, 20,
                                                          print_frequency=1,
-                                                         residual_stop_value=1e-11, lam_stop_value=1e-20)
+                                                         residual_stop_value=1e-11)
 
         assert level.global_params.lam == pytest.approx(0.0977590650225, 1e-3)
         assert np.mean([level.rq(x[:, i]) for i in range(x.shape[1])]) == pytest.approx(0.097759, 1e-3)
@@ -124,7 +124,7 @@ class TestBootstrap:
 #        level.global_params.lam = exact_eigenpair(level.a)
 
         relax_cycle = lambda x: multilevel.relax_cycle(x, 1, 1, 100, max_levels=3)
-        x, conv_factor = hm.multilevel.relax_test_matrix(level.operator, level.rq, relax_cycle, x_init, 15)
+        x, conv_factor = hm.run.relax_test_matrix(level.operator, level.rq, relax_cycle, x_init, 15)
         assert level.global_params.lam == pytest.approx(0.0977590650225, 1e-3)
         assert np.mean([level.rq(x[:, i]) for i in range(x.shape[1])]) == pytest.approx(0.097759, 1e-3)
         assert conv_factor == pytest.approx(0.32, 1e-2)

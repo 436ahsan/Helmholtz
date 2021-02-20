@@ -13,108 +13,6 @@ from helmholtz.linalg import scaled_norm
 _LOGGER = logging.getLogger("multilevel")
 
 
-class Multilevel:
-    """The multilevel hierarchy. Contains a sequence of levels."""
-
-    def __init__(self):
-        self.level = []
-
-    def __len__(self):
-        return len(self.level)
-
-    def relax_cycle(self, x: np.array, nu_pre: int, nu_post: int, nu_coarsest: int,
-                    debug: bool = False, update_lam: str = "coarsest", finest_level_ind: int = 0, cycle_index: int = 1,
-                    max_levels: int = 10000, relax_coarsest: int = 5) -> np.array:
-        """
-        Executes a relaxation V(nu_pre, nu_post) -cycle on A*x = 0.
-
-        Args:
-            x: initial guess. May be a vector of size n or a matrix of size n x m, where A is n x n.
-            nu_pre: number of relaxation sweeps at a level before visiting coarser levels.
-            nu_post: number of relaxation sweeps at a level after visiting coarser levels.
-            nu_coarsest: number of relaxation sweeps to run at the coarsest level.
-            debug: print logging debugging printouts or not.
-
-        Returns:
-            x after the cycle.
-        """
-        # TODO(orenlivne): replace by a general-cycle-index, non-recursive loop. Move relaxation, transfers,
-        #  ritz, etc. logic to a processor -- separate from the cycle -- separate frm the Multilevel object.
-        if debug:
-            _LOGGER.debug("-" * 80)
-            _LOGGER.debug("{:<5}    {:<15}    {:<10}    {:<10}    {:<10}".format(
-                "Level", "Operation", "|R|", "|R_norm|", "lambda"))
-        sigma = np.ones(x.shape[1], )
-        b = np.zeros_like(x)
-        x = self._relax_cycle(finest_level_ind, x, sigma, nu_pre, nu_post, nu_coarsest, relax_coarsest,
-                              b, debug, update_lam, cycle_index, max_levels)
-        # if update_lam == "finest":
-        #     x = self._update_global_constraints(x, sigma, b, self.level[finest_level_ind])
-        return x
-
-    def _update_global_constraints(self, x, sigma, b, level):
-        """
-        Updates lambda + normalize at level 'level'.
-        Args:
-            x:
-
-        Returns:
-            Updated x. Global lambda also updated to the mean of RQ of all test functions.
-        """
-        eta = level.normalization(x)
-        # TODO(orenlivne): vectorize the following expressions.
-        for i in range(x.shape[1]):
-            x[:, i] *= (sigma[i] / eta[i]) ** 0.5
-        level.global_params.lam = np.mean([level.rq(x[:, i], b[:, i]) for i in range(x.shape[1])])
-        return x
-
-    def _relax_cycle(self, level_ind: int, x: np.array, sigma: float,
-                     nu_pre: int, nu_post: int, nu_coarsest: int, relax_coarsest: int, b: np.ndarray, debug: bool,
-                     update_lam: str, cycle_index: int, max_levels: int) -> np.array:
-        level = self.level[level_ind]
-
-        def print_state(title):
-            if debug:
-                _LOGGER.debug("{:<5d}    {:<15}    {:.4e}    {:.4e}    {:.8f}".format(
-                    level_ind, title, scaled_norm(b[:, 0] - level.operator(x[:, 0])),
-                    np.abs(sigma - level.normalization(x))[0], level.global_params.lam))
-
-        print_state("initial")
-        if level_ind == min(len(self), max_levels) - 1:
-            # Coarsest level.
-            for _ in range(nu_coarsest):
-                for _ in range(relax_coarsest):
-                    x = level.relax(x, b)
-                if update_lam == "coarsest":
-                    # Update lambda + normalize only once per several relaxations if multilevel and updating lambda
-                    # at the coarsest level.
-                    x = self._update_global_constraints(x, sigma, b, level)
-            print_state("coarsest ({})".format(nu_coarsest))
-        else:
-            if nu_pre > 0:
-                for _ in range(nu_pre):
-                    x = level.relax(x, b)
-                print_state("relax {}".format(nu_pre))
-            if level_ind < len(self) - 1:
-                coarse_level = self.level[level_ind + 1]
-                # Full Approximation Scheme (FAS).
-                xc_initial = coarse_level.restrict(x)
-                bc = coarse_level.restrict(b - level.operator(x)) + coarse_level.operator(xc_initial)
-                sigma_c = sigma - level.normalization(x) + coarse_level.normalization(xc_initial)
-                for _ in range(cycle_index):
-                    xc = self._relax_cycle(level_ind + 1, xc_initial, sigma_c, nu_pre, nu_post, nu_coarsest,
-                                           relax_coarsest, bc, debug,
-                                           update_lam, cycle_index, max_levels)
-                x += coarse_level.interpolate(xc - xc_initial)
-                print_state("correction {}".format(nu_pre))
-
-            if nu_post > 0:
-                for _ in range(nu_post):
-                    x = level.relax(x, b)
-                print_state("relax {}".format(nu_post))
-        return x
-
-
 class GlobalParams:
     """Parameters shared by all levels of the multilevel hierarchy."""
 
@@ -251,76 +149,43 @@ class Level:
         return self._p_csr.dot(xc)
 
 
-def relax_test_matrix(operator, rq, method, x: np.ndarray, num_sweeps: int = 30, print_frequency: int = None,
-                      residual_stop_value: float = 1e-10, lam_stop_value: float = 1e-15) \
-        -> np.ndarray:
-    """
-    Creates test functions (functions that approximately satisfy A*x=0) using single level relaxation.
+class Multilevel:
+    """The multilevel hierarchy. Contains a sequence of levels."""
 
-    Args:
-        operator: an object that can calculate residuals (action A*x).
-        rq: Rayleigh-quotient functor.
-        method: iterative method functor (an iteration is a call to this method).
-        x: test matrix initial approximation to the test functions.
-        num_sweeps: number of sweeps to execute.
-        print_frequency: print debugging convergence statements per this number of sweeps. None means no printouts.
+    def __init__(self, finest_level: Level):
+        """
+        Creates an initial multi-level hierarchy with one level.
+        Args:
+            finest_level: finest Level.
+        """
+        self.level = [finest_level]
 
-    Returns:
-        e: relaxed test matrix.
-        conv_factor: asymptotic convergence factor (of the last iteration).
-    """
-    # Print the error and residual norm of the first test function.
-    x0 = x[:, 0]
-    x_norm = scaled_norm(x0)
-    r_norm = scaled_norm(operator(x0))
-    lam = rq(x0)
-    lam_error = 1
-    _LOGGER.debug("{:5d} |r| {:.8e} rq {:.5f}".format(0, r_norm, lam))
-    # Run 'num_sweeps' relaxation sweeps.
-    if print_frequency is None:
-        print_frequency = num_sweeps // 10
-    r_norm_history = [None] * (num_sweeps + 1)
-    r_norm_history[0] = r_norm
-    min_sweeps = 5
-    for i in range(1, num_sweeps + 1):
-        r_norm_old = r_norm
-        lam_old = lam
-        lam_error_old = lam_error
-        x = method(x)
-        x0 = x[:, 0]
-        x_norm = scaled_norm(x0)
-        r_norm = scaled_norm(operator(x0))
-        lam = rq(x0)
-        lam_error = np.abs(lam - lam_old)
-        if i % print_frequency == 0:
-            _LOGGER.debug("{:5d} |r| {:.8e} ({:.5f}) rq {:.5f} ({:.5f})".format(
-                i, r_norm, r_norm / max(1e-30, r_norm_old), lam, lam_error / max(1e-30, lam_error_old)))
-        r_norm_history[i] = r_norm
-        if i >= min_sweeps and (r_norm < residual_stop_value or lam_error < lam_stop_value):
-            r_norm_history = r_norm_history[:i + 1]
-            break
-    # return x, r_norm / r_norm_old
-    # Average convergence factor over the last 5 steps. Exclude first cycle.
-    last_steps = min(5, len(r_norm_history) - 2)
-    return x, (r_norm_history[-1] / r_norm_history[-last_steps - 1]) ** (1 / last_steps)
+    def __len__(self):
+        return len(self.level)
 
+    @property
+    def finest_level(self) -> Level:
+        """
+        Returns the finest level.
 
-def random_test_matrix(window_shape: Tuple[int], num_examples: int = None) -> np.ndarray:
-    """
-    Creates the initial test functions as random[-1, 1].
+        Returns: finest level object.
+        """
+        return self.level[0]
 
-    Args:
-        window_shape: domain size (#gridpoints in each dimension).
-        num_examples: number of test functions to generate.
+    @property
+    def global_params(self) -> GlobalParams:
+        """
+        Returns the global parameter struct shared by all levels.
 
-    Returns:
-        e: window_size x num_examples random test matrix.
-    """
-    if num_examples is None:
-        # By default, use more test functions than gridpoints so we have a sufficiently large test function sample.
-        num_examples = 4 * np.prod(window_shape)
+        Returns: global parameter struct.
+        """
+        return self.finest_level.global_params
 
-    # Start from random[-1,1] guess for each function.
-    e = 2 * np.random.random(window_shape + (num_examples,)) - 1
-    e /= norm(e)
-    return e
+    @property
+    def lam(self):
+        """
+        Returns the eigenvalue array approximate solution. A useful shortcut.
+
+        Returns: array of eigenvalues.
+        """
+        return self.global_params.lam

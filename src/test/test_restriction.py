@@ -27,9 +27,9 @@ class TestRestriction:
 
         # Generate relaxed test matrix.
         level = hm.multilevel.Level.create_finest_level(a)
-        x = hm.multilevel.random_test_matrix((n,))
+        x = hm.run.random_test_matrix((n,))
         b = np.zeros_like(x)
-        x, _ = hm.multilevel.relax_test_matrix(level.operator, level.rq,
+        x, _ = hm.run.relax_test_matrix(level.operator, level.rq,
                                                lambda x: level.relax(x, b), x, num_sweeps=num_sweeps)
 
         # Generate coarse variables (R) based on a window of x.
@@ -51,9 +51,9 @@ class TestRestriction:
 
         # Generate relaxed test matrix.
         level = hm.multilevel.Level.create_finest_level(a)
-        x = hm.multilevel.random_test_matrix((n,))
+        x = hm.run.random_test_matrix((n,))
         b = np.zeros_like(x)
-        x, _ = hm.multilevel.relax_test_matrix(level.operator, level.rq,
+        x, _ = hm.run.relax_test_matrix(level.operator, level.rq,
                                                lambda x: level.relax(x, b), x, num_sweeps=num_sweeps)
 
         # Generate coarse variables (R) based on different windows of x.
