@@ -108,7 +108,7 @@ class TestBootstrap:
         kh = 0.5
         a = hm.linalg.helmholtz_1d_operator(kh, n)
         x, lam, multilevel = hm.bootstrap.generate_test_matrix(
-            a, 0, num_sweeps=10, num_examples=4, initial_max_levels=3)
+            a, 0, num_sweeps=10, num_examples=6, initial_max_levels=3)
         assert len(multilevel) == 3
 
         level = multilevel.finest_level

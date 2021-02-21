@@ -197,17 +197,18 @@ def create_transfer_operators(x, domain_size: int, aggregate_size: int, threshol
     # Increase aggregate size until we reach a small enough coarsening ratio.
     while (aggregate_size <= domain_size // 2) and (coarsening_ratio > max_coarsening_ratio):
         aggregate_size *= 2
-        num_windows = (4 * aggregate_size) // num_test_functions
+        num_windows = max((4 * aggregate_size) // num_test_functions, 1)
         x_aggregate_t = np.concatenate(
             tuple(hm.linalg.get_window(x, offset, aggregate_size) for offset in range(num_windows)), axis=1).transpose()
         r, s = hm.restriction.create_restriction(x_aggregate_t, threshold)
         nc = r.asarray().shape[0]
         coarsening_ratio = nc / aggregate_size
+        _LOGGER.debug("SVD {:2d} x {:2d} aggregate size {} nc {} cr {:.2f} interpolation error {:.3f} Singular vals {}".format(
+            x_aggregate_t.shape[0], x_aggregate_t.shape[1], aggregate_size, nc, coarsening_ratio,
+            (sum(s[nc:] ** 2) / sum(s ** 2)) ** 0.5, np.array2string(s, separator=", ", precision=2)))
     if (aggregate_size > domain_size // 2) or (coarsening_ratio > max_coarsening_ratio):
         raise Exception("Could not find a good coarsening ratio")
 
-    _LOGGER.debug("Singular vals {}, aggregate size {} nc {} cr {:.2f} interpolation error {:.3f}".format(
-        s, aggregate_size, nc, coarsening_ratio, (sum(s[nc:] ** 2) / sum(s ** 2)) ** 0.5))
     num_aggregates = domain_size // aggregate_size
     r_csr = r.tile(num_aggregates)
     xc = r_csr.dot(x)
