@@ -30,8 +30,8 @@ class TestRestriction:
         x = hm.run.random_test_matrix((n,))
         b = np.zeros_like(x)
         lam = 0
-        x, _, _ = hm.run.relax_test_matrix(level.operator, lambda x, lam: (level.relax(x, b, lam), lam),
-                                           x, lam, num_sweeps=num_sweeps)
+        x, _, _ = hm.run.run_iterative_method(level.operator, lambda x, lam: (level.relax(x, b, lam), lam),
+                                              x, lam, num_sweeps=num_sweeps)
 
         # Generate coarse variables (R) based on a window of x.
         x_aggregate_t = x[:aggregate_size].transpose()
@@ -55,8 +55,8 @@ class TestRestriction:
         x = hm.run.random_test_matrix((n,))
         b = np.zeros_like(x)
         lam = 0
-        x, _, _ = hm.run.relax_test_matrix(level.operator, lambda x, lam: (level.relax(x, b, lam), lam),
-                                           x, lam, num_sweeps=num_sweeps)
+        x, _, _ = hm.run.run_iterative_method(level.operator, lambda x, lam: (level.relax(x, b, lam), lam),
+                                              x, lam, num_sweeps=num_sweeps)
 
         # Generate coarse variables (R) based on different windows of x.
         # Note: all restrictions and singular values will be almost identical except the two windows (offset = 29, 30)

@@ -99,7 +99,7 @@ def bootstap(x, lam, multilevel: hm.multilevel.Multilevel, max_levels: int, aggr
         def eigen_cycle(x, lam):
             return hm.eigensolver.eigen_cycle(multilevel, 1.0, 2, 2, 30).run((x, lam))
     _LOGGER.info("{} at level {}".format("Relax" if len(multilevel) == 1 else "Cycle", finest))
-    x, lam, _ = hm.run.relax_test_matrix(level.operator, eigen_cycle, x, lam, num_sweeps)
+    x, lam, _ = hm.run.run_iterative_method(level.operator, eigen_cycle, x, lam, num_sweeps)
     _LOGGER.info("lambda {}".format(lam))
 
     # Recreate all coarse levels. One down-pass, relaxing at each level, hopefully starting from improved x so the
@@ -120,7 +120,7 @@ def bootstap(x, lam, multilevel: hm.multilevel.Multilevel, max_levels: int, aggr
         x_level = level.restrict(x_level)
         b = np.zeros_like(x_level)
         _LOGGER.info("Relax at level {}".format(l))
-        x_level, lam, _ = hm.run.relax_test_matrix(
+        x_level, lam, _ = hm.run.run_iterative_method(
             level.operator, lambda x, lam: (level.relax(x, b, lam), lam), x_level, lam, num_sweeps=num_sweeps,
             print_frequency=print_frequency)
         _LOGGER.info("lambda {}".format(lam))

@@ -118,8 +118,12 @@ class EigenProcessor(hm.processor.Processor):
 
     def post_cycle(self, l):
         # Executes at the finest level L at the end of the cycle. A hook.
-        # TODO(orenlivne): add Ritz projection.
-        pass
+        level = self._multilevel.level[l]
+        # # Exclude lam term from action here, so it's just A*x.
+        # action = lambda x: level.stiffness_operator(x)
+        # self._x[l], lam_ritz = hm.linalg.ritz(self._x[l], action)
+        # # TODO(orenlivne): remove this once we start calculating multiple lambda.
+        # self._lam = lam_ritz[0]
 
     def result(self, l):
         # Returns the cycle result X at level l. Normally called by Cycle with l=finest level.

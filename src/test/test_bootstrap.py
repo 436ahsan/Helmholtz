@@ -52,7 +52,7 @@ class TestBootstrap:
         nu = 5
         lam = 0
         method = lambda x, lam: hm.eigensolver.eigen_cycle(multilevel, 1.0, None, None, nu).run((x, lam))
-        x, lam, conv_factor = hm.run.relax_test_matrix(level.operator, method, x, lam, 100)
+        x, lam, conv_factor = hm.run.run_iterative_method(level.operator, method, x, lam, 100)
 
         assert np.mean([level.rq(x[:, i]) for i in range(x.shape[1])]) == pytest.approx(0.09770, 1e-3)
         assert (hm.linalg.scaled_norm_of_matrix(a.dot(x)) / hm.linalg.scaled_norm_of_matrix(x)).mean() == \
@@ -72,7 +72,7 @@ class TestBootstrap:
         eigen_cycle = lambda x, lam: hm.eigensolver.eigen_cycle(multilevel, 1.0, 1, 1, 100).run((x, lam))
         # FMG start so (x, lambda) has a reasonable initial guess.
         x = hm.bootstrap.fmg(multilevel, num_cycles_finest=0)
-        x, lam, conv_factor = hm.run.relax_test_matrix(level.operator, eigen_cycle, x, lam, 20, print_frequency=1)
+        x, lam, conv_factor = hm.run.run_iterative_method(level.operator, eigen_cycle, x, lam, 20, print_frequency=1)
 
         assert lam == pytest.approx(0.0977590650225, 1e-3)
         assert np.mean([level.rq(x[:, i]) for i in range(x.shape[1])]) == pytest.approx(0.097759, 1e-3)
@@ -97,8 +97,8 @@ class TestBootstrap:
         # x += 0.1 * np.random.random(x.shape)
         # multilevel.finest_multilevel.lam *= 1.01
 
-        x, lam, conv_factor = hm.run.relax_test_matrix(level.operator, eigen_cycle, x, lam, 20,
-                                                       print_frequency=1, residual_stop_value=1e-11)
+        x, lam, conv_factor = hm.run.run_iterative_method(level.operator, eigen_cycle, x, lam, 20,
+                                                          print_frequency=1, residual_stop_value=1e-11)
 
         assert lam == pytest.approx(0.0977590650225, 1e-3)
         assert np.mean([level.rq(x[:, i]) for i in range(x.shape[1])]) == pytest.approx(0.097759, 1e-3)
@@ -120,7 +120,7 @@ class TestBootstrap:
         #        multilevel.lam = exact_eigenpair(level.a)
 
         eigen_cycle = lambda x, lam: hm.eigensolver.eigen_cycle(multilevel, 1.0, 1, 1, 100, num_levels=3).run((x, lam))
-        x, lam, conv_factor = hm.run.relax_test_matrix(level.operator, eigen_cycle, x_init, lam, 15)
+        x, lam, conv_factor = hm.run.run_iterative_method(level.operator, eigen_cycle, x_init, lam, 15)
         assert lam == pytest.approx(0.0977590650225, 1e-3)
         assert np.mean([level.rq(x[:, i]) for i in range(x.shape[1])]) == pytest.approx(0.097759, 1e-3)
         assert conv_factor == pytest.approx(0.32, 1e-2)

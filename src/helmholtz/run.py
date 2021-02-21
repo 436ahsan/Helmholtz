@@ -9,8 +9,8 @@ from helmholtz.linalg import scaled_norm
 _LOGGER = logging.getLogger(__name__)
 
 
-def relax_test_matrix(operator, method, x: np.ndarray, lam, num_sweeps: int = 30, print_frequency: int = None,
-                      residual_stop_value: float = 1e-10) -> np.ndarray:
+def run_iterative_method(operator, method, x: np.ndarray, lam, num_sweeps: int = 30, print_frequency: int = None,
+                         residual_stop_value: float = 1e-10) -> np.ndarray:
     """
     Creates test functions (functions that approximately satisfy A*x=0) using single level relaxation.
 
