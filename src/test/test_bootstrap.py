@@ -97,10 +97,10 @@ class TestBootstrap:
         # x += 0.1 * np.random.random(x.shape)
         # multilevel.finest_multilevel.lam *= 1.01
 
-        x, conv_factor = hm.run.relax_test_matrix(level.operator, eigen_cycle, x, 20,
-                                                  print_frequency=1, residual_stop_value=1e-11)
+        x, lam, conv_factor = hm.run.relax_test_matrix(level.operator, eigen_cycle, x, 20,
+                                                       print_frequency=1, residual_stop_value=1e-11)
 
-        assert multilevel.lam == pytest.approx(0.0977590650225, 1e-3)
+        assert lam == pytest.approx(0.0977590650225, 1e-3)
         assert np.mean([level.rq(x[:, i]) for i in range(x.shape[1])]) == pytest.approx(0.097759, 1e-3)
         assert conv_factor == pytest.approx(0.304, 1e-2)
 
@@ -119,10 +119,9 @@ class TestBootstrap:
         x_init = hm.bootstrap.fmg(multilevel, num_cycles_finest=0, num_cycles=1)
         #        multilevel.lam = exact_eigenpair(level.a)
 
-        lam = multilevel.lam
-        eigen_cycle = lambda x: hm.eigensolver.eigen_cycle(multilevel, 1.0, 1, 1, 100, num_levels=3).run((x, lam))
-        x, conv_factor = hm.run.relax_test_matrix(level.operator, eigen_cycle, x_init, 15)
-        assert multilevel.lam == pytest.approx(0.0977590650225, 1e-3)
+        eigen_cycle = lambda x, lam: hm.eigensolver.eigen_cycle(multilevel, 1.0, 1, 1, 100, num_levels=3).run((x, lam))
+        x, lam, conv_factor = hm.run.relax_test_matrix(level.operator, eigen_cycle, x_init, 15)
+        assert lam == pytest.approx(0.0977590650225, 1e-3)
         assert np.mean([level.rq(x[:, i]) for i in range(x.shape[1])]) == pytest.approx(0.097759, 1e-3)
         assert conv_factor == pytest.approx(0.32, 1e-2)
 
