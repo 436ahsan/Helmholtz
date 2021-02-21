@@ -40,14 +40,15 @@ def generate_test_matrix(a: scipy.sparse.spmatrix, num_growth_steps: int, growth
     # TODO(orenlivne): generalize to d-dimensions. This is specific to 1D.
     domain_shape = (a.shape[0],)
     x = hm.run.random_test_matrix(domain_shape, num_examples=num_examples)
+    lam = 0
     # Bootstrap at the current level.
     max_levels = initial_max_levels
     _LOGGER.info("Smallest domain size {}, bootstrap with {} levels".format(x.shape[0], max_levels))
     for i in range(num_bootstrap_steps):
         _LOGGER.info("Bootstrap step {}/{}".format(i + 1, num_bootstrap_steps))
-        x, multilevel = bootstap(
-            x, multilevel, max_levels, aggregate_size=aggregate_size, num_sweeps=num_sweeps, num_examples=num_examples,
-            print_frequency=print_frequency)
+        x, lam, multilevel = bootstap(
+            x, lam, multilevel, max_levels, aggregate_size=aggregate_size, num_sweeps=num_sweeps,
+            num_examples=num_examples, print_frequency=print_frequency)
 
     for l in range(num_growth_steps):
         _LOGGER.info("Growing domain {}/{} to size {}, max_levels {}".format(
@@ -58,22 +59,23 @@ def generate_test_matrix(a: scipy.sparse.spmatrix, num_growth_steps: int, growth
         # Bootstrap at the current level.
         for i in range(num_bootstrap_steps):
             _LOGGER.info("Bootstrap step {}/{}".format(i + 1, num_bootstrap_steps))
-            x, multilevel = bootstap(
-                x, multilevel, max_levels, aggregate_size=aggregate_size, num_sweeps=num_sweeps,
+            x, lam, multilevel = bootstap(
+                x, lam, multilevel, max_levels, aggregate_size=aggregate_size, num_sweeps=num_sweeps,
                 num_examples=num_examples, print_frequency=print_frequency)
         max_levels += 1
 
-    return x, multilevel
+    return x, lam, multilevel
 
 
-def bootstap(x, multilevel: hm.multilevel.Multilevel, max_levels: int, aggregate_size: int = 4, num_sweeps: int = 10,
-             threshold: float = 0.1, caliber: int = 2, interpolation_method: str = "svd",
+def bootstap(x, lam, multilevel: hm.multilevel.Multilevel, max_levels: int, aggregate_size: int = 4,
+             num_sweeps: int = 10, threshold: float = 0.1, caliber: int = 2, interpolation_method: str = "svd",
              num_examples: int = None, print_frequency: int = None) -> \
         Tuple[np.ndarray, hm.multilevel.Multilevel]:
     """
     Improves test functions and a multilevel hierarchy on a fixed-size domain by bootstrapping.
     Args:
         x: test matrix.
+        lam: corresponding eigenvalue array to x's columns.
         multilevel: multilevel hierarchy.
         aggregate_size: aggregate size = #fine vars per aggregate.
         num_sweeps: number of relaxations or cycles to run on fine-level vectors to improve them.
@@ -91,16 +93,14 @@ def bootstap(x, multilevel: hm.multilevel.Multilevel, max_levels: int, aggregate
     b = np.zeros_like(x)
     # TODO(orenlivne): update parameters of relaxation cycle to reasonable values if needed.
     if len(multilevel) == 1:
-        def relax_cycle(x):
-            lam = multilevel.lam
+        def eigen_cycle(x, lam):
             return hm.eigensolver.eigen_cycle(multilevel, 1.0, None, None, 5).run((x, lam))
     else:
-        def relax_cycle(x):
-            lam = multilevel.lam
+        def eigen_cycle(x, lam):
             return hm.eigensolver.eigen_cycle(multilevel, 1.0, 2, 2, 30).run((x, lam))
     _LOGGER.info("{} at level {}".format("Relax" if len(multilevel) == 1 else "Cycle", finest))
-    x, _ = hm.run.relax_test_matrix(level.operator, level.rq, relax_cycle, x, num_sweeps)
-    _LOGGER.info("lambda {}".format(multilevel.finest_level.global_params.lam))
+    x, lam, _ = hm.run.relax_test_matrix(level.operator, eigen_cycle, x, lam, num_sweeps)
+    _LOGGER.info("lambda {}".format(lam))
 
     # Recreate all coarse levels. One down-pass, relaxing at each level, hopefully starting from improved x so the
     # process improves all levels.
@@ -115,16 +115,17 @@ def bootstap(x, multilevel: hm.multilevel.Multilevel, max_levels: int, aggregate
                                          aggregate_size=aggregate_size, threshold=threshold, caliber=caliber,
                                          interpolation_method=interpolation_method)
         # 'level' now becomes the next coarser level and x_level the corresponding test matrix.
-        level = hm.multilevel.Level.create_coarse_level(level.a, level.b, level.global_params, r, p)
+        level = hm.multilevel.Level.create_coarse_level(level.a, level.b, r, p)
         new_multilevel.level.append(level)
         x_level = level.restrict(x_level)
         b = np.zeros_like(x_level)
         _LOGGER.info("Relax at level {}".format(l))
-        x_level, _ = hm.run.relax_test_matrix(level.operator, level.rq, lambda x: level.relax(x, b), x_level,
-                                                     num_sweeps=num_sweeps, print_frequency=print_frequency)
-        _LOGGER.info("lambda {}".format(multilevel.finest_level.global_params.lam))
+        x_level, lam, _ = hm.run.relax_test_matrix(
+            level.operator, lambda x, lam: (level.relax(x, b, lam), lam), x_level, lam, num_sweeps=num_sweeps,
+            print_frequency=print_frequency)
+        _LOGGER.info("lambda {}".format(lam))
 
-    return x, new_multilevel
+    return x, lam, new_multilevel
 
 
 def fmg(multilevel, nu_pre: int = 1, nu_post: int = 1, nu_coarsest: int = 10, num_cycles: int = 1,
@@ -136,35 +137,34 @@ def fmg(multilevel, nu_pre: int = 1, nu_post: int = 1, nu_coarsest: int = 10, nu
     # Coarsest level initial guess.
     level = multilevel.level[coarsest]
     x = hm.run.random_test_matrix((level.a.shape[0],), num_examples=num_examples)
-    level.global_params.lam = 0
+    lam = 0
 
-    lam = multilevel.lam
     processor = hm.eigensolver.EigenProcessor(multilevel, nu_pre, nu_post, nu_coarsest)
     for l in range(coarsest, finest, -1):
         level = multilevel.level[l]
         x0 = x[:, 0]
-        r_norm = scaled_norm(level.operator(x0))
-        _LOGGER.debug("FMG level {} init |r| {:.8e} lam {:.5f}".format(l, r_norm, level.global_params.lam))
+        r_norm = scaled_norm(level.operator(x0, lam))
+        _LOGGER.debug("FMG level {} init |r| {:.8e} lam {:.5f}".format(l, r_norm, lam))
         eigen_cycle = hm.cycle.Cycle(processor, cycle_index, coarsest - l + 1, finest=l)
         for _ in range(num_cycles):
-            x = eigen_cycle.run((x, lam))
+            x, lam = eigen_cycle.run((x, lam))
 
         x = level.interpolate(x)
         level = multilevel.level[l - 1]
         x0 = x[:, 0]
-        r_norm = scaled_norm(level.operator(x0))
-        _LOGGER.debug("FMG level {} cycles {} |r| {:.8e} lam {:.5f}".format(l, num_cycles, r_norm, level.global_params.lam))
+        r_norm = scaled_norm(level.operator(x0, lam))
+        _LOGGER.debug("FMG level {} cycles {} |r| {:.8e} lam {:.5f}".format(l, num_cycles, r_norm, lam))
 
     l = finest
     x0 = x[:, 0]
-    r_norm = scaled_norm(level.operator(x0))
-    _LOGGER.debug("FMG level {} init |r| {:.8e} lam {:.5f}".format(l, r_norm, level.global_params.lam))
+    r_norm = scaled_norm(level.operator(x0, lam))
+    _LOGGER.debug("FMG level {} init |r| {:.8e} lam {:.5f}".format(l, r_norm, lam))
     eigen_cycle = hm.eigensolver.eigen_cycle(multilevel, cycle_index, nu_pre, nu_post, nu_coarsest, finest=l)
     for _ in range(num_cycles_finest):
         x = eigen_cycle.run()
     x0 = x[:, 0]
-    r_norm = scaled_norm(level.operator(x0))
-    _LOGGER.debug("FMG level {} cycles {} |r| {:.8e} lam {:.5f}".format(l, num_cycles_finest, r_norm, level.global_params.lam))
+    r_norm = scaled_norm(level.operator(x0, lam))
+    _LOGGER.debug("FMG level {} cycles {} |r| {:.8e} lam {:.5f}".format(l, num_cycles_finest, r_norm, lam))
     return x
 
 

@@ -16,7 +16,7 @@ class TestRestriction:
         for handler in logging.root.handlers[:]: logging.root.removeHandler(handler)
         logging.basicConfig(stream=sys.stdout, level=logging.DEBUG, format="%(levelname)-8s %(message)s",
                             datefmt="%a, %d %b %Y %H:%M:%S")
-        np.random.seed(0)
+        np.random.seed(1)
 
     def test_restriction(self):
         n = 32
@@ -29,8 +29,9 @@ class TestRestriction:
         level = hm.multilevel.Level.create_finest_level(a)
         x = hm.run.random_test_matrix((n,))
         b = np.zeros_like(x)
-        x, _ = hm.run.relax_test_matrix(level.operator, level.rq,
-                                               lambda x: level.relax(x, b), x, num_sweeps=num_sweeps)
+        lam = 0
+        x, _, _ = hm.run.relax_test_matrix(level.operator, lambda x, lam: (level.relax(x, b, lam), lam),
+                                           x, lam, num_sweeps=num_sweeps)
 
         # Generate coarse variables (R) based on a window of x.
         x_aggregate_t = x[:aggregate_size].transpose()
@@ -44,7 +45,7 @@ class TestRestriction:
 
     def test_restriction_is_same_in_different_windows(self):
         n = 32
-        kh = 0.6
+        kh = 0.1 # 0.6
         num_sweeps = 100
         aggregate_size = 4
         a = hm.linalg.helmholtz_1d_operator(kh, n)
@@ -53,8 +54,9 @@ class TestRestriction:
         level = hm.multilevel.Level.create_finest_level(a)
         x = hm.run.random_test_matrix((n,))
         b = np.zeros_like(x)
-        x, _ = hm.run.relax_test_matrix(level.operator, level.rq,
-                                               lambda x: level.relax(x, b), x, num_sweeps=num_sweeps)
+        lam = 0
+        x, _, _ = hm.run.relax_test_matrix(level.operator, lambda x, lam: (level.relax(x, b, lam), lam),
+                                           x, lam, num_sweeps=num_sweeps)
 
         # Generate coarse variables (R) based on different windows of x.
         # Note: all restrictions and singular values will be almost identical except the two windows (offset = 29, 30)
@@ -64,5 +66,5 @@ class TestRestriction:
                 hm.linalg.get_window(x, offset, aggregate_size).transpose(), 0.1)[0].asarray())
             for offset in range(len(x))])
         # R should not change much across different windows.
-        mean_entry_error = np.mean(np.abs((np.std(r_by_offset, axis=0) / np.mean(r_by_offset, axis=0)).flatten()))
-        assert mean_entry_error <= 0.07
+        mean_entry_error = np.mean(np.abs((np.std(r_by_offset, axis=0) / np.mean(np.abs(r_by_offset), axis=0)).flatten()))
+        assert mean_entry_error <= 0.03

@@ -49,6 +49,7 @@ class EigenProcessor(hm.processor.Processor):
         self._update_lam = update_lam
 
         self._x = None
+        self._lam = None
         self._x_initial = None
         self._b = None
         self._sigma = None
@@ -66,6 +67,7 @@ class EigenProcessor(hm.processor.Processor):
         self._x_initial = [None] * len(self._multilevel)
         # Initialize finest-level quantities.
         self._x[l] = x
+        self._lam = lam
         self._b[l] = np.zeros_like(x)
         self._sigma[l] = np.ones(x.shape[1], )
 
@@ -74,11 +76,11 @@ class EigenProcessor(hm.processor.Processor):
         level = self._multilevel.level[l]
         for _ in range(self._nu_coarsest):
             for _ in range(self._relax_coarsest):
-                self._x[l] = level.relax(self._x[l], self._b[l])
+                self._x[l] = level.relax(self._x[l], self._b[l], self._lam)
             if self._update_lam == "coarsest":
                 # Update lambda + normalize only once per several relaxations if multilevel and updating lambda
                 # at the coarsest level.
-                self._x[l] = self._update_global_constraints(l, self._x[l])
+                self._x[l], self._lam = self._update_global_constraints(l, self._x[l])
         self._print_state(l, "coarsest ({})".format(self._nu_coarsest))
 
     def pre_process(self, l):
@@ -90,11 +92,12 @@ class EigenProcessor(hm.processor.Processor):
         # Full Approximation Scheme (FAS).
         lc = l + 1
         coarse_level = self._multilevel.level[lc]
-        x = self._x[l]
+        x, lam = self._x[l], self._lam
         xc_initial = coarse_level.restrict(x)
         self._x_initial[lc] = xc_initial
         self._x[lc] = xc_initial
-        self._b[lc] = coarse_level.restrict(self._b[l] - level.operator(x)) + coarse_level.operator(xc_initial)
+        self._b[lc] = coarse_level.restrict(self._b[l] - level.operator(x, lam)) + \
+                      coarse_level.operator(xc_initial, lam)
         self._sigma[lc] = self._sigma[l] - level.normalization(x) + coarse_level.normalization(xc_initial)
 
     def post_process(self, l):
@@ -110,7 +113,7 @@ class EigenProcessor(hm.processor.Processor):
         level = self._multilevel.level[l]
         if num_sweeps > 0:
             for _ in range(num_sweeps):
-                self._x[l] = level.relax(self._x[l], self._b[l])
+                self._x[l] = level.relax(self._x[l], self._b[l], self._lam)
             self._print_state(l, "relax {}".format(num_sweeps))
 
     def post_cycle(self, l):
@@ -120,14 +123,15 @@ class EigenProcessor(hm.processor.Processor):
 
     def result(self, l):
         # Returns the cycle result X at level l. Normally called by Cycle with l=finest level.
-        return self._x[l]
+        return self._x[l], self._lam
 
     def _print_state(self, level_ind, title):
         level = self._multilevel.level[level_ind]
         if self._debug:
+            x = self._x[l]
             _LOGGER.debug("{:<5d}    {:<15}    {:.4e}    {:.4e}    {:.8f}".format(
-                level_ind, title, scaled_norm(b[:, 0] - level.operator(x[:, 0])),
-                np.abs(sigma - level.normalization(x))[0], level.global_params.lam))
+                level_ind, title, scaled_norm(b[:, 0] - level.operator(x[:, 0], lam)),
+                np.abs(sigma - level.normalization(x))[0], self._lam))
 
     def _update_global_constraints(self, l, x):
         """
@@ -146,5 +150,5 @@ class EigenProcessor(hm.processor.Processor):
         for i in range(x.shape[1]):
             x[:, i] *= (sigma[i] / eta[i]) ** 0.5
         # TODO(orenlivne): replace by multiple eigenvalue Gram Schmidt.
-        level.global_params.lam = np.mean([level.rq(x[:, i], b[:, i]) for i in range(x.shape[1])])
-        return x
+        lam = np.mean([level.rq(x[:, i], b[:, i]) for i in range(x.shape[1])])
+        return x, lam

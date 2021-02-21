@@ -33,8 +33,9 @@ def get_window_svd(a,
     x = hm.run.random_test_matrix(window_shape, num_examples=num_examples)
     level = hm.multilevel.Level.create_finest_level(a)
     b = np.zeros_like(x)
-    x, _ = hm.run.relax_test_matrix(level.operator, level.rq,
-                                           lambda x: level.relax(x, b), x, num_sweeps=num_sweeps)
+    lam = 0
+    x, lam, _ = hm.run.relax_test_matrix(level.operator, lambda x, lam: (level.relax(x, b, lam), lam),
+                                         x, lam, num_sweeps=num_sweeps)
     # Calculate the SVD.
     e_matrix = np.reshape(x, [np.prod(window_shape), num_examples])
     _, s, vh = svd(e_matrix.transpose())

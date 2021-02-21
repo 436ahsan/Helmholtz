@@ -13,40 +13,31 @@ from helmholtz.linalg import scaled_norm
 _LOGGER = logging.getLogger("multilevel")
 
 
-class GlobalParams:
-    """Parameters shared by all levels of the multilevel hierarchy."""
-
-    def __init__(self):
-        # Eigenvalue.
-        self.lam = 0
-
-
 class Level:
     """A single level in the multilevel hierarchy."""
 
-    def __init__(self, a, b, global_params, r, p, r_csr, p_csr):
+    def __init__(self, a, b, r, p, r_csr, p_csr):
         self.a = a
         self.b = b
         self.r = r
         self.p = p
-        self.global_params = global_params
         self._r_csr = r_csr
         self._p_csr = p_csr
         self._relaxer = hm.relax.KaczmarzRelaxer(a, b)
 
     @staticmethod
     def create_finest_level(a):
-        return Level(a, scipy.sparse.eye(a.shape[0]), GlobalParams(), None, None, None, None)
+        return Level(a, scipy.sparse.eye(a.shape[0]), None, None, None, None)
 
     @staticmethod
-    def create_coarse_level(a, b, global_params, r, p):
+    def create_coarse_level(a, b, r, p):
         num_aggregates = a.shape[0] // r.asarray().shape[1]
         r_csr = r.tile(num_aggregates)
         p_csr = p.tile(num_aggregates)
         # Form Galerkin coarse-level operator.
         ac = (r_csr.dot(a)).dot(p_csr)
         bc = (r_csr.dot(b)).dot(p_csr)
-        return Level(ac, bc, global_params, r, p, r_csr, p_csr)
+        return Level(ac, bc, r, p, r_csr, p_csr)
 
     def print(self):
         _LOGGER.info("a = \n" + str(self.a.toarray()))
@@ -77,16 +68,16 @@ class Level:
         """
         return self.b.dot(x)
 
-    def operator(self, x: np.array) -> np.array:
+    def operator(self, x: np.array, lam) -> np.array:
         """
-        Returns the operator action (A-lam*B)*x. lam is the global eigenvalue value in level.global_params.
+        Returns the operator action (A-lam*B)*x.
         Args:
             x: vector of size n or a matrix of size n x m, where A, B are n x n.
 
         Returns:
             (A-B*lam)*x.
         """
-        return self.a.dot(x) - self.global_params.lam * self.b.dot(x)
+        return self.a.dot(x) - lam * self.b.dot(x)
 
     def normalization(self, x: np.array) -> np.array:
         """
@@ -114,7 +105,7 @@ class Level:
         else:
             return (self.a.dot(x) - b).dot(x) / (self.b.dot(x)).dot(x)
 
-    def relax(self, x: np.array, b: np.array) -> np.array:
+    def relax(self, x: np.array, b: np.array, lam) -> np.array:
         """
         Executes a relaxation sweep on A*x = 0 at this level.
         Args:
@@ -124,7 +115,7 @@ class Level:
         Returns:
             x after relaxation.
         """
-        return self._relaxer.step(x, b, lam=self.global_params.lam)
+        return self._relaxer.step(x, b, lam=lam)
 
     def restrict(self, x: np.array) -> np.array:
         """
@@ -171,21 +162,3 @@ class Multilevel:
         Returns: finest level object.
         """
         return self.level[0]
-
-    @property
-    def global_params(self) -> GlobalParams:
-        """
-        Returns the global parameter struct shared by all levels.
-
-        Returns: global parameter struct.
-        """
-        return self.finest_level.global_params
-
-    @property
-    def lam(self):
-        """
-        Returns the eigenvalue array approximate solution. A useful shortcut.
-
-        Returns: array of eigenvalues.
-        """
-        return self.global_params.lam
