@@ -169,7 +169,7 @@ def fmg(multilevel, nu_pre: int = 1, nu_post: int = 1, nu_coarsest: int = 10, nu
 
 
 def create_transfer_operators(x, domain_size: int, aggregate_size: int, threshold: float = 0.1, caliber: int = 2,
-                              interpolation_method: str = "svd") -> \
+                              interpolation_method: str = "svd", max_coarsening_ratio: float = 0.5) -> \
         Tuple[hm.restriction.Restrictor, hm.interpolation.Interpolator]:
     """
     Creates the next coarse level's R and P operators.
@@ -180,6 +180,8 @@ def create_transfer_operators(x, domain_size: int, aggregate_size: int, threshol
         threshold: relative reconstruction error threshold. Determines nc.
         caliber: interpolation caliber.
         interpolation_method: type of interpolation ("svd"|"ls").
+        max_coarsening_ratio: maximum allowed coarsening ratio. If exceeded at a certain aggregate size, we double
+            it until it is reached (or when the aggregate size becomes too large, in which case an exception is raised).
 
     Returns: R, P
     """
@@ -188,13 +190,25 @@ def create_transfer_operators(x, domain_size: int, aggregate_size: int, threshol
         "Aggregate shape must divide the domain shape in every dimension"
     # assert all(ni % ai == 0 for ni, ai in zip(domain_shape, aggregate_shape)), \
     #     "Aggregate shape must divide the domain shape in every dimension"
-    num_aggregates = domain_size // aggregate_size
 
-    x_aggregate_t = x[:aggregate_size].transpose()
-    r, s = hm.restriction.create_restriction(x_aggregate_t, threshold)
-    nc = r.asarray().shape[0]
-    _LOGGER.debug("Singular vals {}, nc {} interpolation error {:.3f}".format(
-        s, nc, (sum(s[nc:] ** 2) / sum(s ** 2)) ** 0.5))
+    aggregate_size = 1
+    coarsening_ratio = 1
+    num_test_functions = x.shape[1]
+    # Increase aggregate size until we reach a small enough coarsening ratio.
+    while (aggregate_size <= domain_size // 2) and (coarsening_ratio > max_coarsening_ratio):
+        aggregate_size *= 2
+        num_windows = (4 * aggregate_size) // num_test_functions
+        x_aggregate_t = np.concatenate(
+            tuple(hm.linalg.get_window(x, offset, aggregate_size) for offset in range(num_windows)), axis=1).transpose()
+        r, s = hm.restriction.create_restriction(x_aggregate_t, threshold)
+        nc = r.asarray().shape[0]
+        coarsening_ratio = nc / aggregate_size
+    if (aggregate_size > domain_size // 2) or (coarsening_ratio > max_coarsening_ratio):
+        raise Exception("Could not find a good coarsening ratio")
+
+    _LOGGER.debug("Singular vals {}, aggregate size {} nc {} cr {:.2f} interpolation error {:.3f}".format(
+        s, aggregate_size, nc, coarsening_ratio, (sum(s[nc:] ** 2) / sum(s ** 2)) ** 0.5))
+    num_aggregates = domain_size // aggregate_size
     r_csr = r.tile(num_aggregates)
     xc = r_csr.dot(x)
     p = hm.interpolation.create_interpolation(interpolation_method,

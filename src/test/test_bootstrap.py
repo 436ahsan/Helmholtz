@@ -24,15 +24,14 @@ class TestBootstrap:
         kh = 0.5
 
         a = hm.linalg.helmholtz_1d_operator(kh, n)
-        x, lam, multilevel = hm.bootstrap.generate_test_matrix(a, 0, num_sweeps=100)
+        x, lam, multilevel = hm.bootstrap.generate_test_matrix(a, 0, num_examples=4, num_sweeps=10)
 
-        assert x.shape == (16, 64)
+        assert x.shape == (16, 4)
 
         assert len(multilevel) == 2
 
         level = multilevel.finest_level
         assert level.a.shape == (16, 16)
-        level.print()
 
         coarse_level = multilevel.level[1]
         assert coarse_level.a.shape == (8, 8)
@@ -64,7 +63,7 @@ class TestBootstrap:
         n = 16
         kh = 0.5
         a = hm.linalg.helmholtz_1d_operator(kh, n)
-        x, lam, multilevel = hm.bootstrap.generate_test_matrix(a, 0, num_examples=8)
+        x, lam, multilevel = hm.bootstrap.generate_test_matrix(a, 0, num_examples=4)
         assert len(multilevel) == 2
 
         level = multilevel.finest_level
@@ -76,13 +75,13 @@ class TestBootstrap:
 
         assert lam == pytest.approx(0.0977590650225, 1e-3)
         assert np.mean([level.rq(x[:, i]) for i in range(x.shape[1])]) == pytest.approx(0.097759, 1e-3)
-        assert conv_factor == pytest.approx(0.297, 1e-2)
+        assert conv_factor == pytest.approx(0.316, 1e-2)
 
     def test_2_level_two_bootstrap_steps_same_speed_as_one(self):
         n = 16
         kh = 0.5
         a = hm.linalg.helmholtz_1d_operator(kh, n)
-        x, lam, multilevel = hm.bootstrap.generate_test_matrix(a, 0, num_examples=8, num_bootstrap_steps=2)
+        x, lam, multilevel = hm.bootstrap.generate_test_matrix(a, 0, num_examples=4, num_bootstrap_steps=2)
         assert len(multilevel) == 2
 
         level = multilevel.finest_level
@@ -109,7 +108,7 @@ class TestBootstrap:
         kh = 0.5
         a = hm.linalg.helmholtz_1d_operator(kh, n)
         x, lam, multilevel = hm.bootstrap.generate_test_matrix(
-            a, 0, num_sweeps=10, num_examples=20, initial_max_levels=3)
+            a, 0, num_sweeps=10, num_examples=4, initial_max_levels=3)
         assert len(multilevel) == 3
 
         level = multilevel.finest_level

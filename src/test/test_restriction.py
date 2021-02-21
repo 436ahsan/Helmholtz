@@ -66,5 +66,5 @@ class TestRestriction:
                 hm.linalg.get_window(x, offset, aggregate_size).transpose(), 0.1)[0].asarray())
             for offset in range(len(x))])
         # R should not change much across different windows.
-        mean_entry_error = np.mean(np.abs((np.std(r_by_offset, axis=0) / np.mean(np.abs(r_by_offset), axis=0)).flatten()))
+        mean_entry_error = np.mean(((np.std(r_by_offset, axis=0) / np.mean(np.abs(r_by_offset), axis=0)).flatten()))
         assert mean_entry_error <= 0.03
