@@ -72,11 +72,11 @@ class TestBootstrap:
         eigen_cycle = lambda x, lam: hm.eigensolver.eigen_cycle(multilevel, 1.0, 1, 1, 100).run((x, lam))
         # FMG start so (x, lambda) has a reasonable initial guess.
         x = hm.bootstrap.fmg(multilevel, num_cycles_finest=0)
-        x, lam, conv_factor = hm.run.relax_test_matrix(level.operator, eigen_cycle, x, 20, print_frequency=1)
+        x, lam, conv_factor = hm.run.relax_test_matrix(level.operator, eigen_cycle, x, lam, 20, print_frequency=1)
 
         assert lam == pytest.approx(0.0977590650225, 1e-3)
         assert np.mean([level.rq(x[:, i]) for i in range(x.shape[1])]) == pytest.approx(0.097759, 1e-3)
-        assert conv_factor == pytest.approx(0.269, 1e-2)
+        assert conv_factor == pytest.approx(0.297, 1e-2)
 
     def test_2_level_two_bootstrap_steps_same_speed_as_one(self):
         n = 16
@@ -97,7 +97,7 @@ class TestBootstrap:
         # x += 0.1 * np.random.random(x.shape)
         # multilevel.finest_multilevel.lam *= 1.01
 
-        x, lam, conv_factor = hm.run.relax_test_matrix(level.operator, eigen_cycle, x, 20,
+        x, lam, conv_factor = hm.run.relax_test_matrix(level.operator, eigen_cycle, x, lam, 20,
                                                        print_frequency=1, residual_stop_value=1e-11)
 
         assert lam == pytest.approx(0.0977590650225, 1e-3)
@@ -120,7 +120,7 @@ class TestBootstrap:
         #        multilevel.lam = exact_eigenpair(level.a)
 
         eigen_cycle = lambda x, lam: hm.eigensolver.eigen_cycle(multilevel, 1.0, 1, 1, 100, num_levels=3).run((x, lam))
-        x, lam, conv_factor = hm.run.relax_test_matrix(level.operator, eigen_cycle, x_init, 15)
+        x, lam, conv_factor = hm.run.relax_test_matrix(level.operator, eigen_cycle, x_init, lam, 15)
         assert lam == pytest.approx(0.0977590650225, 1e-3)
         assert np.mean([level.rq(x[:, i]) for i in range(x.shape[1])]) == pytest.approx(0.097759, 1e-3)
         assert conv_factor == pytest.approx(0.32, 1e-2)
