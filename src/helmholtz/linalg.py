@@ -182,3 +182,30 @@ def ritz(x: np.ndarray, action) -> Tuple[np.ndarray, np.ndarray]:
     ind = np.argsort(np.abs(lam))
     x_projected = x.dot(z)
     return x_projected[:, ind], lam[ind]
+
+
+# TODO(orenlivne): replace by a sparse Cholesky A*A^T factorization, pass in A directly to it instead of forming A*A^T.
+# explicitly and calculating its LU factorization. scipy doesn't provide an implementation; could not install
+# scikit-sparse on the Mac (https://scikit-sparse.readthedocs.io/en/latest/cholmod.html).
+class SparseLuSolver:
+    """Performs a sparse LU factorization of a scipy matrix, converts the LU parts to sparse torch tensors so that
+    they can be multiplied by."""
+
+    def __init__(self, a):
+        """Constructs a solver of A*x = b where A = sparse scipy matrix. Performs LU factorization."""
+        n = a.shape[0]
+        lu = scipy.sparse.linalg.splu(a.tocsc())
+        self._l_inv = scipy.sparse.csc_matrix(scipy.sparse.linalg.spsolve_triangular(lu.L.tocsr(), scipy.identity(n)))
+        self._u_inv = scipy.sparse.csc_matrix(scipy.sparse.linalg.spsolve_triangular(
+                lu.U.transpose().tocsr(), scipy.identity(n))).transpose()
+        self._pr = scipy.sparse.csc_matrix((np.ones(n), (lu.perm_r, np.arange(n))))
+        self._pc = scipy.sparse.csc_matrix((np.ones(n), (np.arange(n), lu.perm_c)))
+
+    def solve(self, b: np.ndarray):
+        """Solves A*x = b. b is a tensor of shape a.shape[0] x k for some k."""
+        # TODO(olivne): replace permutation matrix multiplications by a simple row/column indexing call.
+        x1 = torch.mm(self._pr, b)
+        x2 = torch.mm(self._l_inv, x1)
+        x3 = torch.mm(self._u_inv, x2)
+        x = torch.mm(self._pc, x3)
+        return x
