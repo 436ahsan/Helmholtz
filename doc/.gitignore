@@ -1,0 +1,7 @@
+**/*.aux
+**/*.bbl
+**/*.blg
+**/*.dvi
+**/*.synctex.gz
+**/*.log
+su_helmholtz_1d.pdf
