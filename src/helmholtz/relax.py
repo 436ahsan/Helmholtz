@@ -5,7 +5,7 @@ import scipy.sparse.linalg
 
 
 class KaczmarzRelaxer:
-    """Implements Kaczmarz relaxation for A*x = 0."""
+    """Implements Kaczmarz relaxation for (A-lam*B)*x = b."""
 
     def __init__(self, a: scipy.sparse.spmatrix, b: scipy.sparse.spmatrix) -> None:
         """
@@ -43,3 +43,31 @@ class KaczmarzRelaxer:
         if delta.ndim < x.ndim:
             delta = delta[:, None]
         return x + self._at.dot(delta) - lam * self._bt.dot(delta)
+
+
+class GsRelaxer:
+    """Implements Gauss-Seidel relaxation for A*x=b."""
+
+    def __init__(self, a: scipy.sparse.spmatrix) -> None:
+        """
+        Creates a Gauss-Seidel relaxer for A*x=b.
+        Args:
+            a: left-hand-side matrix.
+        """
+        self._a = a.tocsr()
+        self._m = scipy.sparse.tril(a).tocsr()
+
+    def step(self, x: np.array, b: np.array) -> np.array:
+        """
+            Executes a Gauss-Seidel sweep on A*x = b.
+        Args:
+            x: initial guess. May be a vector of size n or a matrix of size n x m, where A is n x n.
+            b: RHS. Same size as x.
+
+        Returns:
+            x after relaxation.
+        """
+        delta = scipy.sparse.linalg.spsolve(self._m, b - self._a.dot(x))
+        if delta.ndim < x.ndim:
+            delta = delta[:, None]
+        return x + delta

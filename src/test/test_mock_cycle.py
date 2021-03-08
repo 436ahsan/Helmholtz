@@ -38,7 +38,7 @@ class TestMockCycle(unittest.TestCase):
         level = hm.multilevel.Level.create_finest_level(a)
         relaxer = lambda x, b: level.relax(x, b, lam=0)
         r = _create_svd_coarsening(level)
-        r_pointwise = _create_pointwise_coarsening(level.a.shape[0])
+        r_pointwise = _create_pointwise_coarsening(level)
 
         def mock_cycle_conv_factor(r, num_relax_sweeps):
             mock_cycle = hm.mock_cycle.MockCycle(relaxer, r, num_relax_sweeps)
@@ -94,9 +94,10 @@ def _create_svd_coarsening(level):
     return r_csr
 
 
-def _create_pointwise_coarsening(domain_size):
+def _create_pointwise_coarsening(level):
     aggregate_size = 2
     r = hm.coarsening.Coarsener(np.array([[1, 0]]))
     # Convert to sparse matrix + tile over domain.
+    domain_size = level.a.shape[0]
     r_csr = r.tile(domain_size // aggregate_size)
     return r_csr

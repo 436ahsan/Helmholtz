@@ -4,6 +4,7 @@
 \usepackage{authblk}
 \usepackage{algorithm}
 \usepackage{algorithmic}
+\usepackage{booktabs}
 
 \newcommand{\bbeta}{\boldsymbol\beta}
 \newcommand{\bt}{\boldsymbol\tau}
@@ -22,11 +23,12 @@
 \newcommand{\bX}{\mathbf{X}}
 
 \title{Systematic Upscaling for the 1D Helmholtz Equation}
+\author{}
 
-\author[1]{Achi Brandt}
-\author[2]{Oren Livne}
-\affil[1]{The Weizmann Institute of Science,Department of Applied Mathematics \& Computer Science, 76100 Rehovot, Israel. Email: achibr@gmail.com}
-\affil[2]{Educational Testing Service, 660 Rosedale Road, Attn: MS-12, T-197, Princeton, NJ 08540. Email: olivne@ets.org}
+%\author[1]{Achi Brandt}
+%\author[2]{Oren Livne}
+%\affil[1]{The Weizmann Institute of Science,Department of Applied Mathematics \& Computer Science, 76100 Rehovot, Israel. Email: achibr@gmail.com}
+%\affil[2]{Educational Testing Service, 660 Rosedale Road, Attn: MS-12, T-197, Princeton, NJ 08540. Email: olivne@ets.org}
 \date{\today}
 
 \begin{document}
@@ -109,12 +111,45 @@ Again, we derive an interpolation matrix $P_w$ on an aggregate of size $w$, and 
 
 
 \section{Numerical Results}
+We discretize the Helmholtz operator $A = -\Delta + k^2 I$ using a $3$-point finite difference $A^h = [1, -2 + (kh)^2, 1]$ (since the domain is periodic and we're solving the homogeneous equation, thee is no need to scale by $h^{-2}$).
 
 \subsection{Mock Cycle}
 \label{mock_cycle}
-The mock cycle's task is to predict two-level efficiency, but in the context of upscaling it is a tool to measure how well the coarse variables approximate the solution (up to few relaxations). \textbf{Is that statement actually true?}
+To gauge the quality of the coarse variable set, we compared the mock cycle convergence factors with SVD coarsening and pointwise coarsening with coarsening ratio $1:2$ for different $kh$ values and $\nu$ relaxations per cycle. Kaczmarz relaxation was used in all cases; for $kh=0$ only, we also tested Gauss-Seidel relaxation for comparison. The SVD coarsening was based on test vectors obtained by $100$ relaxations of $\text{random}[-1,1]$ starting vectors, a $w=4$-point aggregate to calculate the SVD, and accuracy threshold of  $\varepsilon=0.1$. Two principal components were selected as coarse variables for all $kh$.
+ 
+\begin{table}
+\begin{tabular}{l|cccc|cccc}
+\toprule
+& \multicolumn{4}{c|}{SVD Coarsening} & \multicolumn{4}{|c}{Pointwise Coarsening} \\
+$kh$ &  $\nu=1$ &  $\nu=2$ &  $\nu=3$ &  $\nu=4$ &  $\nu=1$ &  $\nu=2$ &  $\nu=3$ &  $\nu=4$ \\
+\midrule
+0, GS &       0.30 &       0.10 &       0.07 &       0.02 &      0.65 &      0.60 &      0.58 &      0.56 \\
+0.0      &       0.45 &       0.22 &       0.15 &       0.12 &      0.47 &      0.56 &      0.49 &      0.49 \\
+0.1      &       0.41 &       0.22 &       0.16 &       0.11 &      0.49 &      0.58 &      0.48 &      0.50 \\
+0.2      &       0.44 &       0.23 &       0.15 &       0.13 &      0.51 &      0.58 &      0.52 &      0.50 \\
+0.3      &       0.47 &       0.23 &       0.16 &       0.14 &      0.52 &      0.55 &      0.48 &      0.49 \\
+0.4      &       0.49 &       0.25 &       0.16 &       0.14 &      0.54 &      0.55 &      0.53 &      0.49 \\
+0.5      &       0.48 &       0.25 &       0.15 &       0.14 &      0.54 &      0.55 &      0.54 &      0.48 \\
+0.6      &       0.50 &       0.28 &       0.16 &       0.14 &      0.58 &      0.55 &      0.54 &      0.47 \\
+0.7      &       0.60 &       0.26 &       0.16 &       0.13 &      0.56 &      0.50 &      0.52 &      0.47 \\
+0.8      &       0.56 &       0.30 &       0.16 &       0.11 &      0.62 &      0.45 &      0.50 &      0.47 \\
+0.9      &       0.64 &       0.30 &       0.17 &       0.14 &      0.67 &      0.38 &      0.48 &      0.50 \\
+1.0      &       0.59 &       0.27 &       0.15 &       0.11 &      0.69 &      0.47 &      0.41 &      0.50 \\\bottomrule
+\end{tabular}
+\caption{Mock cycle convergence factors for a grid of size $n=32$. The first row corresponds to the Laplace operator and Gauss-Seidel. All other rows refer to Kaczmarz relaxation.}
+\end{table}
 
-We compare SVD coarsening to pointwise coarsening.
+SVD coarsening exhibits better convergence rates than pointwise. The rate improves with $nu$, while for pointwise it is bounded by $0.5$.  Almost the same efficiency is maintained for all values of $0 \leq kh \leq 1$. In line with geometric multigrid theory, Gauss-Seidel is a better smoother for the Laplace case, but Kaczmarz relaxation provides adequate convergence as well. The result is independent of $n$ for all $n \geq 16$.
+
+\subsubsection{Questions}
+\textbf{
+\begin{itemize}
+\item The mock cycle's task is to predict two-level efficiency, but in the context of upscaling it is a tool to measure how well the coarse variables approximate the solution (up to few relaxations). Is that statement actually true?
+\item For $kh = 0$ and Gauss-Seidel, the predicted 2-level convergence factor does not improve with $\nu$ and does not get below $\sim 0.5$, even though in practice we know that it does and that pointwise coarsening is a perfectly good coarsening of the Laplace operator.
+* Why are we not getting a quantitative prediction with the mock cycle? (We could compare with local mode analysis to gain an insight into the slowest-to-converge component.)
+\item Thus, can we trust this for other $kh$ values? Is it quantitative?
+\end{itemize}
+}
 
 \subsection{2-level}
 
