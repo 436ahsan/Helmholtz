@@ -70,7 +70,7 @@ Our test functions are an approximation to the eigenvectors of $A$ corresponding
 \section{Adaptive Multilevel Hierarchy}
 The algorithm is a Bootstrap Algebraic Multigrid (BAMG) algorithm that takes advantage of the periodic domain to reduce the cost of creating the coarsening and interpolation operators. It starts with a small $n$ and gradually doubles it. At the coarsest $n$, we start with relaxed vectors as our initial test vectors, construct a small coarse hierarchy, and improve the vectors using eigencycles. The hierarchy is then updated using the new vectors. Several such bootstrap iterations are executed. We then double $n$ and tile the test vectors over the larger domain, and both the vectors and multilevel hierarchy using bootstrap iterations. For each domain doubling, we add another coarse level to the hierarchy.
 
-Since $A$ is indefinite, we use a generic smoother: Kaczmarz relaxation in lexicogaphic ordering. While for special cases (e.g. $k h = 0$), better smoothers are available (e.g., red-black Gauss-Seidel), Kaczmarz relaxation is guaranteed to smooth the error \cite{amg_theory}, so we keep the approach general.
+Since $A$ is indefinite, we use a robust smoother: Kaczmarz relaxation in lexicogaphic ordering. While for special cases (e.g. $k h = 0$), better smoothers are available (e.g., red-black Gauss-Seidel), Kaczmarz relaxation is guaranteed to smooth the error \cite{amg_theory}, so we keep the approach general.
 
 \subsection{Initial Vectors}
 Initial vectors are obtained by a $1$-level iteration (using the fine level only), which is exactly the method of \cite{mg_eigen} except that we use Kacmzarz relaxation instead of Gauss-Seidel.
@@ -127,31 +127,35 @@ We discretize the Helmholtz operator $A = -\Delta + k^2 I$ using a $3$-point fin
 
 \subsection{Mock Cycle}
 \label{mock_cycle}
-To gauge the quality of the coarse variable set, we compared the mock cycle convergence factors with SVD coarsening and pointwise coarsening with coarsening ratio $1:2$ for different $kh$ values and $\nu$ relaxations per cycle. Kaczmarz relaxation was used in all cases; for $kh=0$ only, we also tested Gauss-Seidel relaxation for comparison. The SVD coarsening was based on test vectors obtained by $100$ relaxations of $\text{random}[-1,1]$ starting vectors, a $w=4$-point aggregate to calculate the SVD, and accuracy threshold of  $\varepsilon=0.1$. Two principal components were selected as coarse variables for all $kh$.
+To gauge the quality of the coarse variable set, we compared the mock cycle convergence factors with SVD coarsening, $1:2$ pointwise coarsening ($R_w = [1, 0]$) and averaging coarsening with $1:2$ coarsening ratio ($R_w = [1, 1]$). for different $kh$ values and $\nu$ relaxations per cycle. Kaczmarz relaxation was used in all cases; for $kh=0$ only, we also tested Gauss-Seidel relaxation for comparison. The SVD coarsening was based on test vectors obtained by $100$ relaxations of $\text{random}[-1,1]$ starting vectors, a $w=4$-point aggregate to calculate the SVD, and accuracy threshold of  $\varepsilon=0.1$. Two principal components were selected as coarse variables for all $kh$, so all three coarsening schemes have coarsening ratio $\rho = 0.5$.
  
 \begin{table}
-\begin{tabular}{l|cccc|cccc}
+{\small
+\begin{tabular}{l|cccc|cccc|cccc}
 \toprule
-& \multicolumn{4}{c|}{SVD Coarsening} & \multicolumn{4}{|c}{Pointwise Coarsening} \\
-$kh$ &  $\nu=1$ &  $\nu=2$ &  $\nu=3$ &  $\nu=4$ &  $\nu=1$ &  $\nu=2$ &  $\nu=3$ &  $\nu=4$ \\
+& \multicolumn{4}{c|}{SVD Coarsening} & \multicolumn{4}{|c|}{Pointwise Coarsening} & \multicolumn{4}{|c}{Averaging Coarsening} \\
+$kh$ &  $\nu=1$ &  $2$ &  $3$ &  $4$ &  $1$ &  $2$ &  $3$ &  $4$ &  $1$ &  $2$ &  $3$ &  $4$ \\
 \midrule
-0, GS &       0.30 &       0.10 &       0.07 &       0.02 &      0.65 &      0.60 &      0.58 &      0.56 \\
-0.0      &       0.45 &       0.22 &       0.15 &       0.12 &      0.47 &      0.56 &      0.49 &      0.49 \\
-0.1      &       0.41 &       0.22 &       0.16 &       0.11 &      0.49 &      0.58 &      0.48 &      0.50 \\
-0.2      &       0.44 &       0.23 &       0.15 &       0.13 &      0.51 &      0.58 &      0.52 &      0.50 \\
-0.3      &       0.47 &       0.23 &       0.16 &       0.14 &      0.52 &      0.55 &      0.48 &      0.49 \\
-0.4      &       0.49 &       0.25 &       0.16 &       0.14 &      0.54 &      0.55 &      0.53 &      0.49 \\
-0.5      &       0.48 &       0.25 &       0.15 &       0.14 &      0.54 &      0.55 &      0.54 &      0.48 \\
-0.6      &       0.50 &       0.28 &       0.16 &       0.14 &      0.58 &      0.55 &      0.54 &      0.47 \\
-0.7      &       0.60 &       0.26 &       0.16 &       0.13 &      0.56 &      0.50 &      0.52 &      0.47 \\
-0.8      &       0.56 &       0.30 &       0.16 &       0.11 &      0.62 &      0.45 &      0.50 &      0.47 \\
-0.9      &       0.64 &       0.30 &       0.17 &       0.14 &      0.67 &      0.38 &      0.48 &      0.50 \\
-1.0      &       0.59 &       0.27 &       0.15 &       0.11 &      0.69 &      0.47 &      0.41 &      0.50 \\\bottomrule
+GS &       0.30 &       0.11 &       0.07 &       0.02 &      0.65 &      0.60 &      0.57 &      0.54 &       0.32 &       0.12 &       0.07 &       0.02 \\
+0.0   &       0.42 &       0.22 &       0.15 &       0.12 &      0.49 &      0.55 &      0.49 &      0.50 &       0.45 &       0.21 &       0.19 &       0.15 \\
+0.1   &       0.46 &       0.22 &       0.15 &       0.13 &      0.50 &      0.55 &      0.48 &      0.48 &       0.42 &       0.20 &       0.19 &       0.15 \\
+0.2   &       0.45 &       0.24 &       0.15 &       0.12 &      0.51 &      0.58 &      0.50 &      0.48 &       0.45 &       0.21 &       0.19 &       0.16 \\
+0.3   &       0.46 &       0.23 &       0.15 &       0.12 &      0.49 &      0.56 &      0.50 &      0.49 &       0.42 &       0.20 &       0.20 &       0.15 \\
+0.4   &       0.49 &       0.24 &       0.16 &       0.12 &      0.50 &      0.58 &      0.53 &      0.49 &       0.49 &       0.20 &       0.20 &       0.18 \\
+0.5   &       0.51 &       0.25 &       0.16 &       0.13 &      0.53 &      0.55 &      0.49 &      0.47 &       0.47 &       0.22 &       0.21 &       0.20 \\
+0.6   &       0.52 &       0.30 &       0.13 &       0.14 &      0.56 &      0.52 &      0.53 &      0.48 &       0.52 &       0.22 &       0.20 &       0.21 \\
+0.7   &       0.57 &       0.25 &       0.15 &       0.13 &      0.61 &      0.51 &      0.53 &      0.46 &       0.54 &       0.25 &       0.22 &       0.24 \\
+0.8   &       0.60 &       0.30 &       0.15 &       0.11 &      0.64 &      0.44 &      0.50 &      0.52 &       0.49 &       0.24 &       0.23 &       0.26 \\
+0.9   &       0.63 &       0.35 &       0.17 &       0.15 &      0.67 &      0.39 &      0.49 &      0.51 &       0.63 &       0.34 &       0.20 &       0.27 \\
+1.0   &       0.60 &       0.29 &       0.14 &       0.10 &      0.74 &      0.46 &      0.43 &      0.50 &       0.69 &       0.48 &       0.25 &       0.25 \\\bottomrule
 \end{tabular}
+}
 \caption{Mock cycle convergence factors for a grid of size $n=32$. The first row corresponds to the Laplace operator and Gauss-Seidel. All other rows refer to Kaczmarz relaxation.}
 \end{table}
 
-SVD coarsening exhibits better convergence rates than pointwise. The rate improves with $nu$, while for pointwise it is bounded by $0.5$.  Almost the same efficiency is maintained for all values of $0 \leq kh \leq 1$. In line with geometric multigrid theory, Gauss-Seidel is a better smoother for the Laplace case, but Kaczmarz relaxation provides adequate convergence as well. The result is independent of $n$ for all $n \geq 16$.
+The pointwise coarsening convergence factors is bounded by $0.5$; averaging schemes exhibit superior efficiency, which improves with $\nu$ up to $3$ relaxation sweeps. The SVD coarsening is equivalent to averaging for the Laplace case, but trumps simple averaging for $kh = O(1)$, which is substantiates its use for upscaling.
+
+In line with geometric multigrid theory, Gauss-Seidel is a better smoother for the Laplace case, but Kaczmarz relaxation provides adequate convergence as well in that case, while its efficiency is maintained for all values of $0 \leq kh \leq 1$. The result is also independent of $n$ for all $n \geq 16$.
 
 \subsection{2-level}
 
@@ -183,7 +187,6 @@ BAMG:
 \begin{itemize}
 	\item Do we need an eigensolver?
 \end{itemize}
-
 
 \bibliographystyle{plain}
 \bibliography{mg.bib}
