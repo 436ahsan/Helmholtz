@@ -1,4 +1,4 @@
-"""Restriction (R) construction routines. Based on SVD on an aggregate."""
+"""coarsening (R) construction routines. Based on SVD on an aggregate."""
 import numpy as np
 import scipy.sparse
 from numpy.linalg import svd
@@ -6,7 +6,7 @@ from numpy.linalg import svd
 import helmholtz as hm
 
 
-class Restrictor:
+class Coarsener:
     """
     Encapsulates the restruction operator as both a full array over an aggregate (for easy tiling) and sparse CSR matrix
     format. Assumes non-overlapping aggregate (block sparsity) structure."""
@@ -21,12 +21,12 @@ class Restrictor:
         self._r = r
 
     def asarray(self) -> scipy.sparse.csr_matrix:
-        """ Returns the dense restriction matrix on an aggregate."""
+        """ Returns the dense coarsening matrix on an aggregate."""
         return self._r
 
     def tile(self, n: int) -> scipy.sparse.csr_matrix:
         """
-        Returns a tiled restriction over an n-times larger periodic domain, as a CSR matrix.
+        Returns a tiled coarsening over an n-times larger periodic domain, as a CSR matrix.
         Args:
             n: number of times to tile the interpolation = #aggregates in the domain.
 
@@ -35,7 +35,7 @@ class Restrictor:
         return hm.linalg.tile_array(self.asarray(), n)
 
 
-def create_restriction(x_aggregate_t, threshold: float) -> scipy.sparse.csr_matrix:
+def create_coarsening(x_aggregate_t, threshold: float) -> scipy.sparse.csr_matrix:
     """
     Generates R (coarse variables) on an aggregate from  SVD principcal components.
 
@@ -44,11 +44,11 @@ def create_restriction(x_aggregate_t, threshold: float) -> scipy.sparse.csr_matr
         threshold: relative reconstruction error threshold. Determines nc.
 
     Returns:
-        restriction operator nc x {aggregate_size}, list of all singular values on aggregate.
+        coarsening operator nc x {aggregate_size}, list of all singular values on aggregate.
     """
     u, s, vh = svd(x_aggregate_t)
     nc = _get_interpolation_caliber(s, np.array([threshold]))[0]
-    return Restrictor(vh[:nc]), s
+    return Coarsener(vh[:nc]), s
 
 
 def _relative_reconstruction_error(s):

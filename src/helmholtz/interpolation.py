@@ -10,7 +10,7 @@ import helmholtz as hm
 class Interpolator:
     """
     Encapsulates the interpolation as both relative-location neighbor list (for easy tiling) and sparse CSR matrix
-    format. In contrast to the restriction operator, which is assumed to be non-overlapping and thus a simple CSR
+    format. In contrast to the coarsening operator, which is assumed to be non-overlapping and thus a simple CSR
     matrix, this object gives us greater flexibility in interpolating from neighboring aggregates."""
 
     def __init__(self, nbhr: np.ndarray, data: np.ndarray, nc: int):

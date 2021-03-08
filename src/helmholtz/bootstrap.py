@@ -170,7 +170,7 @@ def fmg(multilevel, nu_pre: int = 1, nu_post: int = 1, nu_coarsest: int = 10, nu
 
 def create_transfer_operators(x, domain_size: int, aggregate_size: int, threshold: float = 0.1, caliber: int = 2,
                               interpolation_method: str = "svd", max_coarsening_ratio: float = 0.5) -> \
-        Tuple[hm.restriction.Restrictor, hm.interpolation.Interpolator]:
+        Tuple[hm.coarsening.Coarsener, hm.interpolation.Interpolator]:
     """
     Creates the next coarse level's R and P operators.
     Args:
@@ -200,7 +200,7 @@ def create_transfer_operators(x, domain_size: int, aggregate_size: int, threshol
         num_windows = max((4 * aggregate_size) // num_test_functions, 1)
         x_aggregate_t = np.concatenate(
             tuple(hm.linalg.get_window(x, offset, aggregate_size) for offset in range(num_windows)), axis=1).transpose()
-        r, s = hm.restriction.create_restriction(x_aggregate_t, threshold)
+        r, s = hm.coarsening.create_coarsening(x_aggregate_t, threshold)
         nc = r.asarray().shape[0]
         coarsening_ratio = nc / aggregate_size
         _LOGGER.debug("SVD {:2d} x {:2d} aggregate size {} nc {} cr {:.2f} interpolation error {:.3f} Singular vals {}".format(

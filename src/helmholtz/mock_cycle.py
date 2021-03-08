@@ -1,19 +1,24 @@
 """Mock cycle for predicting the quality of a coarse-variable set."""
+import helmholtz as hm
 import numpy as np
+import scipy.sparse
 
 
 class MockCycle:
     r"""Implements mock cycle comprising of relaxation sweeps + idealized coarse-level correction."""
     def __init__(self,
-                 level,
+                 relaxer,
+                 q: scipy.sparse.spmatrix,
                  num_steps: int = 1,
                  splitting: str = "direct",
                  num_corrector_steps: int = 1,
                  omega: float = 1.0):
         """
-        Creates a mock cycle optimizer.
+        Creates a mock cycle iterative method.
 
         Args:
+            relaxer: relaxation method.
+            q: coarsening (a.k.a. aggregation) matrix Q.
             splitting: type of splitting of Q*Q^T where Q = coarsening matrix. Vallues: 'direct' or 'jacobi'.
             num_steps (int): number of GD steps per mock cycle.
             num_corrector_steps(int): number of coarse level corrector steps per mock cycle.
@@ -21,32 +26,29 @@ class MockCycle:
         """
         self._num_steps = num_steps
         self._num_corrector_steps = num_corrector_steps
-        self._level = level
-        q = level.r
-        baseline_coarse_values = np.zeros_like((r.shape[0], 1))
-        self._corrector = MockCorrector(q, baseline_coarse_values, splitting=splitting)
-        self._level = level
+        self._relaxer = relaxer
+        # For linear problems, we set the coarse variables to 0 (doesn't matter what they are).
+        baseline_coarse_values = np.zeros((q.shape[0], 1))
+        self._corrector = MockCorrector(q, baseline_coarse_values, splitting=splitting, omega=omega)
 
     # TODO(orenlivne): remove lam from method parameters. Update run_iterative_method() to take x only when
     # applicable instead of x, lam; or wrap (x, lam) for the eigensolver case so run_iterative_method() always
     # takes a generic iterate x.
-    def __call__(self, x, lam):
+    def __call__(self, x):
         """Performs a mock cycle for A*x=0 on the test vector or matrix x."""
         b = np.zeros_like(x)
-        lam = 0.0
         # Perform 'num_steps' optimizer steps.
         for i in range(self._num_steps):
-            x = self._level.relax(x, b, lam)
+            x = self._relaxer(x, b)
         for i in range(self._num_corrector_steps):
-            x = corrector.step()
+            x = self._corrector(x)
         return x
 
 
 class MockCorrector:
     r"""Implements the mock coarse-level-correction step of the Mock Cycle (MC) for a single parameter, for either
     input or output activation coarsening."""
-    def __init__(self, activation_key: str, q,
-                 baseline_coarse_values, splitting: str = "direct", omega: float = 1.0):
+    def __init__(self, q, baseline_coarse_values, splitting: str = "direct", omega: float = 1.0):
         """
         Creates a mock coarse-level correction step applicator.
 
@@ -61,10 +63,10 @@ class MockCorrector:
         self._omega = omega
         qt = np.transpose(q)
         self._q = q
-        self._qt = self._q.t()
+        self._qt = self._q.transpose()
         self._q0 = baseline_coarse_values
 
-    def __call__(self, x) -> None:
+    def __call__(self, x: np.ndarray) -> np.ndarray:
         """
         Performs a mock coarse-level correction step that approximately restores the coarse variables to the value
         'self._baseline_coarse_values'.
@@ -76,13 +78,12 @@ class MockCorrector:
 
         where q0 = baseline coarse values.
 
-        Returns: None.
-        Side effects: self._model is made compatible with model_old after this call.
+        Returns: updated x.
 
         """
         r = self._q0 - self._q.dot(x)
         delta = self._omega * self._qt.dot(self._splitting.solve(r))
-        return w + delta
+        return x + delta
 
 
 def _create_splitting(splitting: str, q: scipy.sparse.spmatrix):
@@ -97,10 +98,10 @@ def _create_splitting(splitting: str, q: scipy.sparse.spmatrix):
     """
     if splitting == "direct":
         # Perform a sparse LU decomposition of Q*Q^T on the CPU and cache it for fast repeated linear solves.
-        return fbll.SparseLuSolver(q.dot(np.transpose(q)))
+        return hm.linalg.SparseLuSolver(q.dot(np.transpose(q)))
     elif splitting == "jacobi":
         return _JacobiSplitting(q)
-    # TODO(olivne): add "gs" - triangular solve. May be faster than Jacobi/w-Jacobi.
+    # TODO(orenlivne): add "gs" - triangular solve. May be faster than Jacobi/w-Jacobi.
     else:
         raise Exception("Unsupported splitting kind '%s'" % (splitting,))
 

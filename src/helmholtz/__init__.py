@@ -1,2 +1,2 @@
-from . import linalg, processor, cycle, interpolation_fit, interpolation, restriction, relax, window_svd, \
-    multilevel, eigensolver, run, bootstrap
+from . import logging, linalg, processor, cycle, interpolation_fit, interpolation, coarsening, relax, window_svd, \
+    mock_cycle, multilevel, eigensolver, run, bootstrap

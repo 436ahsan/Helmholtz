@@ -123,7 +123,7 @@ def tile_csr_matrix(a: scipy.sparse.csr_matrix, n: int) -> scipy.sparse.csr_matr
 
 def tile_array(r: np.ndarray, n: int) -> scipy.sparse.csr_matrix:
     """
-    Tiles a dense matrix (e.g., the restriction R over an aggregate) over a domain of non-overlapping aggregates.
+    Tiles a dense matrix (e.g., the coarsening R over an aggregate) over a domain of non-overlapping aggregates.
     Args:
         r: aggregate matrix.
         n: number of times to tile a.
@@ -195,17 +195,18 @@ class SparseLuSolver:
         """Constructs a solver of A*x = b where A = sparse scipy matrix. Performs LU factorization."""
         n = a.shape[0]
         lu = scipy.sparse.linalg.splu(a.tocsc())
-        self._l_inv = scipy.sparse.csc_matrix(scipy.sparse.linalg.spsolve_triangular(lu.L.tocsr(), scipy.identity(n)))
-        self._u_inv = scipy.sparse.csc_matrix(scipy.sparse.linalg.spsolve_triangular(
-                lu.U.transpose().tocsr(), scipy.identity(n))).transpose()
+        self._l_inv = scipy.sparse.csc_matrix(
+            scipy.sparse.linalg.spsolve_triangular(lu.L.tocsr(), np.identity(n)))
+        self._u_inv = scipy.sparse.csc_matrix(
+            scipy.sparse.linalg.spsolve_triangular(lu.U.transpose().tocsr(), np.identity(n))).transpose()
         self._pr = scipy.sparse.csc_matrix((np.ones(n), (lu.perm_r, np.arange(n))))
         self._pc = scipy.sparse.csc_matrix((np.ones(n), (np.arange(n), lu.perm_c)))
 
     def solve(self, b: np.ndarray):
         """Solves A*x = b. b is a tensor of shape a.shape[0] x k for some k."""
-        # TODO(olivne): replace permutation matrix multiplications by a simple row/column indexing call.
-        x1 = torch.mm(self._pr, b)
-        x2 = torch.mm(self._l_inv, x1)
-        x3 = torch.mm(self._u_inv, x2)
-        x = torch.mm(self._pc, x3)
+        # TODO(orenlivne): replace permutation matrix multiplications by a simple row/column indexing call.
+        x1 = self._pr.dot(b)
+        x2 = self._l_inv.dot(x1)
+        x3 = self._u_inv.dot(x2)
+        x = self._pc.dot(x3)
         return x

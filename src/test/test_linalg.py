@@ -121,6 +121,21 @@ class TestLinalg:
 
         assert norm(r.dot(x)) < 1e-14
 
+    def test_sparse_lu_solver(self):
+        # Construct an aggregation matrix Q (has at least one non-zero per row).
+        m, n = 20, 50
+        p = scipy.sparse.csr_matrix((np.ones(m), (np.arange(m), np.random.choice(np.arange(n), m))), shape=(m, n))
+        q = p + scipy.sparse.random(m, n, density=0.05)
+        # A = Q*Q^T.
+        a = q.dot(q.transpose())
+
+        lu_solver = hm.linalg.SparseLuSolver(a)
+        b = np.random.random((m, 5))
+
+        x = lu_solver.solve(b)
+
+        assert norm(a.dot(x) - b) <= 1e-10 * norm(b)
+
 
 def _rq(x, action):
     """

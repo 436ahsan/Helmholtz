@@ -119,7 +119,7 @@ class Level:
 
     def restrict(self, x: np.array) -> np.array:
         """
-        Returns the restriction action R*x.
+        Returns the coarsening action R*x.
         Args:
             x: vector of size n or a matrix of size n x m.
 

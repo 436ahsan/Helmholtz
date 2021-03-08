@@ -8,7 +8,7 @@ import helmholtz as hm
 logger = logging.getLogger("nb")
 
 
-class TestRestriction:
+class TestCoarsening:
 
     def setup_method(self):
         """Fixed random seed for deterministic results."""
@@ -18,7 +18,7 @@ class TestRestriction:
                             datefmt="%a, %d %b %Y %H:%M:%S")
         np.random.seed(1)
 
-    def test_restriction(self):
+    def test_coarsening(self):
         n = 32
         kh = 0.6
         num_sweeps = 100
@@ -35,7 +35,7 @@ class TestRestriction:
 
         # Generate coarse variables (R) based on a window of x.
         x_aggregate_t = x[:aggregate_size].transpose()
-        r, _ = hm.restriction.create_restriction(x_aggregate_t, 0.1)
+        r, _ = hm.coarsening.create_coarsening(x_aggregate_t, 0.1)
 
         # Convert to sparse matrix + tile over domain.
         assert r.asarray().shape == (2, 4)
@@ -43,7 +43,7 @@ class TestRestriction:
 
         assert r_csr.shape == (16, 32)
 
-    def test_restriction_is_same_in_different_windows(self):
+    def test_coarsening_is_same_in_different_windows(self):
         n = 32
         kh = 0.1 # 0.6
         num_sweeps = 100
@@ -59,10 +59,10 @@ class TestRestriction:
                                               x, lam, num_sweeps=num_sweeps)
 
         # Generate coarse variables (R) based on different windows of x.
-        # Note: all restrictions and singular values will be almost identical except the two windows (offset = 29, 30)
+        # Note: all coarsenings and singular values will be almost identical except the two windows (offset = 29, 30)
         # due to Kaczmarz stopping at point 31 (thus 30, 31, 1 are co-linear).
         r_by_offset = np.array([hm.linalg.normalize_signs(
-            hm.restriction.create_restriction(
+            hm.coarsening.create_coarsening(
                 hm.linalg.get_window(x, offset, aggregate_size).transpose(), 0.1)[0].asarray())
             for offset in range(len(x))])
         # R should not change much across different windows.
