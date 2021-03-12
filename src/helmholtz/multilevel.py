@@ -42,9 +42,9 @@ class Level:
     def print(self):
         _LOGGER.info("a = \n" + str(self.a.toarray()))
         if self.r is not None:
-            _LOGGER.info("r = \n" + str(self.r))
+            _LOGGER.info("r = \n" + str(self.r.asarray()))
         if self.p is not None:
-            _LOGGER.info("p = \n" + str(self.p))
+            _LOGGER.info("p = \n" + str(self.p.asarray()))
 
     def stiffness_operator(self, x: np.array) -> np.array:
         """

@@ -5,7 +5,7 @@ import logging
 import numpy as np
 from typing import Tuple
 from numpy.linalg import norm
-from helmholtz.linalg import scaled_norm
+from helmholtz.linalg import norm
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -22,7 +22,7 @@ def run_iterative_method(operator, method, x: np.ndarray, num_sweeps: int = 30, 
         num_sweeps: number of sweeps to execute.
         print_frequency: print debugging convergence statements per this number of sweeps.
           None means no printouts.
-        residual_stop_value: stop iteration when scaled_norm(operator(x)) < residual_stop_value.
+        residual_stop_value: stop iteration when norm(operator(x)) < residual_stop_value.
 
     Returns:
         e: relaxed test matrix.
@@ -30,8 +30,8 @@ def run_iterative_method(operator, method, x: np.ndarray, num_sweeps: int = 30, 
     """
     # Print the error and residual norm of the first test function.
     x0 = x[:, 0]
-    r_norm = scaled_norm(operator(x0))
-    rer = r_norm / scaled_norm(x0)
+    r_norm = norm(operator(x0))
+    rer = r_norm / norm(x0)
     _LOGGER.debug("{:5d} |r| {:.8e} RER {:.5f}".format(0, r_norm, rer))
     # Run 'num_sweeps' relaxation sweeps.
     if print_frequency is None:
@@ -44,11 +44,11 @@ def run_iterative_method(operator, method, x: np.ndarray, num_sweeps: int = 30, 
         rer_old = rer
         x = method(x)
         x0 = x[:, 0]
-        r_norm = scaled_norm(operator(x0))
-        rer = r_norm / scaled_norm(x0)
+        r_norm = norm(operator(x0))
+        rer = r_norm / norm(x0)
         if i % print_frequency == 0:
-            _LOGGER.debug("{:5d} |r| {:.8e} ({:.5f}) RER {:.5f} ({:.5f})".format(
-                i, r_norm, r_norm / max(1e-30, r_norm_old), rer, rer / max(1e-30, rer_old)))
+            _LOGGER.debug("{:5d} |r| {:.8e} ({:.5f}) RER {:.5f} ({:.5f}) {:.5f}".format(
+                i, r_norm, r_norm / max(1e-30, r_norm_old), rer, rer / max(1e-30, rer_old), norm(x0)))
         r_norm_history[i] = r_norm
         if i >= min_sweeps and r_norm < residual_stop_value:
             r_norm_history = r_norm_history[:i + 1]
@@ -56,7 +56,8 @@ def run_iterative_method(operator, method, x: np.ndarray, num_sweeps: int = 30, 
     # return x, r_norm / r_norm_old
     # Average convergence factor over the last 5 steps. Exclude first cycle.
     last_steps = min(5, len(r_norm_history) - 2)
-    return x, (r_norm_history[-1] / r_norm_history[-last_steps - 1]) ** (1 / last_steps)
+    return x, (None if num_sweeps < 5 else
+           (r_norm_history[-1] / r_norm_history[-last_steps - 1]) ** (1 / last_steps))
 
 
 def run_iterative_eigen_method(operator, method, x: np.ndarray, lam, num_sweeps: int = 30, print_frequency: int = None,
@@ -72,7 +73,7 @@ def run_iterative_eigen_method(operator, method, x: np.ndarray, lam, num_sweeps:
         num_sweeps: number of sweeps to execute.
         print_frequency: print debugging convergence statements per this number of sweeps.
           None means no printouts.
-        residual_stop_value: stop iteration when scaled_norm(operator(x)) < residual_stop_value.
+        residual_stop_value: stop iteration when norm(operator(x)) < residual_stop_value.
 
     Returns:
         e: relaxed test matrix.
@@ -80,7 +81,7 @@ def run_iterative_eigen_method(operator, method, x: np.ndarray, lam, num_sweeps:
     """
     # Print the error and residual norm of the first test function.
     x0 = x[:, 0]
-    r_norm = scaled_norm(operator(x0, lam))
+    r_norm = norm(operator(x0, lam))
     lam_error = 1
     _LOGGER.debug("{:5d} |r| {:.8e} lam {:.5f}".format(0, r_norm, lam))
     # Run 'num_sweeps' relaxation sweeps.
@@ -95,7 +96,7 @@ def run_iterative_eigen_method(operator, method, x: np.ndarray, lam, num_sweeps:
         lam_error_old = lam_error
         x, lam = method(x, lam)
         x0 = x[:, 0]
-        r_norm = scaled_norm(operator(x0, lam))
+        r_norm = norm(operator(x0, lam))
         lam_error = np.abs(lam - lam_old)
         if i % print_frequency == 0:
             _LOGGER.debug("{:5d} |r| {:.8e} ({:.5f}) lam {:.5f} ({:.5f})".format(
@@ -107,7 +108,8 @@ def run_iterative_eigen_method(operator, method, x: np.ndarray, lam, num_sweeps:
     # return x, r_norm / r_norm_old
     # Average convergence factor over the last 5 steps. Exclude first cycle.
     last_steps = min(5, len(r_norm_history) - 2)
-    return x, lam, (r_norm_history[-1] / r_norm_history[-last_steps - 1]) ** (1 / last_steps)
+    return x, lam, (None if num_sweeps < last_steps else
+           (r_norm_history[-1] / r_norm_history[-last_steps - 1]) ** (1 / last_steps))
 
 
 def random_test_matrix(window_shape: Tuple[int], num_examples: int = None) -> np.ndarray:

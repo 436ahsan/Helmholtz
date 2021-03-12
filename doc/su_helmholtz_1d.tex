@@ -94,9 +94,7 @@ $R_w$ depends on an accuracy threshold $\varepsilon$ and minimum coarsening rati
 \end{equation}
 Then $R_w := V(1:w_c,:)$ is the sub-matrix of $V$ consisting of the first $w_c$ rows of $V$. (\ref{r_accuracy}) guarantees an $\varepsilon$-relative reconstruction error of $X$ in the Frobenius norm \cite{svd}.
 
-If $w_c/w > \rho$, we double the window size $w$ and recalculate $R$ until a large enough window is reached such that $w_c/w \leq \rho$. \textbf{For any reasonable problem, we can always find a value of $w$ for which this holds. Explain why.}
-
-% Depends on a good smoother. Reduces space. Or can do it from an analysis of the homogenous PDE.
+If $w_c/w > \rho$, we double the window size $w$ and recalculate $R$ until a large enough window is reached such that $w_c/w \leq \rho$. If the relaxation method is a good smoother that quickly reduces the error (and thus our test functions, since we relax on $A x = 0$) into a lower-dimensional space, such a value of $w$ can be found.
 
 The SVD yields coarse variables that are less sensitive to relaxation than pointwise coarsening (i.e., selecting one or several fine gridpoints as coarse variables: $R_w = [1,\underbrace{0,\dots,0}_{w-1}]$), as shown by comparing mock cycle rates Sec.~\ref{mock_cycle}. It also automatically selects the number of coarse variables $w_c$ per aggregate.
 
@@ -126,8 +124,6 @@ where $\overline{x}^c := R x$ is the restricted fine-level approximate solution 
 
 \section{Numerical Results}
 We discretize the Helmholtz operator $A = -\Delta + k^2 I$ using a $3$-point finite difference $A^h = [1, -2 + (kh)^2, 1]$ (since the domain is periodic and we're solving the homogeneous equation, thee is no need to scale by $h^{-2}$).
-
-%%% Rerun without lambda normalization
 
 \subsection{Mock Cycle}
 \label{mock_cycle}

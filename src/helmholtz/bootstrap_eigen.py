@@ -114,7 +114,7 @@ def bootstap(x, lam, multilevel: hm.multilevel.Multilevel, max_levels: int, aggr
     for l in range(1, max_levels):
         _LOGGER.info("Coarsening level {}->{}".format(l - 1, l))
         domain_size = level.a.shape[0]
-        r, p = create_transfer_operators(x_level, domain_size,
+        r, p, _ = create_transfer_operators(x_level, domain_size,
                                          aggregate_size=aggregate_size, threshold=threshold, caliber=caliber,
                                          interpolation_method=interpolation_method)
         # 'level' now becomes the next coarser level and x_level the corresponding test matrix.
@@ -186,7 +186,7 @@ def create_transfer_operators(x, domain_size: int, aggregate_size: int, threshol
         max_coarsening_ratio: maximum allowed coarsening ratio. If exceeded at a certain aggregate size, we double
             it until it is reached (or when the aggregate size becomes too large, in which case an exception is raised).
 
-    Returns: R, P
+    Returns: R, P, s = singular values array.
     """
     # TODO(oren): generalize the domain to the d-dimensional case. For now assuming 1D only.
     assert domain_size % aggregate_size == 0, \
@@ -238,4 +238,4 @@ def create_transfer_operators(x, domain_size: int, aggregate_size: int, threshol
     p = hm.interpolation.create_interpolation(interpolation_method,
                                               r.asarray(), x_disjoint_aggregate_t, xc_disjoint_aggregate_t,
                                               domain_size, nc, caliber)
-    return r, p
+    return r, p, s

@@ -37,12 +37,32 @@ class TestBootstrap:
                pytest.approx(0.110, 1e-2)
         assert conv_factor == pytest.approx(0.9998, 1e-3)
 
-    def test_bootstrap_1level(self):
+    def test_1_level_bootstrap_laplace(self):
+        n = 16
+        kh = 0
+
+        a = hm.linalg.helmholtz_1d_operator(kh, n)
+        x, multilevel = hm.bootstrap.generate_test_matrix(a, 0, num_examples=4, num_sweeps=100)
+
+        assert x.shape == (16, 4)
+
+        assert len(multilevel) == 2
+
+        level = multilevel.finest_level
+        assert level.a.shape == (16, 16)
+
+        coarse_level = multilevel.level[1]
+        assert coarse_level.a.shape == (8, 8)
+        assert coarse_level._r_csr.shape == (8, 16)
+        assert coarse_level._p_csr.shape == (16, 8)
+        coarse_level.print()
+
+    def test_1_level_bootstrap_rays(self):
         n = 16
         kh = 0.5
 
         a = hm.linalg.helmholtz_1d_operator(kh, n)
-        x, multilevel = hm.bootstrap.generate_test_matrix(a, 0, num_examples=4, num_sweeps=10)
+        x, multilevel = hm.bootstrap.generate_test_matrix(a, 0, num_examples=4, num_sweeps=100)
 
         assert x.shape == (16, 4)
 

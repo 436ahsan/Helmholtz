@@ -25,6 +25,9 @@ class Interpolator:
         self._data = data
         self._nc = nc
 
+    def asarray(self):
+        return self._nbhr, self._data
+
     def __len__(self):
         """Returns the number of fine variables being interpolated to (making up a single aggregate)."""
         return len(self._nbhr)
@@ -48,6 +51,11 @@ class Interpolator:
         tiled_col = np.concatenate([col + nc * ic for ic in range(n)])
         tiled_data = np.tile(self._data.flatten(), n)
         domain_size = aggregate_size * n
+
+        print(aggregate_size, n, domain_size)
+        print(tiled_row)
+        print(tiled_col)
+        print(tiled_data)
         return scipy.sparse.coo_matrix((tiled_data, (tiled_row, tiled_col)),
                                        shape=(domain_size, nc * n)).tocsr()
 

@@ -48,9 +48,8 @@ def generate_test_matrix(a: scipy.sparse.spmatrix, num_growth_steps: int, growth
     _LOGGER.info("Smallest domain size {}, bootstrap with {} levels".format(x.shape[0], max_levels))
     for i in range(num_bootstrap_steps):
         _LOGGER.info("Bootstrap step {}/{}".format(i + 1, num_bootstrap_steps))
-        x, multilevel = bootstap(
-            x, multilevel, max_levels, aggregate_size=aggregate_size, num_sweeps=num_sweeps,
-            num_examples=num_examples, print_frequency=print_frequency, interpolation_method=interpolation_method)
+        x, multilevel = bootstap(x, multilevel, max_levels, num_sweeps=num_sweeps, print_frequency=print_frequency,
+                                 interpolation_method=interpolation_method)
 
     for l in range(num_growth_steps):
         _LOGGER.info("Growing domain {}/{} to size {}, max_levels {}".format(
@@ -61,29 +60,26 @@ def generate_test_matrix(a: scipy.sparse.spmatrix, num_growth_steps: int, growth
         # Bootstrap at the current level.
         for i in range(num_bootstrap_steps):
             _LOGGER.info("Bootstrap step {}/{}".format(i + 1, num_bootstrap_steps))
-            x, multilevel = bootstap(
-                x, multilevel, max_levels, aggregate_size=aggregate_size, num_sweeps=num_sweeps,
-                num_examples=num_examples, print_frequency=print_frequency, interpolation_method=interpolation_method)
+            x, multilevel = bootstap(x, multilevel, max_levels, num_sweeps=num_sweeps, print_frequency=print_frequency,
+                                     interpolation_method=interpolation_method)
         max_levels += 1
 
     return x, multilevel
 
 
-def bootstap(x, multilevel: hm.multilevel.Multilevel, max_levels: int, aggregate_size: int = 4,
+def bootstap(x, multilevel: hm.multilevel.Multilevel, max_levels: int,
              num_sweeps: int = 10, threshold: float = 0.1, caliber: int = 2, interpolation_method: str = "svd",
-             num_examples: int = None, print_frequency: int = None) -> \
+             print_frequency: int = None) -> \
         Tuple[np.ndarray, hm.multilevel.Multilevel]:
     """
     Improves test functions and a multilevel hierarchy on a fixed-size domain by bootstrapping.
     Args:
         x: test matrix.
         multilevel: multilevel hierarchy.
-        aggregate_size: aggregate size = #fine vars per aggregate.
         num_sweeps: number of relaxations or cycles to run on fine-level vectors to improve them.
         threshold: relative reconstruction error threshold. Determines nc.
         caliber: interpolation caliber.
         interpolation_method: type of interpolation ("svd"|"ls").
-        num_examples: number of test functions to generate. If None, uses 4 * np.prod(window_shape).
 
     Returns:
         improved x, multilevel hierarchy with the same number of levels.
@@ -95,10 +91,10 @@ def bootstap(x, multilevel: hm.multilevel.Multilevel, max_levels: int, aggregate
     # TODO(orenlivne): update parameters of relaxation cycle to reasonable values if needed.
     if len(multilevel) == 1:
         def relax_cycle(x):
-            return hm.relax_cycle.relax_cycle(multilevel, 1.0, None, None, 5).run(x)
+            return hm.relax_cycle.relax_cycle(multilevel, 1.0, None, None, 1).run(x)
     else:
         def relax_cycle(x):
-            return hm.relax_cycle.relax_cycle(multilevel, 1.0, 2, 2, 30).run(x)
+            return hm.relax_cycle.relax_cycle(multilevel, 1.0, 2, 2, 4).run(x)
     _LOGGER.info("{} at level {}".format("Relax" if len(multilevel) == 1 else "Cycle", finest))
     x, _ = hm.run.run_iterative_method(level.operator, relax_cycle, x, num_sweeps)
 
@@ -111,17 +107,17 @@ def bootstap(x, multilevel: hm.multilevel.Multilevel, max_levels: int, aggregate
     for l in range(1, max_levels):
         _LOGGER.info("Coarsening level {}->{}".format(l - 1, l))
         domain_size = level.a.shape[0]
-        r, p = create_transfer_operators(x_level, domain_size,
-                                         aggregate_size=aggregate_size, threshold=threshold, caliber=caliber,
-                                         interpolation_method=interpolation_method)
+        r, p, _ = create_transfer_operators(x_level, domain_size, threshold=threshold, caliber=caliber,
+                                            interpolation_method=interpolation_method)
         # 'level' now becomes the next coarser level and x_level the corresponding test matrix.
         level = hm.multilevel.Level.create_coarse_level(level.a, level.b, r, p)
         new_multilevel.level.append(level)
-        x_level = level.restrict(x_level)
-        b = np.zeros_like(x_level)
-        _LOGGER.info("Relax at level {}".format(l))
-        x_level, _ = hm.run.run_iterative_method(level.operator, lambda x: level.relax(x, b), x_level,
-                                                 num_sweeps=num_sweeps, print_frequency=print_frequency)
+        if l < max_levels - 1:
+            x_level = level.restrict(x_level)
+            b = np.zeros_like(x_level)
+            _LOGGER.info("Relax at level {}".format(l))
+            x_level, _ = hm.run.run_iterative_method(level.operator, lambda x: level.relax(x, b), x_level,
+                                                     num_sweeps=num_sweeps, print_frequency=print_frequency)
 
     return x, new_multilevel
 
@@ -168,7 +164,7 @@ def fmg(multilevel, nu_pre: int = 1, nu_post: int = 1, nu_coarsest: int = 10, nu
     return x
 
 
-def create_transfer_operators(x, domain_size: int, aggregate_size: int, threshold: float = 0.1, caliber: int = 2,
+def create_transfer_operators(x, domain_size: int, threshold: float = 0.1, caliber: int = 2,
                               interpolation_method: str = "svd", max_coarsening_ratio: float = 0.5) -> \
         Tuple[hm.coarsening.Coarsener, hm.interpolation.Interpolator]:
     """
@@ -176,21 +172,14 @@ def create_transfer_operators(x, domain_size: int, aggregate_size: int, threshol
     Args:
         x: fine-level test matrix.
         domain_size: #gridpoints in fine level.
-        aggregate_size: aggregate size = #fine vars per aggregate
         threshold: relative reconstruction error threshold. Determines nc.
         caliber: interpolation caliber.
         interpolation_method: type of interpolation ("svd"|"ls").
         max_coarsening_ratio: maximum allowed coarsening ratio. If exceeded at a certain aggregate size, we double
             it until it is reached (or when the aggregate size becomes too large, in which case an exception is raised).
 
-    Returns: R, P
+    Returns: R, P, s = singular value array.
     """
-    # TODO(oren): generalize the domain to the d-dimensional case. For now assuming 1D only.
-    assert domain_size % aggregate_size == 0, \
-        "Aggregate shape must divide the domain shape in every dimension"
-    # assert all(ni % ai == 0 for ni, ai in zip(domain_shape, aggregate_shape)), \
-    #     "Aggregate shape must divide the domain shape in every dimension"
-
     aggregate_size = 1
     coarsening_ratio = 1
     num_test_functions = x.shape[1]
@@ -203,9 +192,11 @@ def create_transfer_operators(x, domain_size: int, aggregate_size: int, threshol
         r, s = hm.coarsening.create_coarsening(x_aggregate_t, threshold)
         nc = r.asarray().shape[0]
         coarsening_ratio = nc / aggregate_size
-        _LOGGER.debug("SVD {:2d} x {:2d} aggregate size {} nc {} cr {:.2f} interpolation error {:.3f} Singular vals {}".format(
-            x_aggregate_t.shape[0], x_aggregate_t.shape[1], aggregate_size, nc, coarsening_ratio,
-            (sum(s[nc:] ** 2) / sum(s ** 2)) ** 0.5, np.array2string(s, separator=", ", precision=2)))
+        _LOGGER.debug("SVD {:2d} x {:2d} nc {} cr {:.2f} error {:.3f} Singular vals {}"
+                      " error {}".format(
+            x_aggregate_t.shape[0], x_aggregate_t.shape[1], nc, coarsening_ratio,
+            (sum(s[nc:] ** 2) / sum(s ** 2)) ** 0.5, np.array2string(s, separator=", ", precision=2),
+            np.array2string((1 - np.cumsum(s**2)/sum(s**2))**0.5, separator=", ", precision=2)))
     if (aggregate_size > domain_size // 2) or (coarsening_ratio > max_coarsening_ratio):
         raise Exception("Could not find a good coarsening ratio")
 
@@ -235,4 +226,4 @@ def create_transfer_operators(x, domain_size: int, aggregate_size: int, threshol
     p = hm.interpolation.create_interpolation(interpolation_method,
                                               r.asarray(), x_disjoint_aggregate_t, xc_disjoint_aggregate_t,
                                               domain_size, nc, caliber)
-    return r, p
+    return r, p, s
