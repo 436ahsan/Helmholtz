@@ -1,4 +1,5 @@
-"""Iterative method running and convergence estimation functions."""
+"""Iterative method running and convergence estimation functions.
+RER = Residual-to-error-ratio = |A*x|/|x| = Rayleigh Quotient of x with respect to A'*A."""
 import helmholtz as hm
 import logging
 import numpy as np
@@ -9,15 +10,65 @@ from helmholtz.linalg import scaled_norm
 _LOGGER = logging.getLogger(__name__)
 
 
-def run_iterative_method(operator, method, x: np.ndarray, lam, num_sweeps: int = 30, print_frequency: int = None,
+def run_iterative_method(operator, method, x: np.ndarray, num_sweeps: int = 30, print_frequency: int = None,
                          residual_stop_value: float = 1e-10) -> np.ndarray:
     """
-    Creates test functions (functions that approximately satisfy A*x=0) using single level relaxation.
+    Runs an iterative method on A*x=0 and measures the convergence rate.
 
     Args:
         operator: an object that can calculate residuals (action A*x).
         method: iterative method functor (an iteration is a call to this method).
         x: test matrix initial approximation to the test functions.
+        num_sweeps: number of sweeps to execute.
+        print_frequency: print debugging convergence statements per this number of sweeps.
+          None means no printouts.
+        residual_stop_value: stop iteration when scaled_norm(operator(x)) < residual_stop_value.
+
+    Returns:
+        e: relaxed test matrix.
+        conv_factor: asymptotic convergence factor (of the last iteration) of the RER.
+    """
+    # Print the error and residual norm of the first test function.
+    x0 = x[:, 0]
+    r_norm = scaled_norm(operator(x0))
+    rer = r_norm / scaled_norm(x0)
+    _LOGGER.debug("{:5d} |r| {:.8e} RER {:.5f}".format(0, r_norm, rer))
+    # Run 'num_sweeps' relaxation sweeps.
+    if print_frequency is None:
+        print_frequency = num_sweeps // 10
+    r_norm_history = [None] * (num_sweeps + 1)
+    r_norm_history[0] = r_norm
+    min_sweeps = 5
+    for i in range(1, num_sweeps + 1):
+        r_norm_old = r_norm
+        rer_old = rer
+        x = method(x)
+        x0 = x[:, 0]
+        r_norm = scaled_norm(operator(x0))
+        rer = r_norm / scaled_norm(x0)
+        if i % print_frequency == 0:
+            _LOGGER.debug("{:5d} |r| {:.8e} ({:.5f}) RER {:.5f} ({:.5f})".format(
+                i, r_norm, r_norm / max(1e-30, r_norm_old), rer, rer / max(1e-30, rer_old)))
+        r_norm_history[i] = r_norm
+        if i >= min_sweeps and r_norm < residual_stop_value:
+            r_norm_history = r_norm_history[:i + 1]
+            break
+    # return x, r_norm / r_norm_old
+    # Average convergence factor over the last 5 steps. Exclude first cycle.
+    last_steps = min(5, len(r_norm_history) - 2)
+    return x, (r_norm_history[-1] / r_norm_history[-last_steps - 1]) ** (1 / last_steps)
+
+
+def run_iterative_eigen_method(operator, method, x: np.ndarray, lam, num_sweeps: int = 30, print_frequency: int = None,
+                               residual_stop_value: float = 1e-10) -> np.ndarray:
+    """
+    Runs an iterative method on A*x=lambda*x and measures the convergence rate.
+
+    Args:
+        operator: an object that can calculate residuals (action A*x).
+        method: iterative method functor (an iteration is a call to this method).
+        x: test matrix initial approximation to the test functions.
+        lam: initial guess for eigenvalues.
         num_sweeps: number of sweeps to execute.
         print_frequency: print debugging convergence statements per this number of sweeps.
           None means no printouts.

@@ -37,18 +37,26 @@
 \begin{abstract}
 Multigrid solvers have been successful in solving numerous scientific and and engineering systems. Typically, a hierarchy of increasingly coarser levels are constructed from the original fine equation, such that each level reduces a certain range of error components, and combined in a multigrid cycle that has an optimal convergence rate. This approach, however, falls short in highly nonlinear cases and huge (yet repetitive) systems where even linear complexity is not good enough. Systematic upscaling is an extension of multilevel solvers to such cases: constructing coarse levels that accurately represent the full solution. Fine levels are rarely visited, and used only in selected small windows to improve the coarse level accuracy.
 
-In this work we develop a systematic upscaling algorithm for the one-dimensional Helmholtz equation on a periodic domain. This model is an example where the coarse variables have a completely different character (rays) than fine-level variables (waves). The algorithm produces both near-null space components, and a multilevel hierarchy of highly accurate coarse levels. The hierarchy and functions are iteratively improved together by bootstrap cycles, where the coarsening and interpolation are efficiently derived on local windows. Coarse levels employ the Full Approximation Scheme (FAS), and are then homogenized to obtain the full fine-level accuracy. Numerical results demonstrate the potential of the method for future applications, including the multi-dimensional Helmholtz equation, fluid flows and molecular dynamics.
+In this work we develop a systematic upscaling algorithm for the one-dimensional Helmholtz equation on a periodic domain. This model is an example where the coarse variables have a completely different character (rays) than fine-level variables (waves). The algorithm produces both near-null space functions, and a multilevel hierarchy of highly accurate coarse levels. The hierarchy and functions are iteratively improved together by bootstrap cycles, where the coarsening and interpolation are efficiently derived on local windows. Coarse levels employ the Full Approximation Scheme (FAS), and are then homogenized to obtain the full fine-level accuracy. Numerical results demonstrate the potential of the method for future applications, including the multi-dimensional Helmholtz equation, fluid flows and molecular dynamics.
 \end{abstract}
 
 \section{Introduction}
 \label{intro}
 Multigrid (MG) solvers have been very successful in solving a wide variety of scientific and engineering problems with optimal efficiency \cite{review}. Typically, a hierarchy of coarse levels is constructed from the original system, and combined in a multigrid cycle to obtain a fast iterative solver. There are two reasons for further generalizing these multigrid methods: (a) they cannot perform well for \emph{highly nonlinear cases}, where configurations cannot be decomposed into weakly-interacting local and non-local parts; and (b) for many systems, even attaining linear complexity is not good enough, since the number of variables is huge. Such systems on the other hand are typically \emph{highly repetitive}, in the sense that the same small set of governing equations (or Hamiltonian terms) keep repeating itself throughout the physical domain. Thus, the idea of \emph{systematic upscaling}  \cite{su} is to create coarse levels with  a small set of governing equations that are valid everywhere, and that can be derived from fine-level processing conducted only in some small representative “windows” (see below), so that fine levels are never or rarely visited.
 
-In this work we implement systematic upscaling for the 1D Helmholtz equation on a periodic domain. The Helmholtz model is a simple yet instructive example where coarse-level variables have a completely different character (rays/geometric optics) than fine-level variables (waves/electromagnetics). By choosing a geometric domain, we factor out other difficulties that a numerical Helmholtz solver must treat (boundary effects; and diffraction effects of domain features of size comparable with the wavelength; phase error), to focus on the derivation of the interior-domain coarsening in the context of upscaling.
+In this work we implement systematic upscaling for the 1D Helmholtz equation on a periodic domain. The Helmholtz model is a simple yet instructive example where coarse-level variables have a completely different character (rays/geometric optics) than fine-level variables (waves/electromagnetics). By choosing a periodic domain, we factor out other difficulties that a numerical Helmholtz solver must treat (radiation boundary conditions are necessary; boundary effects; and diffraction effects of domain features of size comparable with the wavelength; phase error), to focus on the derivation of the interior-domain coarsening in the context of upscaling.
 
-The Helmholtz operator has Almost Zero Modes (AZMs; or near-null space components), which are not reduced by the fine-level relaxation. Unlike diffusion PDEs, these are not geometrically smooth functions. In 1D, they can be represented by two basis functions (left- and right-traveling waves $\varphi_-$ and $\varphi_+$, respectively). That is, each AZM can be written as $A_- \varphi_+ A_+ \varphi_+$ where $A_{\pm}$ are smooth functions. The upscaling algorithm finds both approximate AZMs (called ``test functions'') and a multilevel hierarchy that accurately represents them at all levels. (The 2D problem introduces the further difficulty that AZMs are composed of waves in an infinite number of directions. Thus, creating a multigrid solver that properly approximates AZMs and automatically detects the transition from waves to rays, has been a notoriously difficult task \cite{wave_ray, later_papers}.)
+%%%% Low residuals are important.
+%% left, right - sin + i*cos, sin - i*cos are the basis functions.
+
+The Helmholtz operator has Almost Zero Modes (AZMs; or near-null space components), which are not reduced by the fine-level relaxation. Unlike diffusion PDEs, these are not geometrically smooth functions. In 1D, they can be represented by two basis functions $\varphi_-$ and $\varphi_+$. That is, each AZM can be written as $A_- \varphi_+ A_+ \varphi_+$ where $A_{\pm}$ are smooth functions. The upscaling algorithm finds both approximate AZMs (called ``test functions'') and a multilevel hierarchy that accurately represents them at all levels. (The 2D problem introduces the further difficulty that AZMs are composed of waves in an infinite number of directions. Thus, creating a multigrid solver that properly approximates AZMs and automatically detects the transition from waves to rays, has been a notoriously difficult task \cite{wave_ray, later_papers}.)
 
 \subsection{Our Contribution}
+
+%%% generral procedures that arer not only for Helmholtz. THey don't exploit a specific knowledge of the problem like sin and cossine.
+%% Importancce of bootstrapping in generating an accurate coarse levels.
+
+
 Our upscaling algorithm finds approximate AZMs and an accurate multilevel hierarchy using a completely automatic Bootstrap Algebraic Multigrid (BAMG) procedure that does not exploit specific properties of the Helmholtz operator. It provides a crucial stepping stone towards a much simpler and more efficient multigrid Helmholtz solver.
 
 Upscaling can be applied to constructing highly accurate coarse levels beyond just a fast iterative solution, and to other problems, including nonlinear problems and systems of PDEs (such as the Navier Stokes equations).
@@ -57,20 +65,20 @@ We used recent advances in multilevel methods (adaptive MG, BAMG \cite{bamg, lam
 \begin{itemize}
 	\item Coarse variables (both their type and number) are automatically derived using a local Singular Value Decomposition (SVD), as opposed to expert knowledge (e.g., averages of fine variables in PDEs, or centers of mass in molecular dynamics). We do utilize the locality graph, though, by defining an aggregate as a small contiguous segment of gridpoints, although the approach can be generalized to non-geometric and non-local cases as well (cf. Sec.~\ref{Generalizations}).
 	\item Interpolation is derived by regularized least-squares with cross-validation.
-	\item Akin with the idea of local windows, the coarsening and interpolation are very efficiently derived on small aggregates, tiled to the entire domain. The domain is also gradually grown as the hierarchy is expanded.
+	\item Akin with the idea of local windows, the coarsening and interpolation are very efficiently derived on small aggregates, tiled to the entire domain. The domain is gradually grown as the hierarchy is expanded.
 \end{itemize}
 
 \section{Goal}
-Given the Helhmholtz operator $A = -\Delta + k^2 I$, find $M$ \emph{test functions}: $x_1\,dots,x_M$ of unit $l_2$ norm with small $\|A x\|$; i.e., near-null-space components, on a periodic domain, with constant $k$. 
+Given the Helhmholtz operator $A = \Delta + k^2 I$, find $M$ \emph{test functions}: $x_1\,dots,x_M$ of unit $l_2$ norm with small $\|A x\|$; i.e., near-null-space components, on a periodic domain, with constant $k$. 
 
-Specifically, let the domain be $[0,L]$. The problem is discretized on a uniform grid with $n$ points (indexed $i = 0..n-1$; references to indices larger than $n - 1$ or negative are understood as periodic, i.e., $i \text{ mod } n$), and meshsize $h = L/n$. We use the 3-point finite difference discrertization stencil $A^h = [1, -2 + (kh)^2, 1]$. Given $k$, we set $h = 0.1/k$, so that $kh$ is small enough to resolve the wavelength and provide good local pointwise discretization accuracy. (We do not worry about decreasing $h$ further to obtain pointwise accuracy on a large domain that does not have a phase error, as in such resolutions simple geometric coarsening can be employed, so they are irrelevant to the challenge of upscaling.) \emph{Our goal is to obtain discrete test vectors $x^h_1,\dots,x^h_M$ of increasingly smaller $\|A x\|/\|x\|$, as $n$ (or equivalently, $L$) is gradually increased.}
+Specifically, let the domain be $[0,L]$. The problem is discretized on a uniform grid with $n$ points (indexed $i = 0..n-1$; references to indices larger than $n - 1$ or negative are understood as periodic, i.e., $i \text{ mod } n$), and meshsize $h = L/n$. We use the 3-point finite difference discrertization stencil $A^h = [1, -2 + (kh)^2, 1]$. Given $k$, we set $h = 0.1/k$, so that $kh$ is small enough to resolve the wavelength and provide good local pointwise discretization accuracy. (We do not worry at this point about decreasing $h$ further to obtain pointwise accuracy on a large domain that does not have a phase error, as in such resolutions simple geometric coarsening can be employed. Thus they are irrelevant to the challenge of upscaling away from boundaries.) \emph{Our goal is to obtain discrete test vectors $x^h_1,\dots,x^h_M$ of increasingly smaller $\|A x\|/\|x\|$, as $L$ (and therefore $n$) is gradually increased.}
 
 Our test functions are an approximation to the eigenvectors of $A$ corresponding to the $M$ smallest eigenvalues. We do not insist on finding the exact orthogonal basis here; we do know that for the 1D Helmholtz case, a small $M$ ($2-4$) should be sufficient to represent the subspace of AZMs required for an accurate multilevel hierarchy.
 
 \section{Adaptive Multilevel Hierarchy}
-The algorithm is a Bootstrap Algebraic Multigrid (BAMG) algorithm that takes advantage of the periodic domain to reduce the cost of creating the coarsening and interpolation operators. It starts with a small $n$ and gradually doubles it. At the coarsest $n$, we start with relaxed vectors as our initial test vectors, construct a small coarse hierarchy, and improve the vectors using eigencycles. The hierarchy is then updated using the new vectors. Several such bootstrap iterations are executed. We then double $n$ and tile the test vectors over the larger domain, and both the vectors and multilevel hierarchy using bootstrap iterations. For each domain doubling, we add another coarse level to the hierarchy.
+The algorithm is a Bootstrap Algebraic Multigrid (BAMG) \cite{bamg} algorithm that takes advantage of the domain periodicity to reduce the cost of creating the coarsening and interpolation operators. It starts with a small $L$ and gradually doubles it. At the smallest domain, we start with relaxed vectors as our initial test vectors, construct a small coarse hierarchy, and improve the vectors using multigrid cycles. The hierarchy is then updated using the new vectors. Several such bootstrap iterations are executed. We then double $L$ and tile the test vectors over the larger domain, and both the vectors and multilevel hierarchy using bootstrap iterations. For each domain doubling, we add another coarse level to the hierarchy.
 
-Since $A$ is indefinite, we use a robust smoother: Kaczmarz relaxation in lexicogaphic ordering. While for special cases (e.g. $k h = 0$), better smoothers are available (e.g., red-black Gauss-Seidel), Kaczmarz relaxation is guaranteed to smooth the error \cite{amg_theory}, so we keep the approach general.
+Since $A$ is indefinite, we use a robust smoother: Kaczmarz relaxation in lexicographic ordering. While for special cases (e.g. $k h = 0$), better smoothers are available (e.g., red-black Gauss-Seidel), Kaczmarz relaxation is guaranteed to smooth the error \cite{amg_theory}, so we keep the approach general.
 
 \subsection{Initial Vectors}
 Initial vectors are obtained by a $1$-level iteration (using the fine level only), which is exactly the method of \cite{mg_eigen} except that we use Kacmzarz relaxation instead of Gauss-Seidel.
@@ -96,7 +104,9 @@ Then $R_w := V(1:w_c,:)$ is the sub-matrix of $V$ consisting of the first $w_c$ 
 
 If $w_c/w > \rho$, we double the window size $w$ and recalculate $R$ until a large enough window is reached such that $w_c/w \leq \rho$. \textbf{For any reasonable problem, we can always find a value of $w$ for which this holds. Explain why.}
 
-The SVD yields variables that are less sensitive to relaxation than pointwise coarsening (i.e., selecting one or several fine gridpoints as coarse variables: $R_w = [1,\underbrace{0,\dots,0}_{w-1}]$), as shown by comparing mock cycle rates Sec.~\ref{mock_cycle}. It also automatically selects the number of coarse variables $w_c$ per aggregate.
+% Depends on a good smoother. Reduces space. Or can do it from an analysis of the homogenous PDE.
+
+The SVD yields coarse variables that are less sensitive to relaxation than pointwise coarsening (i.e., selecting one or several fine gridpoints as coarse variables: $R_w = [1,\underbrace{0,\dots,0}_{w-1}]$), as shown by comparing mock cycle rates Sec.~\ref{mock_cycle}. It also automatically selects the number of coarse variables $w_c$ per aggregate.
 
 \subsubsection{Least-squares Interpolation}
 The interpolation $P$ is not directly related to $R$. While we could use $P = R^T$, this choice is sparse enough, and for $kh=0$ corresponds only to a piecewise-constant geometric interpolation (as $w = 2, w_c = 1$ would be chosen, and the sole important principal component is constant over the aggregate). Thus, we seek $P$ using a least-squares fit of several neighboring coarse variables to the fine variable in question.
@@ -125,6 +135,8 @@ where $\overline{x}^c := R x$ is the restricted fine-level approximate solution 
 \section{Numerical Results}
 We discretize the Helmholtz operator $A = -\Delta + k^2 I$ using a $3$-point finite difference $A^h = [1, -2 + (kh)^2, 1]$ (since the domain is periodic and we're solving the homogeneous equation, thee is no need to scale by $h^{-2}$).
 
+%%% Rerun without lambda normalization
+
 \subsection{Mock Cycle}
 \label{mock_cycle}
 To gauge the quality of the coarse variable set, we compared the mock cycle convergence factors with SVD coarsening, $1:2$ pointwise coarsening ($R_w = [1, 0]$) and averaging coarsening with $1:2$ coarsening ratio ($R_w = [1, 1]$). for different $kh$ values and $\nu$ relaxations per cycle. Kaczmarz relaxation was used in all cases; for $kh=0$ only, we also tested Gauss-Seidel relaxation for comparison. The SVD coarsening was based on test vectors obtained by $100$ relaxations of $\text{random}[-1,1]$ starting vectors, a $w=4$-point aggregate to calculate the SVD, and accuracy threshold of  $\varepsilon=0.1$. Two principal components were selected as coarse variables for all $kh$, so all three coarsening schemes have coarsening ratio $\rho = 0.5$.
@@ -147,11 +159,14 @@ GS &       0.30 &       0.11 &       0.07 &       0.02 &      0.65 &      0.60 &
 0.7   &       0.57 &       0.25 &       0.15 &       0.13 &      0.61 &      0.51 &      0.53 &      0.46 &       0.54 &       0.25 &       0.22 &       0.24 \\
 0.8   &       0.60 &       0.30 &       0.15 &       0.11 &      0.64 &      0.44 &      0.50 &      0.52 &       0.49 &       0.24 &       0.23 &       0.26 \\
 0.9   &       0.63 &       0.35 &       0.17 &       0.15 &      0.67 &      0.39 &      0.49 &      0.51 &       0.63 &       0.34 &       0.20 &       0.27 \\
-1.0   &       0.60 &       0.29 &       0.14 &       0.10 &      0.74 &      0.46 &      0.43 &      0.50 &       0.69 &       0.48 &       0.25 &       0.25 \\\bottomrule
+1.0   &       0.60 &       0.29 &       0.14 &       0.10 &      0.74 &      0.46 &      0.43 &      0.50 &       0.69 &       0.48 &       0.25 &       0.25 \\
+\bottomrule
 \end{tabular}
 }
-\caption{Mock cycle convergence factors for a grid of size $n=32$. The first row corresponds to the Laplace operator and Gauss-Seidel. All other rows refer to Kaczmarz relaxation.}
+\caption{Mock cycle convergence factors for a grid of size $n=32$. The first row corresponds to the Laplace operator and Gauss-Seidel. All other rows refer to Kaczmarz relaxation. $\nu$ is the number of relaxations per cycle.}
 \end{table}
+
+% Beccause the ampliude of the solution with [x, 0] . Mock cycle is pessimistic. quantitative prediction results from experience. CCould perssimistic butt good in many other examples.
 
 The pointwise coarsening convergence factors is bounded by $0.5$; averaging schemes exhibit superior efficiency, which improves with $\nu$ up to $3$ relaxation sweeps. The SVD coarsening is equivalent to averaging for the Laplace case, but trumps simple averaging for $kh = O(1)$, which is substantiates its use for upscaling.
 
@@ -174,7 +189,12 @@ In line with geometric multigrid theory, Gauss-Seidel is a better smoother for t
 \subsection{Questions}
 Mock cycle:
 \begin{itemize}
-\item The mock cycle's task is to predict two-level efficiency, but in the context of upscaling it is a tool to measure how well the coarse variables approximate the solution (up to few relaxations). Is that statement actually true?
+
+\item The mock cycle's task is to predict two-level efficiency, but in the context of SVD FAS upscaling it is a tool to measure how well the coarse variables approximate the solution (up to few relaxations). Is that statement actually true? 
+- SVD is the tool.
+- Crriterion for cccoarse vars is important: so that they give the full solution, not just in ccase of a smooth error.
+- Mock cycle is perssmistic, can learn a lot. If it is good then ccertainly the sitution is good. Experience (not proof) is that it shows the multlevel potential of coarse vars. Depends on P.
+
 \item For $kh = 0$ and Gauss-Seidel, the predicted 2-level convergence factor does not improve with $\nu$ and does not get below $\sim 0.5$, even though in practice we know that it does and that pointwise coarsening is a perfectly good coarsening of the Laplace operator.
 * Why are we not getting a quantitative prediction with the mock cycle? (We could compare with local mode analysis to gain an insight into the slowest-to-converge component.)
 \item Thus, can we trust this for other $kh$ values? Is it quantitative?

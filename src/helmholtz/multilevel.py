@@ -68,7 +68,7 @@ class Level:
         """
         return self.b.dot(x)
 
-    def operator(self, x: np.array, lam) -> np.array:
+    def operator(self, x: np.array, lam: float = 0) -> np.array:
         """
         Returns the operator action (A-lam*B)*x.
         Args:
@@ -77,7 +77,10 @@ class Level:
         Returns:
             (A-B*lam)*x.
         """
-        return self.a.dot(x) - lam * self.b.dot(x)
+        if lam == 0:
+            return self.a.dot(x)
+        else:
+            return self.a.dot(x) - lam * self.b.dot(x)
 
     def normalization(self, x: np.array) -> np.array:
         """
@@ -105,7 +108,7 @@ class Level:
         else:
             return (self.a.dot(x) - b).dot(x) / (self.b.dot(x)).dot(x)
 
-    def relax(self, x: np.array, b: np.array, lam) -> np.array:
+    def relax(self, x: np.array, b: np.array, lam: float = 0.0) -> np.array:
         """
         Executes a relaxation sweep on A*x = 0 at this level.
         Args:

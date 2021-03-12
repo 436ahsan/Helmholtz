@@ -210,3 +210,31 @@ class SparseLuSolver:
         x3 = self._u_inv.dot(x2)
         x = self._pc.dot(x3)
         return x
+
+
+def pairwise_cos_similarity(x: np.ndarray, y: np.ndarray = None, squared: bool = False, center: bool = False):
+    """
+    Returns the pairwise cosine distance matrix between columns of two matrices.
+    
+    Args:
+        x: x: n x p matrix.
+        y: n x q matrix. Setting y= None is as the same as y = x.
+        squared: if True, returns the cos distance squared.
+        center: if True, removes the means from x and y, i.e., returns the correlation.
+
+    Returns: matrix M of cosine distances of size p x q:
+
+        M_{ij} = sum(x[:,i] * y[:,j]) / (sum(x[:,i] ** 2) * sum(y[:,j] ** 2) ** 0.5
+    """
+    if y is None:
+        y = x
+    if center:
+        x -= np.mean(x, axis=0)[None, :]
+        y -= np.mean(y, axis=0)[None, :]
+
+    x2 = np.sum(x ** 2, axis=0)
+    y2 = np.sum(y ** 2, axis=0)
+    if squared:
+        return (x.transpose().dot(y) ** 2) / np.clip((x2[:, None] * y2[None, :]), 1e-15, None)
+    else:
+        return x.transpose().dot(y) / np.clip((x2[:, None] * y2[None, :]) ** 0.5, 1e-15, None)

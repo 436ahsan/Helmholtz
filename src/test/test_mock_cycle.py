@@ -20,14 +20,13 @@ class TestMockCycle(unittest.TestCase):
         kh = 0.5
         a = hm.linalg.helmholtz_1d_operator(kh, n)
         level = hm.multilevel.Level.create_finest_level(a)
-        relaxer = lambda x, b: level.relax(x, b, lam=0)
+        relaxer = lambda x, b: level.relax(x, b)
         r = _create_svd_coarsening(level)
 
         mock_cycle = hm.mock_cycle.MockCycle(relaxer, r, 2)
 
         x = hm.run.random_test_matrix((n,), num_examples=3)
         x_new = mock_cycle(x)
-        #x, _, _ = hm.run.run_iterative_method(level.operator, mock_cycle, x, lam, num_sweeps=num_sweeps)
 
         assert hm.linalg.scaled_norm(r.dot(x_new)) <= 1e-15
 
@@ -36,16 +35,14 @@ class TestMockCycle(unittest.TestCase):
         kh = 0.5
         a = hm.linalg.helmholtz_1d_operator(kh, n)
         level = hm.multilevel.Level.create_finest_level(a)
-        relaxer = lambda x, b: level.relax(x, b, lam=0)
+        relaxer = lambda x, b: level.relax(x, b)
         r = _create_svd_coarsening(level)
         r_pointwise = _create_pointwise_coarsening(level)
 
         def mock_cycle_conv_factor(r, num_relax_sweeps):
             mock_cycle = hm.mock_cycle.MockCycle(relaxer, r, num_relax_sweeps)
             x = hm.run.random_test_matrix((n,), num_examples=1)
-            lam = 0
-            x, _, conv_factor = hm.run.run_iterative_method(
-                level.operator, lambda x, lam: (mock_cycle(x), lam), x, lam, num_sweeps=10)
+            x, conv_factor = hm.run.run_iterative_method(level.operator, mock_cycle, x,  num_sweeps=10)
             return conv_factor
 
         assert mock_cycle_conv_factor(r, 1) == pytest.approx(0.28, 1e-2)
@@ -61,15 +58,13 @@ class TestMockCycle(unittest.TestCase):
         kh = 0.5
         a = hm.linalg.helmholtz_1d_operator(kh, n)
         level = hm.multilevel.Level.create_finest_level(a)
-        relaxer = lambda x, b: level.relax(x, b, lam=0)
+        relaxer = lambda x, b: level.relax(x, b)
         r = _create_svd_coarsening(level)
 
         def mock_cycle_conv_factor(num_relax_sweeps):
             mock_cycle = hm.mock_cycle.MockCycle(relaxer, r, num_relax_sweeps)
             x = hm.run.random_test_matrix((n,), num_examples=1)
-            lam = 0
-            x, _, conv_factor = hm.run.run_iterative_method(
-                level.operator, lambda x, lam: (mock_cycle(x), lam), x, lam, num_sweeps=10)
+            x, conv_factor = hm.run.run_iterative_method(level.operator, mock_cycle, x, num_sweeps=10)
             return conv_factor
 
         assert mock_cycle_conv_factor(1) == pytest.approx(0.28, 1e-2)
@@ -82,8 +77,7 @@ def _create_svd_coarsening(level):
     x = hm.run.random_test_matrix((n,))
     lam = 0
     b = np.zeros_like(x)
-    x, _, _ = hm.run.run_iterative_method(level.operator, lambda x, lam: (level.relax(x, b, lam), lam),
-                                          x, lam, num_sweeps=10)
+    x, conv_factor = hm.run.run_iterative_method(level.operator, lambda x: level.relax(x, b), x, num_sweeps=10)
     # Generate coarse variables (R) based on a window of x.
     aggregate_size = 4
     x_aggregate_t = x[:aggregate_size].transpose()

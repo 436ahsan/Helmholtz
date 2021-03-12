@@ -31,9 +31,6 @@ class MockCycle:
         baseline_coarse_values = np.zeros((q.shape[0], 1))
         self._corrector = MockCorrector(q, baseline_coarse_values, splitting=splitting, omega=omega)
 
-    # TODO(orenlivne): remove lam from method parameters. Update run_iterative_method() to take x only when
-    # applicable instead of x, lam; or wrap (x, lam) for the eigensolver case so run_iterative_method() always
-    # takes a generic iterate x.
     def __call__(self, x):
         """Performs a mock cycle for A*x=0 on the test vector or matrix x."""
         b = np.zeros_like(x)

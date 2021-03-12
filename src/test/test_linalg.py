@@ -9,6 +9,10 @@ import helmholtz as hm
 
 class TestLinalg:
 
+    def setup_method(self):
+        """Fixed random seed for deterministic results."""
+        np.random.seed(0)
+
     def test_sparse_circulant(self):
         vals = np.array([1, 2, 3, 5, 4])
         offsets = np.array([-2, -1, 0, 2, 1])
@@ -134,7 +138,21 @@ class TestLinalg:
 
         x = lu_solver.solve(b)
 
-        assert norm(a.dot(x) - b) <= 1e-10 * norm(b)
+        assert norm(a.dot(x) - b) <= 1e-7 * norm(b)
+
+    def test_pairwise_cos_similarity(self):
+        # Compare with explicit summation.
+        x = 2 * np.random.random((10, 4)) - 1
+        y = 2 * np.random.random((10, 3)) - 1
+        x[:, 0] = 0
+
+        actual = hm.linalg.pairwise_cos_similarity(x, y)
+        expected = np.array([
+            [sum(x[:, i] * y[:, j]) / np.clip((sum(x[:, i] ** 2) * sum(y[:, j] ** 2)) ** 0.5, 1e-15, None)
+             for j in range(y.shape[1])]
+            for i in range(x.shape[1])])
+
+        assert_array_almost_equal(actual, expected, 10)
 
 
 def _rq(x, action):

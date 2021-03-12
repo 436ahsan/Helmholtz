@@ -2,7 +2,6 @@
 coarse neighborhoods based on domain periodicity)."""
 import numpy as np
 import scipy.sparse
-import sklearn.metrics.pairwise
 
 import helmholtz as hm
 
@@ -71,24 +70,27 @@ def create_interpolation(method: str, r: np.ndarray, x_aggregate_t: np.ndarray, 
         interpolation object.
     """
     if method == "svd":
-        return Interpolator(np.tile(np.arange(nc, dtype=int)[:, None], x_aggregate_t.shape[1]).transpose(),
+        num_aggregates = domain_size // x_aggregate_t.shape[1]
+        return Interpolator(np.tile(np.arange(nc, dtype=int)[:, None], num_aggregates).transpose(),
                             r.transpose(), nc)
     elif method == "ls":
-        return _create_interpolation_ls(x_aggregate_t, xc_t, domain_size, nc, caliber)
+        return _create_interpolation_least_squares(x_aggregate_t, xc_t, domain_size, nc, caliber)
     else:
         raise Exception("Unsupported interpolation method '{}'".format(method))
 
 
-def _create_interpolation_ls(x_aggregate_t: np.ndarray, xc_t: np.ndarray, domain_size: int, nc: int, caliber: int) -> \
-        Interpolator:
+def _create_interpolation_least_squares(x_aggregate_t: np.ndarray, xc_t: np.ndarray, domain_size: int, nc: int,
+                                        caliber: int) -> Interpolator:
     """Defines interpolation to an aggregate by LS fitting to coarse neighbors of each fine var. The global
     interpolation P is the tiling of the aggregate P over the domain."""
 
     # Define nearest coarse neighbors of each fine variable.
     aggregate_size = x_aggregate_t.shape[1]
     num_aggregates = domain_size // aggregate_size
-    nbhr = hm.interpolation_build.geometric_neighbors(domain_size, aggregate_size, nc)
-    nbhr = hm.interpolation_build.sort_neighbors_by_similarity(x_aggregate_t, xc_t, nbhr, num_aggregates)
+    num_coarse_vars = nc * num_aggregates
+    # Find nearest neighbors of each fine point in an aggregate.
+    nbhr = np.mod(_geometric_neighbors(aggregate_size, nc), num_coarse_vars)
+    nbhr = _sort_neighbors_by_similarity(x_aggregate_t, xc_t, nbhr)
 
     # Fit interpolation over an aggregate.
     alpha = np.array([0, 0.001, 0.01, 0.1, 1.0])
@@ -113,35 +115,26 @@ def _geometric_neighbors(w: int, nc: int):
     Returns: array of size w x {num_neighbors} of coarse neighbor indices (relative to fine variable indices) of each
         fine variable.
     """
-    # Here there are aggregate_shape points per aggregate and the same number of coarse vars per aggregate, but in
-    # general aggregate sizes may vary.
-    fine_var = np.arange(0, w, dtype=int)
-    # Index of aggregate that i belongs to, for each i in fine_var.
-    aggregate_of_fine_var = fine_var // w
-    num_coarse_vars = nc * num_aggregates
-    # Global index of coarse variables with each aggregate.
-    aggregate_coarse_vars = np.array([np.arange(ic, ic + nc, dtype=int) for ic in range(0, num_coarse_vars, nc)])
-    nbhr = [None] * w
-    for fine_var in range(w):
-        center_aggregate = fine_var // w
-        if fine_var < w // 2:
-            # Left neighboring aggregate is nearest neighbor of the fine var.
-            nbhr_aggregate = center_aggregate - 1
-        else:
-            # Right neighboring aggregate is nearest neighbor of the fine var.
-            nbhr_aggregate = center_aggregate + 1
-        # Use center aggregate and neighboring aggregate.
-        # coarse_nbhrs = np.union1d(aggregate_coarse_vars[center_aggregate], aggregate_coarse_vars[nbhr_aggregate])
-        # Use center aggregate only.
-        coarse_nbhrs = aggregate_coarse_vars[center_aggregate]
-        # print(fine_var, center_aggregate, nbhr_aggregate, coarse_nbhrs)
-        nbhr[fine_var] = coarse_nbhrs
-    return nbhr
+    # Here we assume w points per aggregate and the same number mc of coarse vars per aggregate, but in general
+    # aggregate sizes may vary.
+    fine_var = np.arange(w, dtype=int)
+
+    # Index of neighboring coarse variable. Left neighboring aggregate for points on the left half of the window;
+    # right for right.
+    coarse_nbhr = np.zeros_like(fine_var)
+    left = fine_var < w // 2
+    right = fine_var >= w // 2
+    coarse_nbhr[left] = -1
+    coarse_nbhr[right] = 1
+
+    # All nbhrs = central aggregate coarse vars + neighboring aggregate coarse vars.
+    coarse_vars_center = np.tile(np.arange(nc, dtype=int), (w, 1))
+    return np.concatenate((coarse_vars_center, coarse_vars_center + nc * coarse_nbhr[:, None]), axis=1)
 
 
-def _sort_neighbors_by_similarity(x_aggregate: np.array, xc: np.array, nbhr: np.array, num_aggregates: int):
+def _sort_neighbors_by_similarity(x_aggregate: np.array, xc: np.array, nbhr: np.array):
     return np.array([nbhr_of_i[
-                         np.argsort(-similarity(x_aggregate[:, i][:, None], xc[:, nbhr_of_i % num_aggregates]))
+                         np.argsort(-_similarity(x_aggregate[:, i][:, None], xc[:, nbhr_of_i]))
                      ][0] for i, nbhr_of_i in enumerate(nbhr)])
 
 
@@ -149,4 +142,4 @@ def _similarity(x, xc):
     """Returns all pairwise cosine similarities between the two test matrices. Does not zero out the mean, which
     assumes intercept = False in fitting interpolation.
     """
-    return sklearn.metrics.pairwise.cosine_similarity(x.transpose(), xc.transpose())
+    return hm.linalg.pairwise_cos_similarity(x, xc, squared=True)
