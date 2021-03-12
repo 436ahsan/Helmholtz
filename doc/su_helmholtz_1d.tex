@@ -46,22 +46,14 @@ Multigrid (MG) solvers have been very successful in solving a wide variety of sc
 
 In this work we implement systematic upscaling for the 1D Helmholtz equation on a periodic domain. The Helmholtz model is a simple yet instructive example where coarse-level variables have a completely different character (rays/geometric optics) than fine-level variables (waves/electromagnetics). By choosing a periodic domain, we factor out other difficulties that a numerical Helmholtz solver must treat (radiation boundary conditions are necessary; boundary effects; and diffraction effects of domain features of size comparable with the wavelength; phase error), to focus on the derivation of the interior-domain coarsening in the context of upscaling.
 
-%%%% Low residuals are important.
-%% left, right - sin + i*cos, sin - i*cos are the basis functions.
-
-The Helmholtz operator has Almost Zero Modes (AZMs; or near-null space components), which are not reduced by the fine-level relaxation. Unlike diffusion PDEs, these are not geometrically smooth functions. In 1D, they can be represented by two basis functions $\varphi_-$ and $\varphi_+$. That is, each AZM can be written as $A_- \varphi_+ A_+ \varphi_+$ where $A_{\pm}$ are smooth functions. The upscaling algorithm finds both approximate AZMs (called ``test functions'') and a multilevel hierarchy that accurately represents them at all levels. (The 2D problem introduces the further difficulty that AZMs are composed of waves in an infinite number of directions. Thus, creating a multigrid solver that properly approximates AZMs and automatically detects the transition from waves to rays, has been a notoriously difficult task \cite{wave_ray, later_papers}.)
+The Helmholtz operator has Almost Zero Modes (AZMs; or near-null space components), which are not reduced by the fine-level relaxation. Unlike diffusion PDEs, these are not geometrically smooth functions. In 1D, they can be represented by two basis functions $\varphi_-$ and $\varphi_+$. That is, each AZM can be written as $A_- \varphi_+ A_+ \varphi_+$ where $A_{\pm}$ are smooth functions (``rays''). (The 2D problem introduces the further difficulty that AZMs are composed of waves in an infinite number of directions. Creating a multigrid solver that properly approximates AZMs and automatically detects the transition from waves to rays, has been a notoriously difficult task \cite{wave_ray, later_papers}.) Our upscaling algorithm finds both low-residual ``test functions'' that contain linear combinations of those AZMs, and a multilevel hierarchy that accurately represents them at all levels.
 
 \subsection{Our Contribution}
+We develop an upscaling algorithm finds low-residual test functions and an accurate multilevel hierarchy using a completely automatic Bootstrap Algebraic Multigrid (BAMG) procedure that does not exploit specific properties of the Helmholtz operator, such as the exponential form the AZMs, which is much simpler than a specifically tailored approach  \cite{wave_ray, later_papers}.
 
-%%% generral procedures that arer not only for Helmholtz. THey don't exploit a specific knowledge of the problem like sin and cossine.
-%% Importancce of bootstrapping in generating an accurate coarse levels.
+Furthermore, this upscaling is general, and can be applied to other problems, including nonlinear problems and systems of PDEs (such as the Navier Stokes equations). It can be used for both a fast iterative solution, and coarse-graining in which the fine levels are never or rarely visited during the simulation.
 
-
-Our upscaling algorithm finds approximate AZMs and an accurate multilevel hierarchy using a completely automatic Bootstrap Algebraic Multigrid (BAMG) procedure that does not exploit specific properties of the Helmholtz operator. It provides a crucial stepping stone towards a much simpler and more efficient multigrid Helmholtz solver.
-
-Upscaling can be applied to constructing highly accurate coarse levels beyond just a fast iterative solution, and to other problems, including nonlinear problems and systems of PDEs (such as the Navier Stokes equations).
-
-We used recent advances in multilevel methods (adaptive MG, BAMG \cite{bamg, lamg, mg_guide} and MG for neural networks \textbf{- pending publication, add citation}) to improve the various multigrid components beyond the framework outlined in \cite{su}:
+Bootstrapping is an essential component in generating accurate coarse levels. We build on top of recent advances in multilevel methods (adaptive MG, BAMG \cite{bamg, lamg, mg_guide} and MG for neural networks \textbf{- pending publication, add citation}) to improve the various multigrid components beyond the framework outlined in \cite{su}:
 \begin{itemize}
 	\item Coarse variables (both their type and number) are automatically derived using a local Singular Value Decomposition (SVD), as opposed to expert knowledge (e.g., averages of fine variables in PDEs, or centers of mass in molecular dynamics). We do utilize the locality graph, though, by defining an aggregate as a small contiguous segment of gridpoints, although the approach can be generalized to non-geometric and non-local cases as well (cf. Sec.~\ref{Generalizations}).
 	\item Interpolation is derived by regularized least-squares with cross-validation.
@@ -166,11 +158,9 @@ GS &       0.30 &       0.11 &       0.07 &       0.02 &      0.65 &      0.60 &
 \caption{Mock cycle convergence factors for a grid of size $n=32$. The first row corresponds to the Laplace operator and Gauss-Seidel. All other rows refer to Kaczmarz relaxation. $\nu$ is the number of relaxations per cycle.}
 \end{table}
 
-% Beccause the ampliude of the solution with [x, 0] . Mock cycle is pessimistic. quantitative prediction results from experience. CCould perssimistic butt good in many other examples.
+The pointwise coarsening convergence factors is bounded by $0.5$ as the error function $1,0,1,\dots$ is reduced only by a meager $0.5$ factor by relaxation. In practice, a multigrid cycle with pointwise coarsening converges faster. Generally, mock cycle predictions can be pessimistic, and cases where their prediction is quantitatively accurate should be identified based on numerical experimentation. Here, it is more accurate when the coarse variables are averages. As expected, the SVD coarsening is equivalent to averaging for the Laplace case, but trumps simple averaging for $kh = O(1)$, which is substantiates its use for upscaling. The convergence improves with $\nu$ up to $3$ relaxation sweeps.
 
-The pointwise coarsening convergence factors is bounded by $0.5$; averaging schemes exhibit superior efficiency, which improves with $\nu$ up to $3$ relaxation sweeps. The SVD coarsening is equivalent to averaging for the Laplace case, but trumps simple averaging for $kh = O(1)$, which is substantiates its use for upscaling.
-
-In line with geometric multigrid theory, Gauss-Seidel is a better smoother for the Laplace case, but Kaczmarz relaxation provides adequate convergence as well in that case, while its efficiency is maintained for all values of $0 \leq kh \leq 1$. The result is also independent of $n$ for all $n \geq 16$.
+Finally, in line with geometric multigrid theory, Gauss-Seidel is a better smoother for the Laplace case, but Kaczmarz relaxation provides adequate convergence as well in that case, while its efficiency is maintained for all values of $0 \leq kh \leq 1$. All results are independent of $n$, for $n \geq 16$.
 
 \subsection{2-level}
 
@@ -187,25 +177,11 @@ In line with geometric multigrid theory, Gauss-Seidel is a better smoother for t
 \section{Conclusions}
 
 \subsection{Questions}
-Mock cycle:
 \begin{itemize}
+\item Why does the mock cycle measure how well coarse variables determine the \emph{full} solution, not just a good approximation to the error left after relaxation?
+\item Why can we say that $\tau$ depend on the coarse level solution? 
 
-\item The mock cycle's task is to predict two-level efficiency, but in the context of SVD FAS upscaling it is a tool to measure how well the coarse variables approximate the solution (up to few relaxations). Is that statement actually true? 
-- SVD is the tool.
-- Crriterion for cccoarse vars is important: so that they give the full solution, not just in ccase of a smooth error.
-- Mock cycle is perssmistic, can learn a lot. If it is good then ccertainly the sitution is good. Experience (not proof) is that it shows the multlevel potential of coarse vars. Depends on P.
-
-\item For $kh = 0$ and Gauss-Seidel, the predicted 2-level convergence factor does not improve with $\nu$ and does not get below $\sim 0.5$, even though in practice we know that it does and that pointwise coarsening is a perfectly good coarsening of the Laplace operator.
-* Why are we not getting a quantitative prediction with the mock cycle? (We could compare with local mode analysis to gain an insight into the slowest-to-converge component.)
-\item Thus, can we trust this for other $kh$ values? Is it quantitative?
-\end{itemize}
-$\tau$-homogenization:
-\begin{itemize}
-	\item Why can we say that $\tau$ depend on the coarse level solution? The fine-level \emph{error} is smooth, so it depends on coarse-level error values in its neighborhood. But the full fine-level solution is not.
-\end{itemize}
-BAMG:
-\begin{itemize}
-	\item Do we need an eigensolver?
+The fine-level \emph{error} is smooth, so it depends on coarse-level error values in its neighborhood. But the full fine-level solution is not.
 \end{itemize}
 
 \bibliographystyle{plain}
