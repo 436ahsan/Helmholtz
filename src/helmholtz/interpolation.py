@@ -51,13 +51,7 @@ class Interpolator:
         tiled_col = np.concatenate([col + nc * ic for ic in range(n)])
         tiled_data = np.tile(self._data.flatten(), n)
         domain_size = aggregate_size * n
-
-        print(aggregate_size, n, domain_size)
-        print(tiled_row)
-        print(tiled_col)
-        print(tiled_data)
-        return scipy.sparse.coo_matrix((tiled_data, (tiled_row, tiled_col)),
-                                       shape=(domain_size, nc * n)).tocsr()
+        return scipy.sparse.coo_matrix((tiled_data, (tiled_row, tiled_col)), shape=(domain_size, nc * n)).tocsr()
 
 
 def create_interpolation(method: str, r: np.ndarray, x_aggregate_t: np.ndarray, xc_t: np.ndarray, domain_size: int,
@@ -78,8 +72,7 @@ def create_interpolation(method: str, r: np.ndarray, x_aggregate_t: np.ndarray, 
         interpolation object.
     """
     if method == "svd":
-        num_aggregates = domain_size // x_aggregate_t.shape[1]
-        return Interpolator(np.tile(np.arange(nc, dtype=int)[:, None], num_aggregates).transpose(),
+        return Interpolator(np.tile(np.arange(nc, dtype=int)[:, None], r.shape[1]).transpose(),
                             r.transpose(), nc)
     elif method == "ls":
         return _create_interpolation_least_squares(x_aggregate_t, xc_t, domain_size, nc, caliber)

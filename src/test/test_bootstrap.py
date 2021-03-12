@@ -3,6 +3,7 @@ import sys
 import numpy as np
 import pytest
 import unittest
+from numpy.ma.testutils import assert_array_equal, assert_array_almost_equal
 from scipy.linalg import eig
 
 import helmholtz as hm
@@ -37,12 +38,12 @@ class TestBootstrap:
                pytest.approx(0.110, 1e-2)
         assert conv_factor == pytest.approx(0.9998, 1e-3)
 
-    def test_1_level_bootstrap_laplace(self):
+    def test_laplace_coarsening(self):
         n = 16
         kh = 0
 
         a = hm.linalg.helmholtz_1d_operator(kh, n)
-        x, multilevel = hm.bootstrap.generate_test_matrix(a, 0, num_examples=4, num_sweeps=100)
+        x, multilevel = hm.bootstrap.generate_test_matrix(a, 0, num_examples=4, num_sweeps=20)
 
         assert x.shape == (16, 4)
 
@@ -57,25 +58,54 @@ class TestBootstrap:
         assert coarse_level._p_csr.shape == (16, 8)
         coarse_level.print()
 
-    def test_1_level_bootstrap_rays(self):
+        assert (hm.linalg.scaled_norm_of_matrix(a.dot(x)) / hm.linalg.scaled_norm_of_matrix(x)).mean() == \
+               pytest.approx(0.178, 1e-2)
+
+    def test_laplace_2_level_bootstrap(self):
+        """We improve vectors by relaxation -> coarsening creation -> 2-level relaxation cycles.
+        P = SVD interpolation = R^T."""
         n = 16
-        kh = 0.5
+        kh = 0
 
         a = hm.linalg.helmholtz_1d_operator(kh, n)
-        x, multilevel = hm.bootstrap.generate_test_matrix(a, 0, num_examples=4, num_sweeps=100)
+        x, multilevel = hm.bootstrap.generate_test_matrix(a, 0, num_examples=4, num_sweeps=20, num_bootstrap_steps=2)
 
         assert x.shape == (16, 4)
-
         assert len(multilevel) == 2
 
-        level = multilevel.finest_level
-        assert level.a.shape == (16, 16)
-
+        # The coarse level should be Galerkin coarsening with piecewise constant interpolation.
         coarse_level = multilevel.level[1]
-        assert coarse_level.a.shape == (8, 8)
-        assert coarse_level._r_csr.shape == (8, 16)
-        assert coarse_level._p_csr.shape == (16, 8)
+
+        p = coarse_level.p.asarray()
+        assert_array_equal(p[0], [[0], [0]])
+        assert_array_almost_equal(p[1], [[-0.729063], [-0.684447]])
+
+        r = coarse_level.r.asarray()
+        assert_array_almost_equal(r, [[-0.729063, -0.684447]])
+
+        ac_0 = coarse_level.a[0]
         coarse_level.print()
+        assert_array_equal(ac_0.nonzero()[1], [0, 7, 1])
+        assert_array_almost_equal(ac_0.data, [-1.001991,  0.499005,  0.499005])
+
+        # Vectors have much lower residual after 2-level relaxation cycles.
+        assert (hm.linalg.scaled_norm_of_matrix(a.dot(x)) / hm.linalg.scaled_norm_of_matrix(x)).mean() == \
+               pytest.approx(0.042, 1e-3)
+
+    def test_laplace_2_level_more_bootstrap_improves_vectors(self):
+        n = 16
+        kh = 0
+
+        a = hm.linalg.helmholtz_1d_operator(kh, n)
+        x, multilevel = hm.bootstrap.generate_test_matrix(a, 0, num_examples=4, num_sweeps=20, num_bootstrap_steps=3)
+
+        assert x.shape == (16, 4)
+        coarse_level = multilevel.level[1]
+        coarse_level.print()
+
+        # Vectors have much lower residual after 2-level relaxation cycles.
+        assert (hm.linalg.scaled_norm_of_matrix(a.dot(x)) / hm.linalg.scaled_norm_of_matrix(x)).mean() == \
+               pytest.approx(0.000939, 1e-3)
 
     def test_2_level_one_bootstrap_step_improves_convergence(self):
         n = 16
@@ -87,7 +117,7 @@ class TestBootstrap:
         level = multilevel.finest_level
         # Convergence speed test.
         relax_cycle = lambda x: hm.relax_cycle.relax_cycle(multilevel, 1.0, 1, 1, 100).run(x)
-        # FMG start so (xbda) has a reasonable initial guess.
+        # FMG start so x has a reasonable initial guess.
         x = hm.bootstrap_eigen.fmg(multilevel, num_cycles_finest=0)
         x, conv_factor = hm.run.run_iterative_eigen_method(level.operator, relax_cycle, x, 20, print_frequency=1)
 

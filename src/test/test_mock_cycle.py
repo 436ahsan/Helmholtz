@@ -71,6 +71,7 @@ class TestMockCycle(unittest.TestCase):
         assert mock_cycle_conv_factor(2) == pytest.approx(0.194, 1e-2)
         assert mock_cycle_conv_factor(3) == pytest.approx(0.074, 1e-2)
 
+
 def _create_svd_coarsening(level):
     # Generate relaxed test matrix.
     n = level.a.shape[0]
