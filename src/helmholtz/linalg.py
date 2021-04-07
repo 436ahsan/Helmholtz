@@ -148,6 +148,21 @@ def helmholtz_1d_operator(kh: float, n: int) -> scipy.sparse.dia_matrix:
     return sparse_circulant(np.array([1, -2 + kh ** 2, 1]), np.array([-1, 0, 1]), n)
 
 
+def helmholtz_1d_5_point_operator(kh: float, n: int) -> scipy.sparse.dia_matrix:
+    """
+    Returns the normalized FD-discretized 1D Helmholtz operator with periodic boundary conditions. This is an O(h^4)
+    discretization with stencil is [1, -2 + (kh)^2, -1] / 12.
+
+    Args:
+        kh: k*h, where k is a the wave number and h is the meshsize.
+        n: size of grid.
+
+    Returns:
+        Helmholtz operator (as a sparse matrix).
+    """
+    return sparse_circulant(np.array([-1, 16, -30 + 12 * kh ** 2, 16, -1]) / 12, np.array([-2, -1, 0, 1, 2]), n)
+
+
 def gram_schmidt(a: np.ndarray) -> np.ndarray:
     """
     Performs a Gram-Schmidt orthonormalization on matrix columns. Uses the QR factorization, which is more
