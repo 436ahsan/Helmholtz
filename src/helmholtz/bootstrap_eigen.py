@@ -15,7 +15,8 @@ _LOGGER = logging.getLogger(__name__)
 def generate_test_matrix(a: scipy.sparse.spmatrix, num_growth_steps: int, growth_factor: int = 2,
                          num_bootstrap_steps: int = 1, aggregate_size: int = 4, num_sweeps: int = 10,
                          num_examples: int = None, print_frequency: int = None, initial_max_levels: int = 2,
-                         interpolation_method: str = "svd") -> Tuple[np.ndarray, np.ndarray, hm.multilevel.Multilevel]:
+                         interpolation_method: str = "svd",
+                         threshold: float = 0.1) -> Tuple[np.ndarray, np.ndarray, hm.multilevel.Multilevel]:
     """
     Creates low-residual test functions and multilevel hierarchy on a large domain from the operator on a small window
     (the coarsest domain). This is similar to a full multigrid algorithm.
@@ -51,7 +52,8 @@ def generate_test_matrix(a: scipy.sparse.spmatrix, num_growth_steps: int, growth
         _LOGGER.info("Bootstrap step {}/{}".format(i + 1, num_bootstrap_steps))
         x, lam, multilevel = bootstap(
             x, lam, multilevel, max_levels, aggregate_size=aggregate_size, num_sweeps=num_sweeps,
-            num_examples=num_examples, print_frequency=print_frequency, interpolation_method=interpolation_method)
+            num_examples=num_examples, print_frequency=print_frequency, interpolation_method=interpolation_method,
+            threshold=threshold)
 
     for l in range(num_growth_steps):
         _LOGGER.info("Growing domain {}/{} to size {}, max_levels {}".format(
@@ -64,7 +66,8 @@ def generate_test_matrix(a: scipy.sparse.spmatrix, num_growth_steps: int, growth
             _LOGGER.info("Bootstrap step {}/{}".format(i + 1, num_bootstrap_steps))
             x, lam, multilevel = bootstap(
                 x, lam, multilevel, max_levels, aggregate_size=aggregate_size, num_sweeps=num_sweeps,
-                num_examples=num_examples, print_frequency=print_frequency, interpolation_method=interpolation_method)
+                num_examples=num_examples, print_frequency=print_frequency, interpolation_method=interpolation_method,
+            threshold=threshold)
         max_levels += 1
 
     return x, lam, multilevel

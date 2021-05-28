@@ -15,7 +15,8 @@ _LOGGER = logging.getLogger(__name__)
 def generate_test_matrix(a: scipy.sparse.spmatrix, num_growth_steps: int, growth_factor: int = 2,
                          num_bootstrap_steps: int = 1, aggregate_size: int = 4, num_sweeps: int = 10,
                          num_examples: int = None, print_frequency: int = None, initial_max_levels: int = 2,
-                         interpolation_method: str = "svd") -> Tuple[np.ndarray, np.ndarray, hm.multilevel.Multilevel]:
+                         interpolation_method: str = "svd",
+                         threshold: float = 0.1) -> Tuple[np.ndarray, np.ndarray, hm.multilevel.Multilevel]:
     """
     Creates low-residual test functions and multilevel hierarchy on a large domain from the operator on a small window
     (the coarsest domain). This is similar to a full multigrid algorithm.
@@ -49,7 +50,7 @@ def generate_test_matrix(a: scipy.sparse.spmatrix, num_growth_steps: int, growth
     for i in range(num_bootstrap_steps):
         _LOGGER.info("Bootstrap step {}/{}".format(i + 1, num_bootstrap_steps))
         x, multilevel = bootstap(x, multilevel, max_levels, num_sweeps=num_sweeps, print_frequency=print_frequency,
-                                 interpolation_method=interpolation_method)
+                                 interpolation_method=interpolation_method, threshold=threshold)
 
     for l in range(num_growth_steps):
         _LOGGER.info("Growing domain {}/{} to size {}, max_levels {}".format(
@@ -61,7 +62,7 @@ def generate_test_matrix(a: scipy.sparse.spmatrix, num_growth_steps: int, growth
         for i in range(num_bootstrap_steps):
             _LOGGER.info("Bootstrap step {}/{}".format(i + 1, num_bootstrap_steps))
             x, multilevel = bootstap(x, multilevel, max_levels, num_sweeps=num_sweeps, print_frequency=print_frequency,
-                                     interpolation_method=interpolation_method)
+                                     interpolation_method=interpolation_method, threshold=threshold)
         max_levels += 1
 
     return x, multilevel
@@ -138,7 +139,7 @@ def fmg(multilevel, nu_pre: int = 1, nu_post: int = 1, nu_coarsest: int = 10, nu
         x0 = x[:, 0]
         r_norm = scaled_norm(level.operator(x0))
         x_norm = scaled_norm(x0)
-        _LOGGER.debug("FMG level {} init |r| {:.8e} REER {:.5f}".format(l, r_norm, r_norm / x_norm))
+        _LOGGER.debug("FMG level {} init |r| {:.8e} RER {:.5f}".format(l, r_norm, r_norm / x_norm))
         relax_cycle = hm.cycle.Cycle(processor, cycle_index, coarsest - l + 1, finest=l)
         for _ in range(num_cycles):
             x = relax_cycle.run((x))
@@ -147,7 +148,8 @@ def fmg(multilevel, nu_pre: int = 1, nu_post: int = 1, nu_coarsest: int = 10, nu
         level = multilevel.level[l - 1]
         x0 = x[:, 0]
         r_norm = scaled_norm(level.operator(x0))
-        _LOGGER.debug("FMG level {} cycles {} |r| {:.8e} RER {:.5f}".format(l, num_cycles, r_norm))
+        x_norm = scaled_norm(x0)
+        _LOGGER.debug("FMG level {} cycles {} |r| {:.8e} RER {:.5f}".format(l, num_cycles, r_norm, r_norm / x_norm))
 
     l = finest
     x0 = x[:, 0]

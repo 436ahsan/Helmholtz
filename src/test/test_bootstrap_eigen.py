@@ -11,7 +11,7 @@ import helmholtz as hm
 logger = logging.getLogger("nb")
 
 
-class TestBootstrap:
+class TestBootstrapEigen:
 
     def setup_method(self):
         """Fixed random seed for deterministic results."""

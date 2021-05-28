@@ -43,12 +43,13 @@ class Interpolator:
         # Build P sparsity arrays for a single aggregate.
         nc = self._nc
         aggregate_size = len(self)
-        row = np.tile(np.arange(aggregate_size)[:, None], nc).flatten()
+        row = np.tile(np.arange(aggregate_size)[:, None], self._nbhr[0].shape).flatten()
         col = np.concatenate([nbhr_i for nbhr_i in self._nbhr])
 
         # Tile P of a single aggregate over the entire domain.
         tiled_row = np.concatenate([row + aggregate_size * ic for ic in range(n)])
-        tiled_col = np.concatenate([col + nc * ic for ic in range(n)])
+        # Periodically wrap around coarse variable indices.
+        tiled_col = np.concatenate([col + nc * ic for ic in range(n)]) % (nc * n)
         tiled_data = np.tile(self._data.flatten(), n)
         domain_size = aggregate_size * n
         return scipy.sparse.coo_matrix((tiled_data, (tiled_row, tiled_col)), shape=(domain_size, nc * n)).tocsr()
@@ -102,7 +103,7 @@ def _create_interpolation_least_squares(x_aggregate_t: np.ndarray, xc_t: np.ndar
     error, alpha_opt = fitter.optimized_relative_error(caliber, alpha, return_weights=True)
     # Interpolation validation error = error[:, 1]
     data = np.concatenate([pi for pi in error[:, 2:]])
-    return hm.interpolator.Interpolator(nbhr, data, nc)
+    return hm.interpolation.Interpolator(nbhr, data, nc)
 
 
 def _geometric_neighbors(w: int, nc: int):
