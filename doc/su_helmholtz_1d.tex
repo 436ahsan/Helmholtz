@@ -76,11 +76,9 @@ The algorithm is a Bootstrap Algebraic Multigrid (BAMG) \cite{bamg} algorithm th
 Since $A$ is indefinite, we use a robust smoother: Kaczmarz relaxation in lexicographic ordering. While for special cases (e.g. $k h = 0$), better smoothers are available (e.g., red-black Gauss-Seidel), Kaczmarz relaxation is guaranteed to smooth the error \cite{amg_theory}, so we keep the approach general.
 
 \subsection{Initial Vectors}
-Initial vectors are obtained by a $1$-level iteration (using the fine level only), which is exactly the method of \cite{mg_eigen} except that we use Kacmzarz relaxation instead of Gauss-Seidel.
-\begin{itemize}
-	\item $\nu$ Kaczmarz relaxation sweeps on $A x - \lambda x = 0$ with fixed $\lambda$.
-	\item Update $x \longleftarrow x_m / (x_m^T x_m)^{\frac12}$ for all $m$, $\lambda \longleftarrow \text{mean}_m ((x_m^T A x_m)/(x_m^T x_m))$, where $x_m$ is the $m$th column of $x$.
-\end{itemize}
+Initial vectors are obtained by $\nu$ Kacmzarz relaxations on $A x = 0$, starting from $\text{rand}[-1, 1]$. $x$ is normalized to unit $l_2$ norm at the end. There is no need to normalize after each relaxation sweep, since we are solving a homogeneous equation (and anyway,the norm doesn't change much unless a huge number of relaxations is performed). 
+
+{\bf What $\nu$ should we use to get a good enough initial guess for two-level boostrapping?}
 
 \subsection{Coarse-level Construction}
 We omit the $h$ superscripts in this section and use quantities without superscripts (e.g., $A$, $x$) to denote fine-level quantities and $c$-superscripted quantities (e.g., $A^c, x^c$) to denote coarse-level quantities.
@@ -90,7 +88,8 @@ Given a fixed-size discrete domain with $n$ and test functions $x_1,\dots,x_M$ o
 \begin{equation}
 	R := \text{diag} \left\{ \underbrace{R_w, R_w, \dots, ... R_w }_{\frac{n}{w}}  \right\} \,.
 \end{equation}
-$R_w$ depends on an accuracy threshold $\varepsilon$ and minimum coarsening ratio $0 < \rho < 1$. Start with $w = 2$. From each function we can derive $n$ windows of size $w$: $x^k_i = (x_{k,i},\dots,x_{k,i+w})$, a total of $Kw$ windows. We pick $m = 4 w$ windows, and compute the SVD decomposition $X = U \Sigma V^T$ of the $m \times w$ matrix $X$ whose rows are the windows, where $\Sigma = \text{diag}\left\{\sigma_1, \dots, \sigma_m \right\}$ and $\sigma_1 \geq \sigma_2 \geq \cdots$. Let $w_c$ be the smallest number such that
+
+$R_w$ depends on an accuracy threshold $\varepsilon$ and minimum coarsening ratio $0 < \rho < 1$. Start with $w = 2$. From each function we can derive \emph{many test samples}: $n$ windows of size $w$: $x^k_i = (x_{k,i},\dots,x_{k,i+w})$, a total of $Kw$ windows. We pick $m = 4 w$ windows, and compute the SVD decomposition $X = U \Sigma V^T$ of the $m \times w$ matrix $X$ whose rows are the windows, where $\Sigma = \text{diag}\left\{\sigma_1, \dots, \sigma_m \right\}$ and $\sigma_1 \geq \sigma_2 \geq \cdots$. Let $w_c$ be the smallest number such that
 \begin{equation}
 	\left(\frac{\sum_{j=n_c+1}^m \sigma_j^2}{\sum_{j=1}^m \sigma_j^2 } \right)^{\frac12} < \varepsilon.
 	\label{r_accuracy}
@@ -99,12 +98,23 @@ Then $R_w := V(1:w_c,:)$ is the sub-matrix of $V$ consisting of the first $w_c$ 
 
 If $w_c/w > \rho$, we double the window size $w$ and recalculate $R$ until a large enough window is reached such that $w_c/w \leq \rho$. If the relaxation method is a good smoother that quickly reduces the error (and thus our test functions, since we relax on $A x = 0$) into a lower-dimensional space, such a value of $w$ can be found.
 
-The SVD yields coarse variables that are less sensitive to relaxation than pointwise coarsening (i.e., selecting one or several fine gridpoints as coarse variables: $R_w = [1,\underbrace{0,\dots,0}_{w-1}]$), as shown by comparing mock cycle rates Sec.~\ref{mock_cycle}. It also automatically selects the number of coarse variables $w_c$ per aggregate.
+The SVD yields coarse variables that are less sensitive to relaxation than pointwise coarsening (i.e., selecting one or several fine gridpoints as coarse variables, which corresponds to $R_w = [1,\underbrace{0,\dots,0}_{w-1}]$), as shown by comparing mock cycle rates Sec.~\ref{mock_cycle}. It also automatically selects the number of coarse variables $w_c$ per aggregate.
+
+{\bf Add explanation on the particular nature of the coarse vars for the 1D Helmholtz: two waves, i.e., combination of sines and cosines. Add figure.}
 
 \subsubsection{Least-squares Interpolation}
-The interpolation $P$ is not directly related to $R$. While we could use $P = R^T$, this choice is sparse enough, and for $kh=0$ corresponds only to a piecewise-constant geometric interpolation (as $w = 2, w_c = 1$ would be chosen, and the sole important principal component is constant over the aggregate). Thus, we seek $P$ using a least-squares fit of several neighboring coarse variables to the fine variable in question.
+As for $R$, we derive an interpolation matrix $P_w$ on an aggregate of size $w$, and then tile it over the entire domain to obtain the full $P_{n \times n_c}$ interpolation matrix.
 
-Again, we derive an interpolation matrix $P_w$ on an aggregate of size $w$, and then tile it over the entire domain to obtain the full $P_{n \times n_c}$ interpolation matrix.
+The \emph{interpolatory set} (the set of coarse variables used to interpolate to a target fine gridpoint) can be the set of coarse variables of its aggregate. In this case, the optimal interpolation that minimizes the interpolation error of the test functions is $P_w = R_w^T$ (as the truncated SVD is the best low-rank approximation in the Frobenius norm).
+
+While this choice may be sufficient in some problems, even in the Laplace case ($kh=0$), $R_w^T$ is a piecewise-constant geometric interpolation (with the window size $w = 2, w_c = 1$, where only one principal component already explains most of the energy -- the constant vector), which only yields marginal multilevel efficiency (two-level, but but not multilevel $h$-independent convergence). Linear interpolation is required to obtain the full multilevel efficiency.
+
+Thus, we increase $P_w$'s accuracy by including in the interpolatory set as many coarse variables as possible without increasing the coarse operator's density. A general rule is to use the union of all coarse variables in all aggregates of the fine gridpoints appearing in the target gridpoint's stencil.
+
+The \emph{interpolation weights} are determined by least-square fitting to test samples.
+
+{\bf include a description of the LS process: fitting set, fit with regularization parameter $\alpha$. Validation set: use to determine $\alpha$. $\alpha$ is global across all fine gridpoints in an aggregate. Test set: test the interpolation accuracy on samples we haven't used to ensure no overfitting.
+}
 
 \begin{equation}
 	\min_p \sum_m \left( x_{m,i} - \sum_j p_{ij} x_{m,j} \right)^2 + \alpha \left( \sum_m (x_{m,i})^2 \right) \left(\sum_j p_{ij}^2\right) 
@@ -113,6 +123,7 @@ Again, we derive an interpolation matrix $P_w$ on an aggregate of size $w$, and 
 \subsection{Multilevel Bootstrapping}
 
 \subsection{Domain Growing}
+{\bf When do we grow the domain? Do we add more levels on a fixed-size domain of size $n$ gridpoints until we get to $O(\log n)$ levels and a coarsest grid with only a few points, before growing the domain, so that we get a full multilevel cycle that reduces the error by a fixed factor in $O(n)$ operations; or, do we start with level 1 on $n$ points, create level $2$ with $n/2$ points, improve the hierarchy with $2$-level cycles, then consider level $2$ on $n$ points as our finest level, and coarsen it using $2$-level cycles, and so on, i.e., recursive homogenization with $2$ level-cycles only, but increasingly larger domains?}
 
 \section{Coarse-level Homogenization}
 The FAS coarse-level equations depend on the fine level only through the fine-to-coarse $\tau$ correction:
@@ -167,8 +178,20 @@ The pointwise coarsening convergence factors is bounded by $0.5$ as the error fu
 Finally, in line with geometric multigrid theory, Gauss-Seidel is a better smoother for the Laplace case, but Kaczmarz relaxation provides adequate convergence as well in that case, while its efficiency is maintained for all values of $0 \leq kh \leq 1$. All results are independent of $n$, for $n \geq 16$.
 
 \subsection{2-level}
+{\bf 
+\begin{itemize}
+\item Start with $n=96$ at level 1. 
+\item Show 2-level rates of solving $A x = 0$ for $n=96$ as a function of number of bootstrap cycles. Test function residuals.
+\item  Then show convergence for increasingly larger $n$ with the same coarsening.
+\item How do the SVD components look like.
+\item Performance vs. window size. Number of components.
+\end{itemize}
+}
 
 \subsection{3-level}
+
+\subsection{Wave to Ray Transition}
+{\bf Show limit of stencil coefficients of coarse equations after many coarsening levels and afer few. Is it elliptic / Ray?}
 
 \subsection{$\tau$-Homogenization}
 
