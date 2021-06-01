@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 import unittest
 from numpy.ma.testutils import assert_array_equal, assert_array_almost_equal
-from scipy.linalg import eig
+from scipy.linalg import eig, norm
 
 import helmholtz as hm
 
@@ -118,18 +118,27 @@ class TestBootstrap:
     def test_helmholtz_2_level_bootstrap(self):
         """We improve vectors by relaxation -> coarsening creation -> 2-level relaxation cycles.
         P = SVD interpolation = R^T."""
-        n = 16
-        kh = 0.392
+        # Larger domain, as in Karsten's experiments.
+        n = 96
+        kh = 0.5
+        num_examples = 1
+        max_levels = 2
 
+        # Initialize test functions (to random) and hierarchy at coarsest level.
         a = hm.linalg.helmholtz_1d_5_point_operator(kh, n)
-        x, multilevel = hm.bootstrap.generate_test_matrix(a, 0, num_examples=4, num_sweeps=40, num_bootstrap_steps=2)
+        level = hm.multilevel.Level.create_finest_level(a)
+        multilevel = hm.multilevel.Multilevel(level)
+        domain_shape = (a.shape[0],)
+        x = hm.run.random_test_matrix(domain_shape, num_examples=num_examples)
+        assert norm(a.dot(x)) / norm(x) == pytest.approx(3.155, 1e-3)
 
-        assert x.shape == (16, 4)
-        assert len(multilevel) == 2
+        # Residual norm decreases fast during the first 3 bootstrap cycles, then saturates.
+        expected_residual_norms = [0.276, 0.2144, 0.0901, 0.0626, 0.0509, 0.0464, 0.0442, 0.04278]
 
-        # Vectors have much lower residual after 2-level relaxation cycles.
-        assert (hm.linalg.scaled_norm_of_matrix(a.dot(x)) / hm.linalg.scaled_norm_of_matrix(x)).mean() == \
-               pytest.approx(0.1294, 1e-3)
+        # Relax vector + coarsen in first iteration; then 2-level cycle + improve hierarchy (bootstrap).
+        for i, expected_residual_norm in enumerate(expected_residual_norms):
+            x, multilevel = hm.bootstrap.bootstap(x, multilevel, max_levels, num_sweeps=10)
+            assert norm(a.dot(x)) / norm(x) == pytest.approx(expected_residual_norm, 1e-3)
 
     def test_helmholtz_2_level_more_bootstrap_doesnt_change_residual(self):
         """We improve vectors by relaxation -> coarsening creation -> 2-level relaxation cycles.
