@@ -4,6 +4,7 @@ import logging
 import numpy as np
 
 import helmholtz as hm
+import helmholtz.setup
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -11,7 +12,7 @@ _LOGGER = logging.getLogger(__name__)
 #         Executes a relaxation V(nu_pre, nu_post) -cycle on A*x = 0.
 
 
-def eigen_cycle(multilevel: hm.multilevel.Multilevel,
+def eigen_cycle(multilevel:helmholtz.setup.multilevel.Multilevel,
                 cycle_index: float, nu_pre: int, nu_post: int, nu_coarsest: int,
                 debug: bool = False, update_lam: str = "coarsest",
                 relax_coarsest: int = 5,
@@ -20,14 +21,14 @@ def eigen_cycle(multilevel: hm.multilevel.Multilevel,
         num_levels = len(multilevel)
     processor = EigenProcessor(multilevel, nu_pre, nu_post, nu_coarsest, debug=debug, update_lam=update_lam,
                                relax_coarsest=relax_coarsest)
-    return hm.cycle.Cycle(processor, cycle_index, num_levels, finest=finest)
+    return helmholtz.solve.cycle.Cycle(processor, cycle_index, num_levels, finest=finest)
 
 
-class EigenProcessor(hm.processor.Processor):
+class EigenProcessor(helmholtz.solve.processor.Processor):
     """
     Eigensolver cycle processor. Executes am eigensolver Cycle(nu_pre, nu_post, nu_coarsest) on A*x = lam*x.
     """
-    def __init__(self, multilevel: hm.multilevel.Multilevel,
+    def __init__(self, multilevel:helmholtz.setup.multilevel.Multilevel,
                  nu_pre: int, nu_post: int, nu_coarsest: int,
                  debug: bool = False, update_lam: str = "coarsest",
                  relax_coarsest: int = 5) -> np.array:

@@ -3,9 +3,10 @@ import pytest
 from numpy.linalg import norm, lstsq
 
 import helmholtz as hm
+import helmholtz.setup
 
 
-class TestInterpolation:
+class TestInterpolationFit:
 
     def setup_method(self):
         """Fixed random seed for deterministic results."""
@@ -22,7 +23,7 @@ class TestInterpolation:
 
         xc_fit = 2 * x_fit
         xc_val = 2 * x_val
-        info = hm.interpolation_fit.fit_interpolation(xc_fit[:, nbhr[i, :k]], x_fit[:, i],
+        info = helmholtz.setup.interpolation_fit.fit_interpolation(xc_fit[:, nbhr[i, :k]], x_fit[:, i],
                                                       xc_val[:, nbhr[i, :k]], x_val[:, i],
                                                       alpha, intercept=True, return_weights=True)
 
@@ -49,7 +50,7 @@ class TestInterpolation:
         x = np.random.random((20, 6))
         alpha = [0, 0.1, 0.2, 1.0]
 
-        fitter = hm.interpolation_fit.InterpolationFitter(x, fit_samples=10, val_samples=10)
+        fitter = helmholtz.setup.interpolation_fit.InterpolationFitter(x, fit_samples=10, val_samples=10)
         error = fitter.relative_error(3, alpha, intercept=True)
 
         assert error.shape == (6, 4, 2)
@@ -61,7 +62,7 @@ class TestInterpolation:
         alpha = np.array([0, 0.1, 0.2, 1.0])
         expected_alpha_opt_values = [0.0, 0.1, 0.1, 0.1, 0.2]
         for k, expected_alpha_opt in zip(k_values, expected_alpha_opt_values):
-            fitter = hm.interpolation_fit.InterpolationFitter(
+            fitter = helmholtz.setup.interpolation_fit.InterpolationFitter(
                 x, xc=x[:, :50] + np.random.random((300, 50)),
                 fit_samples=100, val_samples=100, test_samples=100)
             error, alpha_opt = fitter.optimized_relative_error(k, alpha, intercept=True)

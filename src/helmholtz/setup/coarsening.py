@@ -37,7 +37,7 @@ class Coarsener:
 
 def create_coarsening(x_aggregate_t, threshold: float) -> scipy.sparse.csr_matrix:
     """
-    Generates R (coarse variables) on an aggregate from  SVD principcal components.
+    Generates R (coarse variables) on an aggregate from SVD principcal components.
 
     Args:
         x_aggregate_t: fine-level test matrix on an aggregate, transposed.

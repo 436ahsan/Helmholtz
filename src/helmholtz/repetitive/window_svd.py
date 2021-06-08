@@ -6,6 +6,8 @@ import numpy as np
 from numpy.linalg import svd
 
 import helmholtz as hm
+import helmholtz.setup
+import helmholtz.solve
 
 logger = logging.getLogger(__name__)
 
@@ -30,10 +32,10 @@ def get_window_svd(a,
     if num_examples is None:
         # By default, use more test functions than gridpoints so we have a sufficiently large test function sample.
         num_examples = 4 * np.prod(window_shape)
-    x = hm.run.random_test_matrix(window_shape, num_examples=num_examples)
-    level = hm.multilevel.Level.create_finest_level(a)
+    x = helmholtz.solve.run.random_test_matrix(window_shape, num_examples=num_examples)
+    level = helmholtz.setup.multilevel.Level.create_finest_level(a)
     b = np.zeros_like(x)
-    x, _ = hm.run.run_iterative_method(level.operator, lambda x: level.relax(x, b), x, num_sweeps=num_sweeps)
+    x, _ = helmholtz.solve.run.run_iterative_method(level.operator, lambda x: level.relax(x, b), x, num_sweeps=num_sweeps)
     # Calculate the SVD.
     e_matrix = np.reshape(x, [np.prod(window_shape), num_examples])
     _, s, vh = svd(e_matrix.transpose())

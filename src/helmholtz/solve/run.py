@@ -13,11 +13,11 @@ _LOGGER = logging.getLogger(__name__)
 def run_iterative_method(operator, method, x: np.ndarray, num_sweeps: int = 30, print_frequency: int = None,
                          residual_stop_value: float = 1e-10) -> np.ndarray:
     """
-    Runs an iterative method on A*x=0 and measures the convergence rate.
+    Runs an solve method on A*x=0 and measures the convergence rate.
 
     Args:
         operator: an object that can calculate residuals (action A*x).
-        method: iterative method functor (an iteration is a call to this method).
+        method: solve method functor (an iteration is a call to this method).
         x: test matrix initial approximation to the test functions.
         num_sweeps: number of sweeps to execute.
         print_frequency: print debugging convergence statements per this number of sweeps.
@@ -63,11 +63,11 @@ def run_iterative_method(operator, method, x: np.ndarray, num_sweeps: int = 30, 
 def run_iterative_eigen_method(operator, method, x: np.ndarray, lam, num_sweeps: int = 30, print_frequency: int = None,
                                residual_stop_value: float = 1e-10) -> np.ndarray:
     """
-    Runs an iterative method on A*x=lambda*x and measures the convergence rate.
+    Runs an solve method on A*x=lambda*x and measures the convergence rate.
 
     Args:
         operator: an object that can calculate residuals (action A*x).
-        method: iterative method functor (an iteration is a call to this method).
+        method: solve method functor (an iteration is a call to this method).
         x: test matrix initial approximation to the test functions.
         lam: initial guess for eigenvalues.
         num_sweeps: number of sweeps to execute.

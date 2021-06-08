@@ -1,8 +1,8 @@
 import numpy as np
 import pytest
-from numpy.ma.testutils import assert_array_almost_equal
 
 import helmholtz as hm
+import helmholtz.solve
 from helmholtz.linalg import scaled_norm
 
 
@@ -19,7 +19,7 @@ class TestCycle:
         num_levels = 7
         tol = 1e-14 if isinstance(cycle_index, int) else 0.2
         processor = _LevelVisitCounter()
-        cycle = hm.cycle.Cycle(processor, cycle_index, num_levels)
+        cycle = helmholtz.solve.cycle.Cycle(processor, cycle_index, num_levels)
 
         cycle.run(0)
 
@@ -33,7 +33,7 @@ def _factors(a):
     return np.exp(np.diff(-np.log(a)))
 
 
-class _LevelVisitCounter(hm.processor.Processor):
+class _LevelVisitCounter(helmholtz.solve.processor.Processor):
     def __init__(self):
         self.num_visits = None
 

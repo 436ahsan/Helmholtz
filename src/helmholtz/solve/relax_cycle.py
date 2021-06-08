@@ -4,24 +4,26 @@ import logging
 import numpy as np
 
 import helmholtz as hm
+import helmholtz.setup.multilevel as hsl
+import helmholtz.solve
 
 _LOGGER = logging.getLogger(__name__)
 
 
-def relax_cycle(multilevel: hm.multilevel.Multilevel,
+def relax_cycle(multilevel: hsl.Multilevel,
                 cycle_index: float, nu_pre: int, nu_post: int, nu_coarsest: int,
                 debug: bool = False, num_levels: int = None, finest: int = 0):
     if num_levels is None:
         num_levels = len(multilevel)
     processor = RelaxCycleProcessor(multilevel, nu_pre, nu_post, nu_coarsest, debug=debug)
-    return hm.cycle.Cycle(processor, cycle_index, num_levels, finest=finest)
+    return helmholtz.solve.cycle.Cycle(processor, cycle_index, num_levels, finest=finest)
 
 
-class RelaxCycleProcessor(hm.processor.Processor):
+class RelaxCycleProcessor(helmholtz.solve.processor.Processor):
     """
     Relaxation cycle processor. Executes a Cycle(nu_pre, nu_post, nu_coarsest) on A*x = 0.
     """
-    def __init__(self, multilevel: hm.multilevel.Multilevel,
+    def __init__(self, multilevel: hsl.Multilevel,
                  nu_pre: int, nu_post: int, nu_coarsest: int, debug: bool = False) -> np.array:
         """
         Args:

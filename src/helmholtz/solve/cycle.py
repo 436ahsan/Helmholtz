@@ -1,8 +1,7 @@
 """A generic multi-level cycle."""
 import logging
 import numpy as np
-
-import helmholtz as hm
+import helmholtz.solve.processor as hsc
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -13,7 +12,7 @@ class Cycle:
     levels), leaving the business logic to a delegate processor object.
     """
 
-    def __init__(self, processor: hm.processor.Processor, cycle_index, num_levels: int, finest: int = 0):
+    def __init__(self, processor: hsc.Processor, cycle_index, num_levels: int, finest: int = 0):
         """
         Creates an NUMLEVEL-level cycle at level FINEST with cycle index cycle_index that executes the
         business logic of PROCESSOR.

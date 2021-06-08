@@ -1,12 +1,11 @@
 import helmholtz as hm
-import itertools
-import logging
+import helmholtz.setup
+import helmholtz.solve.run
+
 import numpy as np
 import pytest
 import scipy.sparse
 import unittest
-from numpy.linalg import norm
-from numpy.ma.testutils import assert_array_almost_equal
 
 
 class TestMockCycle(unittest.TestCase):
@@ -19,13 +18,13 @@ class TestMockCycle(unittest.TestCase):
         n = 16
         kh = 0.5
         a = hm.linalg.helmholtz_1d_operator(kh, n)
-        level = hm.multilevel.Level.create_finest_level(a)
+        level = helmholtz.setup.multilevel.Level.create_finest_level(a)
         relaxer = lambda x, b: level.relax(x, b)
         r = _create_svd_coarsening(level)
 
-        mock_cycle = hm.mock_cycle.MockCycle(relaxer, r, 2)
+        mock_cycle = helmholtz.solve.mock_cycle.MockCycle(relaxer, r, 2)
 
-        x = hm.run.random_test_matrix((n,), num_examples=3)
+        x = helmholtz.solve.run.random_test_matrix((n,), num_examples=3)
         x_new = mock_cycle(x)
 
         assert hm.linalg.scaled_norm(r.dot(x_new)) <= 1e-15
@@ -34,15 +33,15 @@ class TestMockCycle(unittest.TestCase):
         n = 16
         kh = 0.5
         a = hm.linalg.helmholtz_1d_operator(kh, n)
-        level = hm.multilevel.Level.create_finest_level(a)
+        level = helmholtz.setup.multilevel.Level.create_finest_level(a)
         relaxer = lambda x, b: level.relax(x, b)
         r = _create_svd_coarsening(level)
         r_pointwise = _create_pointwise_coarsening(level)
 
         def mock_cycle_conv_factor(r, num_relax_sweeps):
-            mock_cycle = hm.mock_cycle.MockCycle(relaxer, r, num_relax_sweeps)
-            x = hm.run.random_test_matrix((n,), num_examples=1)
-            x, conv_factor = hm.run.run_iterative_method(level.operator, mock_cycle, x,  num_sweeps=10)
+            mock_cycle = helmholtz.solve.mock_cycle.MockCycle(relaxer, r, num_relax_sweeps)
+            x = helmholtz.solve.run.random_test_matrix((n,), num_examples=1)
+            x, conv_factor = helmholtz.solve.run.run_iterative_method(level.operator, mock_cycle, x,  num_sweeps=10)
             return conv_factor
 
         assert mock_cycle_conv_factor(r, 1) == pytest.approx(0.28, 1e-2)
@@ -57,14 +56,14 @@ class TestMockCycle(unittest.TestCase):
         n = 16
         kh = 0.5
         a = hm.linalg.helmholtz_1d_operator(kh, n)
-        level = hm.multilevel.Level.create_finest_level(a)
+        level = helmholtz.setup.multilevel.Level.create_finest_level(a)
         relaxer = lambda x, b: level.relax(x, b)
         r = _create_svd_coarsening(level)
 
         def mock_cycle_conv_factor(num_relax_sweeps):
-            mock_cycle = hm.mock_cycle.MockCycle(relaxer, r, num_relax_sweeps)
-            x = hm.run.random_test_matrix((n,), num_examples=1)
-            x, conv_factor = hm.run.run_iterative_method(level.operator, mock_cycle, x, num_sweeps=10)
+            mock_cycle = helmholtz.solve.mock_cycle.MockCycle(relaxer, r, num_relax_sweeps)
+            x = helmholtz.solve.run.random_test_matrix((n,), num_examples=1)
+            x, conv_factor = helmholtz.solve.run.run_iterative_method(level.operator, mock_cycle, x, num_sweeps=10)
             return conv_factor
 
         assert mock_cycle_conv_factor(1) == pytest.approx(0.28, 1e-2)
@@ -86,14 +85,14 @@ class TestMockCycle(unittest.TestCase):
                 A[i, j % n] = b[j - i + 5]
         A = scipy.sparse.csr_matrix(A)
 
-        level = hm.multilevel.Level.create_finest_level(A)
+        level = helmholtz.setup.multilevel.Level.create_finest_level(A)
         relaxer = lambda x, b: level.relax(x, b)
         r = _create_svd_coarsening(level)
 
         def mock_cycle_conv_factor(r, num_relax_sweeps):
-            mock_cycle = hm.mock_cycle.MockCycle(relaxer, r, num_relax_sweeps)
-            x = hm.run.random_test_matrix((n,), num_examples=1)
-            x, conv_factor = hm.run.run_iterative_method(level.operator, mock_cycle, x,  num_sweeps=10)
+            mock_cycle = helmholtz.solve.mock_cycle.MockCycle(relaxer, r, num_relax_sweeps)
+            x = helmholtz.solve.run.random_test_matrix((n,), num_examples=1)
+            x, conv_factor = helmholtz.solve.run.run_iterative_method(level.operator, mock_cycle, x,  num_sweeps=10)
             return conv_factor
 
         assert mock_cycle_conv_factor(r, 1) == pytest.approx(0.192, 1e-2)
@@ -104,14 +103,14 @@ class TestMockCycle(unittest.TestCase):
 def _create_svd_coarsening(level, threshold: float = 0.1):
     # Generate relaxed test matrix.
     n = level.a.shape[0]
-    x = hm.run.random_test_matrix((n,))
+    x = helmholtz.solve.run.random_test_matrix((n,))
     lam = 0
     b = np.zeros_like(x)
-    x, conv_factor = hm.run.run_iterative_method(level.operator, lambda x: level.relax(x, b), x, num_sweeps=10)
+    x, conv_factor = helmholtz.solve.run.run_iterative_method(level.operator, lambda x: level.relax(x, b), x, num_sweeps=10)
     # Generate coarse variables (R) based on a window of x.
     aggregate_size = 4
     x_aggregate_t = x[:aggregate_size].transpose()
-    r, _ = hm.coarsening.create_coarsening(x_aggregate_t, threshold)
+    r, _ = hm.setup.coarsening.create_coarsening(x_aggregate_t, threshold)
 
     # Convert to sparse matrix + tile over domain.
     r_csr = r.tile(n // aggregate_size)
@@ -120,7 +119,7 @@ def _create_svd_coarsening(level, threshold: float = 0.1):
 
 def _create_pointwise_coarsening(level):
     aggregate_size = 2
-    r = hm.coarsening.Coarsener(np.array([[1, 0]]))
+    r = hm.setup.coarsening.Coarsener(np.array([[1, 0]]))
     # Convert to sparse matrix + tile over domain.
     domain_size = level.a.shape[0]
     r_csr = r.tile(domain_size // aggregate_size)

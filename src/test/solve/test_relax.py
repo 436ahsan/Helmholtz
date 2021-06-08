@@ -14,7 +14,7 @@ class TestRelax:
         n = 16
         kh = 0.5
         a = hm.linalg.helmholtz_1d_operator(kh, n)
-        relaxer = hm.relax.KaczmarzRelaxer(a, scipy.sparse.eye(a.shape[0]))
+        relaxer = hm.solve.relax.KaczmarzRelaxer(a, scipy.sparse.eye(a.shape[0]))
 
         x = np.random.random((n, 5))
         b = np.zeros_like(x)
@@ -31,7 +31,7 @@ class TestRelax:
         n = 16
         kh = 0.5
         a = hm.linalg.helmholtz_1d_operator(kh, n)
-        relaxer = hm.relax.GsRelaxer(a)
+        relaxer = hm.solve.relax.GsRelaxer(a)
 
         x = np.random.random((n, 5))
         b = np.zeros_like(x)
@@ -45,7 +45,7 @@ class TestRelax:
         kh = 0
         # Make a positive definite (= -Laplacian).
         a = -hm.linalg.helmholtz_1d_operator(kh, n)
-        relaxer = hm.relax.GsRelaxer(a)
+        relaxer = hm.solve.relax.GsRelaxer(a)
 
         x = np.random.random((n, 1))
         b = np.zeros_like(x)

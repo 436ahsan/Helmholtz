@@ -8,6 +8,7 @@ import scipy.sparse.linalg
 from numpy.linalg import norm
 
 import helmholtz as hm
+import helmholtz.solve.relax as hsr
 from helmholtz.linalg import scaled_norm
 
 _LOGGER = logging.getLogger("multilevel")
@@ -23,7 +24,7 @@ class Level:
         self.p = p
         self._r_csr = r_csr
         self._p_csr = p_csr
-        self._relaxer = hm.relax.KaczmarzRelaxer(a, b)
+        self._relaxer = hsr.KaczmarzRelaxer(a, b)
 
     @staticmethod
     def create_finest_level(a):

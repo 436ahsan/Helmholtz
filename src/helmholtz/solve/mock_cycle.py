@@ -14,7 +14,7 @@ class MockCycle:
                  num_corrector_steps: int = 1,
                  omega: float = 1.0):
         """
-        Creates a mock cycle iterative method.
+        Creates a mock cycle solve method.
 
         Args:
             relaxer: relaxation method.
