@@ -4,7 +4,6 @@ from numpy.linalg import norm, lstsq
 from numpy.ma.testutils import assert_array_almost_equal
 
 import helmholtz as hm
-import helmholtz.setup
 
 
 class TestInterpolationFit:
@@ -24,7 +23,7 @@ class TestInterpolationFit:
 
         xc_fit = 2 * x_fit
         xc_val = 2 * x_val
-        info = helmholtz.setup.interpolation_fit.fit_interpolation(xc_fit[:, nbhr[i, :k]], x_fit[:, i],
+        info = hm.setup.interpolation_fit.fit_interpolation(xc_fit[:, nbhr[i, :k]], x_fit[:, i],
                                                       xc_val[:, nbhr[i, :k]], x_val[:, i],
                                                       alpha, intercept=True, return_weights=True)
 
@@ -51,7 +50,7 @@ class TestInterpolationFit:
         x = np.random.random((20, 6))
         alpha = [0, 0.1, 0.2, 1.0]
 
-        fitter = helmholtz.setup.interpolation_fit.InterpolationFitter(x, fit_samples=10, val_samples=10)
+        fitter = hm.setup.interpolation_fit.InterpolationFitter(x, fit_samples=10, val_samples=10)
         error = fitter.relative_error(3, alpha, intercept=True)
 
         assert error.shape == (6, 4, 2)
@@ -63,7 +62,7 @@ class TestInterpolationFit:
         alpha = np.array([0, 0.1, 0.2, 1.0])
         expected_alpha_opt_values = [0.0, 0.1, 0.1, 0.1, 0.2]
         for k, expected_alpha_opt in zip(k_values, expected_alpha_opt_values):
-            fitter = helmholtz.setup.interpolation_fit.InterpolationFitter(
+            fitter = hm.setup.interpolation_fit.InterpolationFitter(
                 x, xc=x[:, :50] + np.random.random((300, 50)),
                 fit_samples=100, val_samples=100, test_samples=100)
             error, alpha_opt = fitter.optimized_relative_error(k, alpha, intercept=True)
@@ -81,7 +80,7 @@ class TestInterpolationFit:
 
         xc_fit = 2 * x_fit + 0.1 * np.random.random((10, 6)) + 1
         xc_val = 2 * x_val + 0.1 * np.random.random((10, 6)) + 1
-        alpha_opt, info = helmholtz.setup.interpolation_fit.optimized_fit_interpolation(
+        alpha_opt, info = hm.setup.interpolation_fit.optimized_fit_interpolation(
             xc_fit[:, nbhr[i, :k]], x_fit[:, i], xc_val[:, nbhr[i, :k]], x_val[:, i],
             alpha, intercept=True, return_weights=True)
 
@@ -99,7 +98,7 @@ class TestInterpolationFit:
         nbhr = [np.take(coarse_vars, np.arange(i - 2, i + (2 if i % 2 == 0 else 1)), mode="wrap") for i in fine_vars]
         alpha = [0, 0.1, 0.2, 1.0]
         p, fit_error, val_error, test_error, alpha_opt = \
-            helmholtz.setup.interpolation_fit.create_interpolation_least_squares(x, xc, nbhr, alpha)
+            hm.setup.interpolation_fit.create_interpolation_least_squares(x, xc, nbhr, alpha)
 
         assert_array_almost_equal(alpha_opt, [0.1, 1. , 0.1, 1. , 0. , 1. , 1. , 1. , 0. , 1. ])
         assert_array_almost_equal(fit_error, [0.074688, 0.290358, 0.092224, 0.587811, 0.073116, 0.541977,

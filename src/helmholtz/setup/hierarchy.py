@@ -1,13 +1,11 @@
-"""Utilities: multilevel hierarchy for repetitive problems."""
-import numpy as np
+"""Utilities: multilevel hierarchy for non-repetitive problems."""
 import scipy.sparse
 import helmholtz as hm
 import helmholtz.hierarchy.multilevel as multilevel
-import helmholtz.repetitive.hierarchy as hierarchy
 
 
-def create_tiled_coarse_level(a: scipy.sparse.spmatrix, b: scipy.sparse.spmatrix, r: np.ndarray, p: np.ndarray) -> \
-        multilevel.Level:
+def create_coarse_level(a: scipy.sparse.csr_matrix, b: scipy.sparse.csr_matrix,
+                        r: scipy.sparse.csr_matrix, p: scipy.sparse.csr_matrix) -> multilevel.Level:
     """
     Creates a tiled coarse level.
     Args:
@@ -18,14 +16,11 @@ def create_tiled_coarse_level(a: scipy.sparse.spmatrix, b: scipy.sparse.spmatrix
 
     Returns: coarse level object.
     """
-    num_aggregates = a.shape[0] // r.asarray().shape[1]
-    r_csr = r.tile(num_aggregates)
-    p_csr = p.tile(num_aggregates)
     # Form Galerkin coarse-level operator.
-    ac = (r_csr.dot(a)).dot(p_csr)
-    bc = (r_csr.dot(b)).dot(p_csr)
+    ac = (r.dot(a)).dot(p)
+    bc = (r.dot(b)).dot(p)
     relaxer = hm.solve.relax.KaczmarzRelaxer(ac, bc)
-    return multilevel.Level(ac, bc, relaxer, r, p, r_csr, p_csr)
+    return hm.hierarchy.multilevel.Level(ac, bc, relaxer, r, p, r, p)
 
 
 def create_finest_level(a: scipy.sparse.spmatrix) -> multilevel.Level:
@@ -38,4 +33,4 @@ def create_finest_level(a: scipy.sparse.spmatrix) -> multilevel.Level:
     """
     b = scipy.sparse.eye(a.shape[0])
     relaxer = hm.solve.relax.KaczmarzRelaxer(a, b)
-    return multilevel.Level.create_finest_level(a, relaxer)
+    return hm.hierarchy.multilevel.Level.create_finest_level(a, relaxer)

@@ -1,7 +1,7 @@
-"""Multilevel relaxation cycle."""
+"""Multilevel solution cycle of A*x=b. Coarsest level problem is solved via a direct solver."""
 import logging
-
 import numpy as np
+from scipy.sparse.linalg import spsolve
 
 import helmholtz as hm
 import helmholtz.hierarchy.multilevel as multilevel
@@ -9,21 +9,19 @@ import helmholtz.hierarchy.multilevel as multilevel
 _LOGGER = logging.getLogger(__name__)
 
 
-def relax_cycle(multilevel: multilevel.Multilevel,
-                cycle_index: float, nu_pre: int, nu_post: int, nu_coarsest: int,
+def solve_cycle(multilevel: multilevel.Multilevel, cycle_index: float, nu_pre: int, nu_post: int,
                 debug: bool = False, num_levels: int = None, finest: int = 0):
     if num_levels is None:
         num_levels = len(multilevel)
-    processor = RelaxCycleProcessor(multilevel, nu_pre, nu_post, nu_coarsest, debug=debug)
+    processor = SolutionCycleProcessor(multilevel, nu_pre, nu_post, debug=debug)
     return hm.hierarchy.cycle.Cycle(processor, cycle_index, num_levels, finest=finest)
 
 
-class RelaxCycleProcessor(hm.hierarchy.processor.Processor):
+class SolutionCycleProcessor(hm.hierarchy.processor.Processor):
     """
-    Relaxation cycle processor. Executes a Cycle(nu_pre, nu_post, nu_coarsest) on A*x = 0.
+    Relaxation cycle processor. Executes a Cycle(nu_pre, nu_post) on A*x = 0.
     """
-    def __init__(self, multilevel: multilevel.Multilevel,
-                 nu_pre: int, nu_post: int, nu_coarsest: int, debug: bool = False) -> np.array:
+    def __init__(self, multilevel: multilevel.Multilevel, nu_pre: int, nu_post: int, debug: bool = False) -> np.array:
         """
         Args:
             multilevel: multilevel hierarchy to use in the cycle.
@@ -35,7 +33,6 @@ class RelaxCycleProcessor(hm.hierarchy.processor.Processor):
         self._multilevel = multilevel
         self._nu_pre = nu_pre
         self._nu_post = nu_post
-        self._nu_coarsest = nu_coarsest
         self._debug = debug
         self._x = None
         self._x_initial = None
@@ -56,9 +53,8 @@ class RelaxCycleProcessor(hm.hierarchy.processor.Processor):
     def process_coarsest(self, l):
         self._print_state(l, "initial")
         level = self._multilevel.level[l]
-        for _ in range(self._nu_coarsest):
-            self._x[l] = level.relax(self._x[l], self._b[l])
-        self._print_state(l, "coarsest ({})".format(self._nu_coarsest))
+        self._x[l] = spsolve(level.a, self._b[l])
+        self._print_state(l, "coarsest")
 
     def pre_process(self, l):
         # Execute at level L right before switching to the next-coarser level L+1.
@@ -90,15 +86,6 @@ class RelaxCycleProcessor(hm.hierarchy.processor.Processor):
             for _ in range(num_sweeps):
                 self._x[l] = level.relax(self._x[l], self._b[l])
             self._print_state(l, "relax {}".format(num_sweeps))
-
-    def post_cycle(self, l):
-        # Normalize the solution to unit norm. Not required per say after each iteration, but done so we can see
-        # the effect of the cycle on the RER.
-        x = self._x[l]
-        eta = self._multilevel.level[l].normalization(x)
-        # TODO(orenlivne): vectorize the following expressions.
-        for i in range(x.shape[1]):
-            x[:, i] *= (1 / eta[i]) ** 0.5
 
     def result(self, l):
         # Returns the cycle result X at level l. Normally called by Cycle with l=finest level.

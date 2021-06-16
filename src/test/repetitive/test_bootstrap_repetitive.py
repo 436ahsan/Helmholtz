@@ -7,10 +7,6 @@ from numpy.ma.testutils import assert_array_equal, assert_array_almost_equal
 from scipy.linalg import eig
 
 import helmholtz as hm
-import helmholtz.solve
-import helmholtz.solve.relax_cycle
-import helmholtz.repetitive
-import helmholtz.setup_eigen
 
 logger = logging.getLogger("nb")
 
@@ -28,14 +24,14 @@ class TestBootstrapRepetitive:
         n = 16
         kh = 0.5
         a = hm.linalg.helmholtz_1d_operator(kh, n)
-        level = helmholtz.setup.multilevel.Level.create_finest_level(a)
-        multilevel = helmholtz.setup.multilevel.Multilevel(level)
-        x = helmholtz.solve.run.random_test_matrix((n,), num_examples=1)
-        multilevel = helmholtz.setup.multilevel.Multilevel(level)
+        level = hm.repetitive.hierarchy.create_finest_level(a)
+        multilevel = hm.repetitive.hierarchy.multilevel.Multilevel(level)
+        x = hm.solve.run.random_test_matrix((n,), num_examples=1)
+        multilevel = hm.repetitive.hierarchy.multilevel.Multilevel(level)
         # Run enough Kaczmarz relaxations per lambda update (not just 1 relaxation) so we converge to the minimal one.
         nu = 1
-        method = lambda x: helmholtz.solve.relax_cycle.relax_cycle(multilevel, 1.0, None, None, nu).run(x)
-        x, conv_factor = helmholtz.solve.run.run_iterative_method(level.operator, method, x, 100)
+        method = lambda x: hm.solve.relax_cycle.relax_cycle(multilevel, 1.0, None, None, nu).run(x)
+        x, conv_factor = hm.solve.run.run_iterative_method(level.operator, method, x, 100)
 
         assert np.mean([level.rq(x[:, i]) for i in range(x.shape[1])]) == pytest.approx(0.0979, 1e-3)
         assert (hm.linalg.scaled_norm_of_matrix(a.dot(x)) / hm.linalg.scaled_norm_of_matrix(x)).mean() == \
@@ -47,7 +43,7 @@ class TestBootstrapRepetitive:
         kh = 0
 
         a = hm.linalg.helmholtz_1d_operator(kh, n)
-        x, multilevel = helmholtz.repetitive.bootstrap_repetitive.generate_test_matrix(a, 0, num_examples=4, num_sweeps=20)
+        x, multilevel = hm.repetitive.bootstrap_repetitive.generate_test_matrix(a, 0, num_examples=4, num_sweeps=20)
 
         assert x.shape == (16, 4)
 
@@ -72,7 +68,7 @@ class TestBootstrapRepetitive:
         kh = 0
 
         a = hm.linalg.helmholtz_1d_operator(kh, n)
-        x, multilevel = helmholtz.repetitive.bootstrap_repetitive.generate_test_matrix(a, 0, num_examples=4, num_sweeps=20, num_bootstrap_steps=2)
+        x, multilevel = hm.repetitive.bootstrap_repetitive.generate_test_matrix(a, 0, num_examples=4, num_sweeps=20, num_bootstrap_steps=2)
 
         assert x.shape == (16, 4)
         assert len(multilevel) == 2
@@ -101,7 +97,7 @@ class TestBootstrapRepetitive:
         kh = 0
 
         a = hm.linalg.helmholtz_1d_operator(kh, n)
-        x, multilevel = helmholtz.repetitive.bootstrap_repetitive.generate_test_matrix(a, 0, num_examples=4, num_sweeps=20, num_bootstrap_steps=3)
+        x, multilevel = hm.repetitive.bootstrap_repetitive.generate_test_matrix(a, 0, num_examples=4, num_sweeps=20, num_bootstrap_steps=3)
 
         assert x.shape == (16, 4)
         coarse_level = multilevel.level[1]
@@ -116,17 +112,17 @@ class TestBootstrapRepetitive:
         kh = 0.5
         a = hm.linalg.helmholtz_1d_operator(kh, n)
         # Threshold = 0.12 gives 2 SVD components
-        x, multilevel = helmholtz.repetitive.bootstrap_repetitive.generate_test_matrix(a, 0, num_examples=4, threshold=0.12)
+        x, multilevel = hm.repetitive.bootstrap_repetitive.generate_test_matrix(a, 0, num_examples=4, threshold=0.12)
         assert len(multilevel) == 2
 
         level = multilevel.finest_level
 
         # Convergence speed test.
-        relax_cycle = lambda x, lam: helmholtz.setup_eigen.eigensolver.eigen_cycle(
+        relax_cycle = lambda x, lam: hm.setup_eigen.eigensolver.eigen_cycle(
             multilevel, 1.0, 1, 1, 100).run((x, lam))
         # FMG start so x has a reasonable initial guess.
-        x = helmholtz.repetitive.bootstrap_repetitive.fmg(multilevel, num_cycles_finest=0)
-        x, lam, conv_factor = helmholtz.solve.run.run_iterative_eigen_method(level.operator, relax_cycle, x, 20, print_frequency=1)
+        x = hm.repetitive.bootstrap_repetitive.fmg(multilevel, num_cycles_finest=0)
+        x, lam, conv_factor = hm.solve.run.run_iterative_eigen_method(level.operator, relax_cycle, x, 20, print_frequency=1)
 
 #        assert np.mean([level.rq(x[:, i]) for i in range(x.shape[1])]) == pytest.approx(0.097759, 1e-3)
         assert conv_factor == pytest.approx(0.46, 1e-2)
@@ -135,23 +131,23 @@ class TestBootstrapRepetitive:
         n = 16
         kh = 0.5
         a = hm.linalg.helmholtz_1d_operator(kh, n)
-        x, multilevel = helmholtz.repetitive.bootstrap_repetitive.generate_test_matrix(a, 0, num_examples=4, num_bootstrap_steps=2)
+        x, multilevel = hm.repetitive.bootstrap_repetitive.generate_test_matrix(a, 0, num_examples=4, num_bootstrap_steps=2)
         assert len(multilevel) == 2
 
         level = multilevel.finest_level
 
         # Convergence speed test.
-        relax_cycle = lambda x, lam: helmholtz.setup_eigen.eigensolver.eigen_cycle(
+        relax_cycle = lambda x, lam: hm.setup_eigen.eigensolver.eigen_cycle(
             multilevel, 1.0, 4, 3, 100).run((x, lam))
         # FMG start so x has a reasonable initial guess.
         logger.info("2-level convergence test")
-        x = helmholtz.repetitive.bootstrap_repetitive.fmg(multilevel, num_cycles_finest=0)
+        x = hm.repetitive.bootstrap_repetitive.fmg(multilevel, num_cycles_finest=0)
 
         # Add some random noise but still stay near a reasonable initial guess.
         # x += 0.1 * np.random.random(x.shape)
         # multilevel.finest_multilevel.lam *= 1.01
 
-        x, lam, conv_factor = helmholtz.solve.run.run_iterative_eigen_method(level.operator, relax_cycle, x, 20,
+        x, lam, conv_factor = hm.solve.run.run_iterative_eigen_method(level.operator, relax_cycle, x, 20,
                                                           print_frequency=1, residual_stop_value=1e-11)
 
 #        assert np.mean([level.rq(x[:, i]) for i in range(x.shape[1])]) == pytest.approx(0.097759, 1e-3)
@@ -161,18 +157,18 @@ class TestBootstrapRepetitive:
         n = 16
         kh = 0
         a = hm.linalg.helmholtz_1d_operator(kh, n)
-        x, multilevel = helmholtz.repetitive.bootstrap_repetitive.generate_test_matrix(
+        x, multilevel = hm.repetitive.bootstrap_repetitive.generate_test_matrix(
             a, 0, num_examples=4, interpolation_method="ls", num_sweeps=1000)
         assert len(multilevel) == 2
 
         # Convergence speed test.
         level = multilevel.finest_level
-        eigen_cycle = lambda x, lam: helmholtz.setup_eigen.eigensolver.eigen_cycle(
+        eigen_cycle = lambda x, lam: hm.setup_eigen.eigensolver.eigen_cycle(
             multilevel, 1.0, 1, 1, 100).run((x, lam))
         # FMG start so (x, lambda) has a reasonable initial guess.
-        x = helmholtz.setup_eigen.bootstrap_eigen.fmg(multilevel, num_cycles_finest=0)
+        x = hm.setup_eigen.bootstrap_eigen.fmg(multilevel, num_cycles_finest=0)
         lam = level.rq(x[:, 0])
-        x, lam, conv_factor = helmholtz.solve.run.run_iterative_eigen_method(level.operator, eigen_cycle, x, lam, 20, print_frequency=1)
+        x, lam, conv_factor = hm.solve.run.run_iterative_eigen_method(level.operator, eigen_cycle, x, lam, 20, print_frequency=1)
 
 #        assert lam == pytest.approx(0.0977590650225, 1e-3)
 #        assert np.mean([level.rq(x[:, i]) for i in range(x.shape[1])]) == pytest.approx(0.097759, 1e-3)
@@ -183,17 +179,17 @@ class TestBootstrapRepetitive:
         n = 16
         kh = 0.5
         a = hm.linalg.helmholtz_1d_operator(kh, n)
-        x, multilevel = helmholtz.repetitive.bootstrap_repetitive.generate_test_matrix(a, 0, num_examples=4, interpolation_method="ls")
+        x, multilevel = hm.repetitive.bootstrap_repetitive.generate_test_matrix(a, 0, num_examples=4, interpolation_method="ls")
         assert len(multilevel) == 2
 
         level = multilevel.finest_level
         # Convergence speed test.
-        relax_cycle = lambda x, lam: helmholtz.setup_eigen.eigensolver.eigen_cycle(
+        relax_cycle = lambda x, lam: hm.setup_eigen.eigensolver.eigen_cycle(
             multilevel, 1.0, 1, 1, 100).run((x, lam))
         # FMG start so x has a reasonable initial guess.
-        x = helmholtz.repetitive.bootstrap_repetitive.fmg(multilevel, num_cycles_finest=0)
+        x = hm.repetitive.bootstrap_repetitive.fmg(multilevel, num_cycles_finest=0)
         lam = level.rq(x[:, 0])
-        x, lam, conv_factor = helmholtz.solve.run.run_iterative_eigen_method(level.operator, relax_cycle, x, 20, print_frequency=1)
+        x, lam, conv_factor = hm.solve.run.run_iterative_eigen_method(level.operator, relax_cycle, x, 20, print_frequency=1)
 
         assert np.mean([level.rq(x[:, i]) for i in range(x.shape[1])]) == pytest.approx(0.097759, 1e-3)
         assert conv_factor == pytest.approx(0.316, 1e-2)
@@ -203,7 +199,7 @@ class TestBootstrapRepetitive:
         n = 16
         kh = 0.5
         a = hm.linalg.helmholtz_1d_operator(kh, n)
-        x, multilevel = helmholtz.repetitive.bootstrap_repetitive.generate_test_matrix(
+        x, multilevel = hm.repetitive.bootstrap_repetitive.generate_test_matrix(
             a, 0, num_sweeps=20, num_examples=4, initial_max_levels=3)
         assert len(multilevel) == 3
 
@@ -211,10 +207,10 @@ class TestBootstrapRepetitive:
 
         # Convergence speed test.
         # FMG start so x has a reasonable initial guess.
-        x_init = helmholtz.repetitive.bootstrap_repetitivefmg(multilevel, num_cycles_finest=0, num_cycles=1)
+        x_init = hm.repetitive.bootstrap_repetitivefmg(multilevel, num_cycles_finest=0, num_cycles=1)
         #        multilevel.lam = exact_eigenpair(level.a)
 
-        relax_cycle = lambda x: helmholtz.setup_eigen.eigensolver.relax_cycle(multilevel, 1.0, 1, 1, 100, num_levels=3).run(x)
-        x, conv_factor = helmholtz.solve.run.run_iterative_eigen_method(level.operator, relax_cycle, x_init, 15)
+        relax_cycle = lambda x: hm.setup_eigen.eigensolver.relax_cycle(multilevel, 1.0, 1, 1, 100, num_levels=3).run(x)
+        x, conv_factor = hm.solve.run.run_iterative_eigen_method(level.operator, relax_cycle, x_init, 15)
         assert np.mean([level.rq(x[:, i]) for i in range(x.shape[1])]) == pytest.approx(0.097759, 1e-3)
         assert conv_factor == pytest.approx(0.32, 1e-2)

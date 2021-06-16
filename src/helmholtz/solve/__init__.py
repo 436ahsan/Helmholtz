@@ -1,1 +1,1 @@
-from . import relax, processor, cycle, mock_cycle, run
+from . import relax, mock_cycle, run, solve_cycle, relax_cycle

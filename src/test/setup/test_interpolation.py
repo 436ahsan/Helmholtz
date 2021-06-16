@@ -1,10 +1,8 @@
 import numpy as np
 import pytest
-from numpy.linalg import norm, lstsq
 from numpy.ma.testutils import assert_array_almost_equal
 
 import helmholtz as hm
-import helmholtz.setup
 
 
 class TestInterpolation:
@@ -17,18 +15,17 @@ class TestInterpolation:
         n = 32
         kh = 0.6
         num_sweeps = 100
-        aggregate_size = 4
         a = hm.linalg.helmholtz_1d_operator(kh, n).tocsr()
         # Generate relaxed test matrix.
-        level = helmholtz.setup.multilevel.Level.create_finest_level(a)
+        level = hm.setup.hierarchy.create_finest_level(a)
         x = hm.solve.run.random_test_matrix((n,))
         b = np.zeros_like(x)
-        x, _ = helmholtz.solve.run.run_iterative_method(level.operator, lambda x: level.relax(x, b), x, num_sweeps=num_sweeps)
+        x, _ = hm.solve.run.run_iterative_method(level.operator, lambda x: level.relax(x, b), x, num_sweeps=num_sweeps)
         # Generate coarse variables (R) on the non-repetitive domain.
         r, aggregates = hm.setup.coarsening.create_coarsening_full_domain(x, threshold=0.15)
 
         p, fit_error, val_error, test_error, alpha_opt = \
-            helmholtz.setup.interpolation.create_interpolation_least_squares_auto_nbhrs(x, a, r)
+            hm.setup.interpolation.create_interpolation_least_squares_auto_nbhrs(x, a, r)
 
         assert np.mean(alpha_opt) == pytest.approx(0.0015625)
         assert max(fit_error) == pytest.approx(0.0286, 1e-2)

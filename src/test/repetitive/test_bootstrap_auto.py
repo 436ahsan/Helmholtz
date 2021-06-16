@@ -4,14 +4,11 @@ import logging
 import sys
 import numpy as np
 import pytest
-import unittest
 from numpy.ma.testutils import assert_array_equal, assert_array_almost_equal
-from scipy.linalg import eig, norm
+from scipy.linalg import norm
 
 import helmholtz as hm
-import helmholtz.solve
-import helmholtz.solve.relax_cycle
-import helmholtz.setup
+import helmholtz.setup.hierarchy as hierarchy
 
 logger = logging.getLogger("nb")
 
@@ -24,18 +21,19 @@ class TestBootstrapAuto:
         for handler in logging.root.handlers[:]: logging.root.removeHandler(handler)
         logging.basicConfig(stream=sys.stdout, level=logging.DEBUG, format="%(message)s")
         np.random.seed(0)
+        np.set_printoptions(linewidth=200, precision=2)
 
     def test_run_1_level_relax(self):
         n = 16
         kh = 0.5
         a = hm.linalg.helmholtz_1d_5_point_operator(kh, n)
-        level = helmholtz.setup.multilevel.Level.create_finest_level(a)
-        multilevel = helmholtz.setup.multilevel.Multilevel(level)
+        level = hierarchy.create_finest_level(a)
+        multilevel = hm.hierarchy.multilevel.Multilevel(level)
         x = hm.solve.run.random_test_matrix((n,), num_examples=1)
-        multilevel = helmholtz.setup.multilevel.Multilevel(level)
+        multilevel = hm.hierarchy.multilevel.Multilevel(level)
         # Run enough Kaczmarz relaxations per lambda update (not just 1 relaxation) so we converge to the minimal one.
         nu = 1
-        method = lambda x: helmholtz.solve.relax_cycle.relax_cycle(multilevel, 1.0, None, None, nu).run(x)
+        method = lambda x: hm.solve.relax_cycle.relax_cycle(multilevel, 1.0, None, None, nu).run(x)
         x, conv_factor = hm.solve.run.run_iterative_method(level.operator, method, x, 100)
 
         assert np.mean([level.rq(x[:, i]) for i in range(x.shape[1])]) == pytest.approx(0.1001, 1e-3)
@@ -46,9 +44,81 @@ class TestBootstrapAuto:
     def test_laplace_coarsening(self):
         n = 16
         kh = 0
-
         a = hm.linalg.helmholtz_1d_5_point_operator(kh, n).tocsr()
-        x, multilevel = helmholtz.setup.auto_setup.setup(a, max_levels=2, num_examples=20, num_sweeps=20,
+
+        x, multilevel = hm.setup.auto_setup.setup(a, max_levels=2, num_examples=20, num_sweeps=20,
+                                                         threshold=0.2)
+
+        assert x.shape == (16, 20)
+
+        assert len(multilevel) == 2
+
+        level = multilevel.finest_level
+        assert level.a.shape == (16, 16)
+
+        coarse_level = multilevel.level[1]
+        assert coarse_level.a.shape == (8, 8)
+        assert coarse_level._r_csr.shape == (8, 16)
+        assert coarse_level._p_csr.shape == (16, 8)
+        coarse_level.print()
+
+        # Test that test vector residuals are small.
+        assert (hm.linalg.scaled_norm_of_matrix(a.dot(x)) / hm.linalg.scaled_norm_of_matrix(x)).mean() == \
+               pytest.approx(0.120, 1e-2)
+
+        # Test two-level cycle convergence for A*x=0.
+        two_level_cycle = lambda x: hm.solve.solve_cycle.solve_cycle(multilevel, 1.0, 1, 1).run(x)
+        # FMG start so x has a reasonable initial guess.
+        x, conv_factor = hm.solve.run.run_iterative_method(level.operator, two_level_cycle, x, 20)
+        assert conv_factor == pytest.approx(0.375, 1e-2)
+
+
+    def test_laplace_2_level_bootstrap(self):
+        """We improve vectors by relaxation -> coarsening creation -> 2-level relaxation cycles.
+        P = SVD interpolation = R^T."""
+        n = 16
+        kh = 0
+        a = hm.linalg.helmholtz_1d_5_point_operator(kh, n).tocsr()
+
+        x, multilevel = hm.setup.auto_setup.setup(a, max_levels=2, num_examples=20, num_sweeps=20,
+                                                         threshold=0.2, num_bootstrap_steps=2)
+
+        assert x.shape == (16, 20)
+        assert len(multilevel) == 2
+
+        # The coarse level should be Galerkin coarsening with piecewise constant interpolation.
+        coarse_level = multilevel.level[1]
+
+        # Interpolation ~ 2nd order interpolation from 3 to 4 coarse neighbors.
+        p = coarse_level.p
+        assert_array_equal(p[0].nonzero()[0], [0, 0, 0])
+        assert_array_equal(p[0].nonzero()[1], [0, 1, 7])
+        assert_array_almost_equal(p[0].data, [-0.73, 0.13, -0.11], decimal=2)
+        # Row sums are ~ constant.
+        assert np.array(p.sum(axis=1)).flatten().mean() == pytest.approx(-0.707, 1e-2)
+        assert np.array(p.sum(axis=1)).flatten().std() < 1e-4
+
+        # Coarsening ~ averaging.
+        r = coarse_level.r
+        assert_array_equal(r[0].nonzero()[0], [0, 0])
+        assert_array_equal(r[0].nonzero()[1], [0, 1])
+        assert_array_almost_equal(r[0].data, [-0.7, -0.71], decimal=2)
+
+        ac_0 = coarse_level.a[0]
+        coarse_level.print()
+        assert_array_equal(ac_0.nonzero()[1], [7, 6, 2, 1, 0])
+        assert_array_almost_equal(ac_0.data, [0.55, -0.08, -0.1, 0.59, -0.96], decimal=2)
+
+        # Vectors have lower residual after 2-level relaxation cycles than after relaxation only.
+        assert (hm.linalg.scaled_norm_of_matrix(a.dot(x)) / hm.linalg.scaled_norm_of_matrix(x)).mean() == \
+               pytest.approx(0.0438, 1e-2)
+
+    def test_helmholtz_coarsening(self):
+        n = 16
+        kh = 0.5
+        a = hm.linalg.helmholtz_1d_5_point_operator(kh, n).tocsr()
+
+        x, multilevel = hm.setup.auto_setup.setup(a, max_levels=2, num_examples=20, num_sweeps=20,
                                                          threshold=0.2)
 
         assert x.shape == (16, 20)
@@ -65,133 +135,44 @@ class TestBootstrapAuto:
         coarse_level.print()
 
         assert (hm.linalg.scaled_norm_of_matrix(a.dot(x)) / hm.linalg.scaled_norm_of_matrix(x)).mean() == \
-               pytest.approx(0.120, 1e-2)
+               pytest.approx(0.145, 1e-2)
 
-    def test_laplace_2_level_bootstrap(self):
-        """We improve vectors by relaxation -> coarsening creation -> 2-level relaxation cycles.
-        P = SVD interpolation = R^T."""
-        n = 16
-        kh = 0
-
-        a = hm.linalg.helmholtz_1d_5_point_operator(kh, n)
-        x, multilevel = helmholtz.repetitive.bootstrap_repetitive.generate_test_matrix(a, 0, num_examples=4, num_sweeps=20, num_bootstrap_steps=2)
-
-        assert x.shape == (16, 4)
-        assert len(multilevel) == 2
-
-        # The coarse level should be Galerkin coarsening with piecewise constant interpolation.
-        coarse_level = multilevel.level[1]
-
-        p = coarse_level.p.asarray()
-        assert_array_equal(p[0], [[0], [0]])
-        assert_array_almost_equal(p[1], [[-0.748798], [-0.662799]])
-
-        r = coarse_level.r.asarray()
-        assert_array_almost_equal(r, [[-0.748798, -0.662799]])
-
-        ac_0 = coarse_level.a[0]
-        coarse_level.print()
-        assert_array_equal(ac_0.nonzero()[1], [0, 7, 1])
-        assert_array_almost_equal(ac_0.data, [-1.176528,  0.578403,  0.578403])
-
-        # Vectors have much lower residual after 2-level relaxation cycles.
-        assert (hm.linalg.scaled_norm_of_matrix(a.dot(x)) / hm.linalg.scaled_norm_of_matrix(x)).mean() == \
-               pytest.approx(0.0838, 1e-3)
-
-    def test_helmholtz_coarsening(self):
-        n = 16
-        kh = 0.5
-
-        a = hm.linalg.helmholtz_1d_5_point_operator(kh, n)
-        x, multilevel = helmholtz.repetitive.bootstrap_repetitive.generate_test_matrix(a, 0, num_examples=4, num_sweeps=20)
-
-        assert x.shape == (16, 4)
-
-        assert len(multilevel) == 2
-
-        level = multilevel.finest_level
-        assert level.a.shape == (16, 16)
-
-        coarse_level = multilevel.level[1]
-        assert coarse_level.a.shape == (8, 8)
-        assert coarse_level._r_csr.shape == (8, 16)
-        assert coarse_level._p_csr.shape == (16, 8)
-        coarse_level.print()
-
-        assert (hm.linalg.scaled_norm_of_matrix(a.dot(x)) / hm.linalg.scaled_norm_of_matrix(x)).mean() == \
-               pytest.approx(0.226, 1e-2)
-
-    def test_helmholtz_2_level_bootstrap(self):
+    def test_helmholtz_2_level_bootstrap_cycles_reduce_test_function_residual(self):
         """We improve vectors by relaxation -> coarsening creation -> 2-level relaxation cycles.
         P = SVD interpolation = R^T."""
         # Larger domain, as in Karsten's experiments.
         n = 96
         kh = 0.5
-        num_examples = 1
+        num_examples = 20
         max_levels = 2
 
         # Initialize test functions (to random) and hierarchy at coarsest level.
-        a = hm.linalg.helmholtz_1d_5_point_operator(kh, n)
-        level = helmholtz.setup.multilevel.Level.create_finest_level(a)
-        multilevel = helmholtz.setup.multilevel.Multilevel(level)
-        domain_shape = (a.shape[0],)
-        x = hm.solve.run.random_test_matrix(domain_shape, num_examples=num_examples)
-        assert norm(a.dot(x)) / norm(x) == pytest.approx(3.155, 1e-3)
+        a = hm.linalg.helmholtz_1d_5_point_operator(kh, n).tocsr()
+        level = hierarchy.create_finest_level(a)
+        multilevel = hm.hierarchy.multilevel.Multilevel(level)
+        x = hm.solve.run.random_test_matrix((a.shape[0],), num_examples=num_examples)
+        assert norm(a.dot(x)) / norm(x) == pytest.approx(2.91, 1e-2)
 
         # Residual norm decreases fast during the first 3 bootstrap cycles, then saturates.
-        expected_residual_norms = [0.276, 0.2144, 0.0901, 0.0626, 0.0509, 0.0464, 0.0442, 0.04278]
+        expected_residual_norms = [0.175, 0.049, 0.0637, 0.0626, 0.0509, 0.0464, 0.0442, 0.04278]
 
         # Relax vector + coarsen in first iteration; then 2-level cycle + improve hierarchy (bootstrap).
         for i, expected_residual_norm in enumerate(expected_residual_norms):
-            x, multilevel = helmholtz.repetitive.bootstrap_repetitive.bootstap(x, multilevel, max_levels, num_sweeps=10)
-            assert norm(a.dot(x)) / norm(x) == pytest.approx(expected_residual_norm, 1e-3)
-
-    def test_helmholtz_2_level_more_bootstrap_doesnt_change_residual(self):
-        """We improve vectors by relaxation -> coarsening creation -> 2-level relaxation cycles.
-        P = SVD interpolation = R^T."""
-        n = 16
-        kh = 0.5
-
-        a = hm.linalg.helmholtz_1d_5_point_operator(kh, n)
-        x, multilevel = helmholtz.repetitive.bootstrap_repetitive.generate_test_matrix(a, 0, num_examples=4, num_sweeps=20, num_bootstrap_steps=3)
-
-        assert x.shape == (16, 4)
-        assert len(multilevel) == 2
-
-        # Vectors have much lower residual after 2-level relaxation cycles.
-        assert (hm.linalg.scaled_norm_of_matrix(a.dot(x)) / hm.linalg.scaled_norm_of_matrix(x)).mean() == \
-               pytest.approx(0.1473, 1e-3)
-
-
-    def test_2_level_bootstrap_least_squares_interpolation(self):
-        """We improve vectors by relaxation -> coarsening creation -> 2-level relaxation cycles.
-        P = SVD interpolation = R^T."""
-        n = 16
-        kh = 0.5
-
-        a = hm.linalg.helmholtz_1d_5_point_operator(kh, n)
-        x, multilevel = helmholtz.repetitive.bootstrap_repetitive.generate_test_matrix(a, 0, num_examples=10, num_sweeps=20, num_bootstrap_steps=1,
-                                                          interpolation_method="ls")
-
-        assert x.shape == (16, 10)
-        assert len(multilevel) == 2
-
-        # Vectors have much lower residual after 2-level relaxation cycles.
-        assert (hm.linalg.scaled_norm_of_matrix(a.dot(x)) / hm.linalg.scaled_norm_of_matrix(x)).mean() == \
-               pytest.approx(0.22, 1e-2)
+            x, multilevel = hm.setup.auto_setup.bootstap(x, multilevel, max_levels, num_sweeps=10)
+            assert norm(a.dot(x)) / norm(x) == pytest.approx(expected_residual_norm, 1e-2)
 
     # def test_2_level_bootstrap_least_squares_interpolation(self):
     #     n = 16
     #     kh = 0.5
     #     a = hm.linalg.helmholtz_1d_operator(kh, n)
-    #     x, multilevel = helmholtz.repetitive.bootstrap_repetitive._repetitive_eigen.generate_test_matrix(a, 0, num_examples=4, interpolation_method="ls")
+    #     x, multilevel = hm.repetitive.bootstrap_repetitive._repetitive_eigen.generate_test_matrix(a, 0, num_examples=4, interpolation_method="ls")
     #     assert len(multilevel) == 2
     #
     #     level = multilevel.finest_level
     #     # Convergence speed test.
-    #     relax_cycle = lambda x: helmholtz.setup_eigen.eigensolver.relax_cycle(multilevel, 1.0, 1, 1, 100).run(x)
+    #     relax_cycle = lambda x: hm.setup_eigen.eigensolver.relax_cycle(multilevel, 1.0, 1, 1, 100).run(x)
     #     # FMG start so x has a reasonable initial guess.
-    #     x = helmholtz.repetitive.bootstrap_repetitive._repetitive_eigen.fmg(multilevel, num_cycles_finest=0)
+    #     x = hm.repetitive.bootstrap_repetitive._repetitive_eigen.fmg(multilevel, num_cycles_finest=0)
     #     x, conv_factor = hm.solve.run.run_iterative_eigen_method(level.operator, relax_cycle, x, 20, print_frequency=1)
     #
     #     assert np.mean([level.rq(x[:, i]) for i in range(x.shape[1])]) == pytest.approx(0.097759, 1e-3)
@@ -202,7 +183,7 @@ class TestBootstrapAuto:
     #     n = 16
     #     kh = 0.5
     #     a = hm.linalg.helmholtz_1d_operator(kh, n)
-    #     x, multilevel = helmholtz.repetitive.bootstrap_repetitive._repetitive_eigen.generate_test_matrix(
+    #     x, multilevel = hm.repetitive.bootstrap_repetitive._repetitive_eigen.generate_test_matrix(
     #         a, 0, num_sweeps=20, num_examples=4, initial_max_levels=3)
     #     assert len(multilevel) == 3
     #
@@ -210,10 +191,10 @@ class TestBootstrapAuto:
     #
     #     # Convergence speed test.
     #     # FMG start so x has a reasonable initial guess.
-    #     x_init = helmholtz.repetitive.bootstrap_repetitive._repetitive_eigen.fmg(multilevel, num_cycles_finest=0, num_cycles=1)
+    #     x_init = hm.repetitive.bootstrap_repetitive._repetitive_eigen.fmg(multilevel, num_cycles_finest=0, num_cycles=1)
     #     #        multilevel.lam = exact_eigenpair(level.a)
     #
-    #     relax_cycle = lambda x: helmholtz.setup_eigen.eigensolver.relax_cycle(multilevel, 1.0, 1, 1, 100, num_levels=3).run(x)
+    #     relax_cycle = lambda x: hm.setup_eigen.eigensolver.relax_cycle(multilevel, 1.0, 1, 1, 100, num_levels=3).run(x)
     #     x, conv_factor = hm.solve.run.run_iterative_eigen_method(level.operator, relax_cycle, x_init, 15)
     #     assert np.mean([level.rq(x[:, i]) for i in range(x.shape[1])]) == pytest.approx(0.097759, 1e-3)
     #     assert conv_factor == pytest.approx(0.32, 1e-2)

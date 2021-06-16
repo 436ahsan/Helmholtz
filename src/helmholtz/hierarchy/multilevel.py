@@ -8,7 +8,6 @@ import scipy.sparse.linalg
 from numpy.linalg import norm
 
 import helmholtz as hm
-import helmholtz.solve.relax as hsr
 from helmholtz.linalg import scaled_norm
 
 _LOGGER = logging.getLogger("multilevel")
@@ -17,18 +16,18 @@ _LOGGER = logging.getLogger("multilevel")
 class Level:
     """A single level in the multilevel hierarchy."""
 
-    def __init__(self, a, b, r, p, r_csr, p_csr):
+    def __init__(self, a, b, relaxer, r, p, r_csr, p_csr):
         self.a = a
         self.b = b
         self.r = r
         self.p = p
         self._r_csr = r_csr
         self._p_csr = p_csr
-        self._relaxer = hsr.KaczmarzRelaxer(a, b)
+        self._relaxer = relaxer
 
     @staticmethod
-    def create_finest_level(a):
-        return Level(a, scipy.sparse.eye(a.shape[0]), None, None, None, None)
+    def create_finest_level(a, relaxer):
+        return Level(a, scipy.sparse.eye(a.shape[0]), relaxer, None, None, None, None)
 
     @property
     def size(self):
@@ -37,10 +36,11 @@ class Level:
 
     def print(self):
         _LOGGER.info("a = \n" + str(self.a.toarray()))
-        if self.r is not None:
-            _LOGGER.info("r = \n" + str(self.r.asarray()))
-        if self.p is not None:
-            _LOGGER.info("p = \n" + str(self.p.asarray()))
+
+        if isinstance(self._r_csr, scipy.sparse.csr_matrix):
+            _LOGGER.info("r = \n" + str(self._r_csr.todense()))
+        if isinstance(self._p_csr, scipy.sparse.csr_matrix):
+            _LOGGER.info("p = \n" + str(self._p_csr.todense()))
 
     def stiffness_operator(self, x: np.array) -> np.array:
         """

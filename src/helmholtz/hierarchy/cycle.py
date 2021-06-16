@@ -1,7 +1,7 @@
 """A generic multi-level cycle."""
 import logging
 import numpy as np
-import helmholtz.solve.processor as hsc
+import helmholtz.hierarchy.processor as hsc
 
 _LOGGER = logging.getLogger(__name__)
 

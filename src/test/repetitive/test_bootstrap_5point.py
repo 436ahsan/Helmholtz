@@ -2,15 +2,10 @@ import logging
 import sys
 import numpy as np
 import pytest
-import unittest
 from numpy.ma.testutils import assert_array_equal, assert_array_almost_equal
-from scipy.linalg import eig, norm
+from scipy.linalg import norm
 
 import helmholtz as hm
-import helmholtz.setup
-import helmholtz.solve
-import helmholtz.solve.relax_cycle
-import helmholtz.repetitive
 
 logger = logging.getLogger("nb")
 
@@ -28,13 +23,13 @@ class TestBootstrap5Point:
         n = 16
         kh = 0.5
         a = hm.linalg.helmholtz_1d_5_point_operator(kh, n)
-        level = helmholtz.setup.multilevel.Level.create_finest_level(a)
-        multilevel = helmholtz.setup.multilevel.Multilevel(level)
+        level = hm.repetitive.hierarchy.create_finest_level(a)
+        multilevel = hm.hierarchy.multilevel.Multilevel(level)
         x = hm.solve.run.random_test_matrix((n,), num_examples=1)
-        multilevel = helmholtz.setup.multilevel.Multilevel(level)
+        multilevel = hm.hierarchy.multilevel.Multilevel(level)
         # Run enough Kaczmarz relaxations per lambda update (not just 1 relaxation) so we converge to the minimal one.
         nu = 1
-        method = lambda x: helmholtz.solve.relax_cycle.relax_cycle(multilevel, 1.0, None, None, nu).run(x)
+        method = lambda x: hm.solve.relax_cycle.relax_cycle(multilevel, 1.0, None, None, nu).run(x)
         x, conv_factor = hm.solve.run.run_iterative_method(level.operator, method, x, 100)
 
         assert np.mean([level.rq(x[:, i]) for i in range(x.shape[1])]) == pytest.approx(0.1001, 1e-3)
@@ -47,7 +42,7 @@ class TestBootstrap5Point:
         kh = 0
 
         a = hm.linalg.helmholtz_1d_5_point_operator(kh, n)
-        x, multilevel = helmholtz.repetitive.bootstrap_repetitive.generate_test_matrix(a, 0, num_examples=4, num_sweeps=20)
+        x, multilevel = hm.repetitive.bootstrap_repetitive.generate_test_matrix(a, 0, num_examples=4, num_sweeps=20)
 
         assert x.shape == (16, 4)
 
@@ -72,7 +67,7 @@ class TestBootstrap5Point:
         kh = 0
 
         a = hm.linalg.helmholtz_1d_5_point_operator(kh, n)
-        x, multilevel = helmholtz.repetitive.bootstrap_repetitive.generate_test_matrix(a, 0, num_examples=4, num_sweeps=20, num_bootstrap_steps=2)
+        x, multilevel = hm.repetitive.bootstrap_repetitive.generate_test_matrix(a, 0, num_examples=4, num_sweeps=20, num_bootstrap_steps=2)
 
         assert x.shape == (16, 4)
         assert len(multilevel) == 2
@@ -101,7 +96,7 @@ class TestBootstrap5Point:
         kh = 0.5
 
         a = hm.linalg.helmholtz_1d_5_point_operator(kh, n)
-        x, multilevel = helmholtz.repetitive.bootstrap_repetitive.generate_test_matrix(a, 0, num_examples=4, num_sweeps=20)
+        x, multilevel = hm.repetitive.bootstrap_repetitive.generate_test_matrix(a, 0, num_examples=4, num_sweeps=20)
 
         assert x.shape == (16, 4)
 
@@ -130,8 +125,8 @@ class TestBootstrap5Point:
 
         # Initialize test functions (to random) and hierarchy at coarsest level.
         a = hm.linalg.helmholtz_1d_5_point_operator(kh, n)
-        level = helmholtz.setup.multilevel.Level.create_finest_level(a)
-        multilevel = helmholtz.setup.multilevel.Multilevel(level)
+        level = hm.repetitive.hierarchy.create_finest_level(a)
+        multilevel = hm.hierarchy.multilevel.Multilevel(level)
         domain_shape = (a.shape[0],)
         x = hm.solve.run.random_test_matrix(domain_shape, num_examples=num_examples)
         assert norm(a.dot(x)) / norm(x) == pytest.approx(3.155, 1e-3)
@@ -141,7 +136,7 @@ class TestBootstrap5Point:
 
         # Relax vector + coarsen in first iteration; then 2-level cycle + improve hierarchy (bootstrap).
         for i, expected_residual_norm in enumerate(expected_residual_norms):
-            x, multilevel = helmholtz.repetitive.bootstrap_repetitive.bootstap(x, multilevel, max_levels, num_sweeps=10)
+            x, multilevel = hm.repetitive.bootstrap_repetitive.bootstap(x, multilevel, max_levels, num_sweeps=10)
             assert norm(a.dot(x)) / norm(x) == pytest.approx(expected_residual_norm, 1e-3)
 
     def test_helmholtz_2_level_more_bootstrap_doesnt_change_residual(self):
@@ -151,7 +146,7 @@ class TestBootstrap5Point:
         kh = 0.5
 
         a = hm.linalg.helmholtz_1d_5_point_operator(kh, n)
-        x, multilevel = helmholtz.repetitive.bootstrap_repetitive.generate_test_matrix(a, 0, num_examples=4, num_sweeps=20, num_bootstrap_steps=3)
+        x, multilevel = hm.repetitive.bootstrap_repetitive.generate_test_matrix(a, 0, num_examples=4, num_sweeps=20, num_bootstrap_steps=3)
 
         assert x.shape == (16, 4)
         assert len(multilevel) == 2
@@ -168,7 +163,7 @@ class TestBootstrap5Point:
         kh = 0.5
 
         a = hm.linalg.helmholtz_1d_5_point_operator(kh, n)
-        x, multilevel = helmholtz.repetitive.bootstrap_repetitive.generate_test_matrix(a, 0, num_examples=10, num_sweeps=20, num_bootstrap_steps=1,
+        x, multilevel = hm.repetitive.bootstrap_repetitive.generate_test_matrix(a, 0, num_examples=10, num_sweeps=20, num_bootstrap_steps=1,
                                                           interpolation_method="ls")
 
         assert x.shape == (16, 10)
@@ -182,14 +177,14 @@ class TestBootstrap5Point:
     #     n = 16
     #     kh = 0.5
     #     a = hm.linalg.helmholtz_1d_operator(kh, n)
-    #     x, multilevel = helmholtz.repetitive.bootstrap_repetitive._repetitive_eigen.generate_test_matrix(a, 0, num_examples=4, interpolation_method="ls")
+    #     x, multilevel = hm.repetitive.bootstrap_repetitive._repetitive_eigen.generate_test_matrix(a, 0, num_examples=4, interpolation_method="ls")
     #     assert len(multilevel) == 2
     #
     #     level = multilevel.finest_level
     #     # Convergence speed test.
-    #     relax_cycle = lambda x: helmholtz.setup_eigen.eigensolver.relax_cycle(multilevel, 1.0, 1, 1, 100).run(x)
+    #     relax_cycle = lambda x: hm.setup_eigen.eigensolver.relax_cycle(multilevel, 1.0, 1, 1, 100).run(x)
     #     # FMG start so x has a reasonable initial guess.
-    #     x = helmholtz.repetitive.bootstrap_repetitive._repetitive_eigen.fmg(multilevel, num_cycles_finest=0)
+    #     x = hm.repetitive.bootstrap_repetitive._repetitive_eigen.fmg(multilevel, num_cycles_finest=0)
     #     x, conv_factor = hm.solve.run.run_iterative_eigen_method(level.operator, relax_cycle, x, 20, print_frequency=1)
     #
     #     assert np.mean([level.rq(x[:, i]) for i in range(x.shape[1])]) == pytest.approx(0.097759, 1e-3)
@@ -200,7 +195,7 @@ class TestBootstrap5Point:
     #     n = 16
     #     kh = 0.5
     #     a = hm.linalg.helmholtz_1d_operator(kh, n)
-    #     x, multilevel = helmholtz.repetitive.bootstrap_repetitive._repetitive_eigen.generate_test_matrix(
+    #     x, multilevel = hm.repetitive.bootstrap_repetitive._repetitive_eigen.generate_test_matrix(
     #         a, 0, num_sweeps=20, num_examples=4, initial_max_levels=3)
     #     assert len(multilevel) == 3
     #
@@ -208,10 +203,10 @@ class TestBootstrap5Point:
     #
     #     # Convergence speed test.
     #     # FMG start so x has a reasonable initial guess.
-    #     x_init = helmholtz.repetitive.bootstrap_repetitive._repetitive_eigen.fmg(multilevel, num_cycles_finest=0, num_cycles=1)
+    #     x_init = hm.repetitive.bootstrap_repetitive._repetitive_eigen.fmg(multilevel, num_cycles_finest=0, num_cycles=1)
     #     #        multilevel.lam = exact_eigenpair(level.a)
     #
-    #     relax_cycle = lambda x: helmholtz.setup_eigen.eigensolver.relax_cycle(multilevel, 1.0, 1, 1, 100, num_levels=3).run(x)
+    #     relax_cycle = lambda x: hm.setup_eigen.eigensolver.relax_cycle(multilevel, 1.0, 1, 1, 100, num_levels=3).run(x)
     #     x, conv_factor = hm.solve.run.run_iterative_eigen_method(level.operator, relax_cycle, x_init, 15)
     #     assert np.mean([level.rq(x[:, i]) for i in range(x.shape[1])]) == pytest.approx(0.097759, 1e-3)
     #     assert conv_factor == pytest.approx(0.32, 1e-2)

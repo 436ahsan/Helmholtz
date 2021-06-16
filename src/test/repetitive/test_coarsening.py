@@ -4,7 +4,6 @@ import numpy as np
 from numpy.ma.testutils import assert_array_almost_equal
 
 import helmholtz as hm
-import helmholtz.setup
 
 logger = logging.getLogger("nb")
 
@@ -27,10 +26,10 @@ class TestCoarsening:
         a = hm.linalg.helmholtz_1d_operator(kh, n)
 
         # Generate relaxed test matrix.
-        level = helmholtz.setup.multilevel.Level.create_finest_level(a)
+        level = hm.repetitive.hierarchy.create_finest_level(a)
         x = hm.solve.run.random_test_matrix((n,))
         b = np.zeros_like(x)
-        x, _ = helmholtz.solve.run.run_iterative_method(level.operator, lambda x: level.relax(x, b), x, num_sweeps=num_sweeps)
+        x, _ = hm.solve.run.run_iterative_method(level.operator, lambda x: level.relax(x, b), x, num_sweeps=num_sweeps)
 
         # Generate coarse variables (R) based on a window of x.
         x_aggregate_t = x[:aggregate_size].transpose()
@@ -50,10 +49,10 @@ class TestCoarsening:
         a = hm.linalg.helmholtz_1d_operator(kh, n)
 
         # Generate relaxed test matrix.
-        level = helmholtz.setup.multilevel.Level.create_finest_level(a)
-        x = helmholtz.solve.run.random_test_matrix((n,))
+        level = hm.repetitive.hierarchy.create_finest_level(a)
+        x = hm.solve.run.random_test_matrix((n,))
         b = np.zeros_like(x)
-        x, _ = helmholtz.solve.run.run_iterative_method(level.operator, lambda x: level.relax(x, b), x, num_sweeps=num_sweeps)
+        x, _ = hm.solve.run.run_iterative_method(level.operator, lambda x: level.relax(x, b), x, num_sweeps=num_sweeps)
 
         # Generate coarse variables (R) based on different windows of x.
         # Note: all coarsenings and singular values will be almost identical except the two windows (offset = 29, 30)
@@ -74,10 +73,10 @@ class TestCoarsening:
         a = hm.linalg.helmholtz_1d_operator(kh, n)
 
         # Generate relaxed test matrix.
-        level = helmholtz.setup.multilevel.Level.create_finest_level(a)
+        level = hm.repetitive.hierarchy.create_finest_level(a)
         x = hm.solve.run.random_test_matrix((n,))
         b = np.zeros_like(x)
-        x, _ = helmholtz.solve.run.run_iterative_method(level.operator, lambda x: level.relax(x, b), x, num_sweeps=num_sweeps)
+        x, _ = hm.solve.run.run_iterative_method(level.operator, lambda x: level.relax(x, b), x, num_sweeps=num_sweeps)
 
         # Generate coarse variables (R) on the non-repetitive domain.
         r, aggregates = hm.setup.coarsening.create_coarsening_full_domain(x, threshold=0.15)

@@ -5,7 +5,6 @@ import scipy.sparse
 from typing import Tuple
 
 import helmholtz as hm
-import helmholtz.setup.interpolation_fit
 
 
 class Interpolator:
@@ -99,7 +98,7 @@ def create_interpolation_least_squares(x_aggregate_t: np.ndarray, xc_t: np.ndarr
     # Fit interpolation over an aggregate.
     alpha = np.array([0, 0.001, 0.01, 0.1, 1.0])
     num_examples = x_aggregate_t.shape[0]
-    fitter = helmholtz.setup.interpolation_fit.InterpolationFitter(
+    fitter = hm.setup.interpolation_fit.InterpolationFitter(
         x_aggregate_t, xc=xc_t, nbhr=nbhr,
         fit_samples=num_examples // 3, val_samples=num_examples // 3, test_samples=num_examples // 3)
     error, alpha_opt = fitter.optimized_relative_error(caliber, alpha, return_weights=True)

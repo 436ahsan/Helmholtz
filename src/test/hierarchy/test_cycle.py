@@ -2,8 +2,6 @@ import numpy as np
 import pytest
 
 import helmholtz as hm
-import helmholtz.solve
-from helmholtz.linalg import scaled_norm
 
 
 _EPS = 1e-15
@@ -19,12 +17,12 @@ class TestCycle:
         num_levels = 7
         tol = 1e-14 if isinstance(cycle_index, int) else 0.2
         processor = _LevelVisitCounter()
-        cycle = helmholtz.solve.cycle.Cycle(processor, cycle_index, num_levels)
+        cycle = hm.hierarchy.cycle.Cycle(processor, cycle_index, num_levels)
 
         cycle.run(0)
 
         ratio = 1. / _factors(processor.num_visits[:-1])
-        weighted_error = scaled_norm((ratio - cycle_index) * np.arange(num_levels - 2))
+        weighted_error = hm.linalg.scaled_norm((ratio - cycle_index) * np.arange(num_levels - 2))
         assert weighted_error < tol
 
 
@@ -33,7 +31,7 @@ def _factors(a):
     return np.exp(np.diff(-np.log(a)))
 
 
-class _LevelVisitCounter(helmholtz.solve.processor.Processor):
+class _LevelVisitCounter(hm.hierarchy.processor.Processor):
     def __init__(self):
         self.num_visits = None
 

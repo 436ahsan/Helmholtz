@@ -7,18 +7,17 @@ import numpy as np
 import scipy.sparse
 
 import helmholtz as hm
-import helmholtz.setup
-import helmholtz.repetitive.hierarchy
+import helmholtz.repetitive.hierarchy as hierarchy
 from helmholtz.linalg import scaled_norm
 
 _LOGGER = logging.getLogger(__name__)
 
 
 def generate_test_matrix(a: scipy.sparse.spmatrix, num_growth_steps: int, growth_factor: int = 2,
-                         num_bootstrap_steps: int = 1, aggregate_size: int = 4, num_sweeps: int = 10,
+                         num_bootstrap_steps: int = 1, num_sweeps: int = 10,
                          num_examples: int = None, print_frequency: int = None, initial_max_levels: int = 2,
                          interpolation_method: str = "svd",
-                         threshold: float = 0.1) -> Tuple[np.ndarray, np.ndarray, helmholtz.setup.multilevel.Multilevel]:
+                         threshold: float = 0.1) -> Tuple[np.ndarray, np.ndarray, hm.hierarchy.multilevel.Multilevel]:
     """
     Creates low-residual test functions and multilevel hierarchy on a large domain from the operator on a small window
     (the coarsest domain). This is similar to a full multigrid algorithm.
@@ -28,21 +27,21 @@ def generate_test_matrix(a: scipy.sparse.spmatrix, num_growth_steps: int, growth
         num_growth_steps: number of steps to increase the domain.
         growth_factor: by how much to increase the domain size at each growth step.
         num_bootstrap_steps: number of bootstrap steps to perform on each domain.
-        aggregate_size: aggregate size = #fine vars per aggregate
         num_sweeps: number of relaxations or cycles to run on fine-level vectors to improve them.
         num_examples: number of test functions to generate. If None, uses 4 * np.prod(window_shape).
         print_frequency: print debugging convergence statements per this number of relaxation cycles/sweeps.
           None means no printouts.
         initial_max_levels: number of levels to employ at the smallest domain size.
         interpolation_method: type of interpolation ("svd"|"ls").
+        threshold: coarsening accuracy threshold.
 
     Returns:
         x: test matrix on the largest (final) domain.
         multilevel: multilevel hierarchy on the largest (final) domain.
     """
     # Initialize test functions (to random) and hierarchy at coarsest level.
-    level = helmholtz.setup.multilevel.Level.create_finest_level(a)
-    multilevel = helmholtz.setup.multilevel.Multilevel(level)
+    level = hierarchy.create_finest_level(a)
+    multilevel = hm.hierarchy.multilevel.Multilevel(level)
     # TODO(orenlivne): generalize to d-dimensions. This is specific to 1D.
     domain_shape = (a.shape[0],)
     x = hm.solve.run.random_test_matrix(domain_shape, num_examples=num_examples)
@@ -70,10 +69,10 @@ def generate_test_matrix(a: scipy.sparse.spmatrix, num_growth_steps: int, growth
     return x, multilevel
 
 
-def bootstap(x, multilevel: helmholtz.setup.multilevel.Multilevel, max_levels: int,
+def bootstap(x, multilevel: hm.hierarchy.multilevel.Multilevel, max_levels: int,
              num_sweeps: int = 10, threshold: float = 0.1, caliber: int = 2, interpolation_method: str = "svd",
              print_frequency: int = None) -> \
-        Tuple[np.ndarray, helmholtz.setup.multilevel.Multilevel]:
+        Tuple[np.ndarray, hm.hierarchy.multilevel.Multilevel]:
     """
     Improves test functions and a multilevel hierarchy on a fixed-size domain by bootstrapping.
     Args:
@@ -104,7 +103,7 @@ def bootstap(x, multilevel: helmholtz.setup.multilevel.Multilevel, max_levels: i
     # Recreate all coarse levels. One down-pass, relaxing at each level, hopefully starting from improved x so the
     # process improves all levels.
     # TODO(orenlivne): add nested bootstrap cycles if needed.
-    new_multilevel = helmholtz.setup.multilevel.Multilevel(level)
+    new_multilevel = hm.hierarchy.multilevel.Multilevel(level)
     # Keep the x's of coarser levels in x_level; keep 'x' pointing to the finest test matrix.
     x_level = x
     for l in range(1, max_levels):
@@ -113,7 +112,7 @@ def bootstap(x, multilevel: helmholtz.setup.multilevel.Multilevel, max_levels: i
         r, p, _ = create_transfer_operators(x_level, domain_size, threshold=threshold, caliber=caliber,
                                             interpolation_method=interpolation_method)
         # 'level' now becomes the next coarser level and x_level the corresponding test matrix.
-        level = helmholtz.repetitive.hierarchy.create_tiled_coarse_level(level.a, level.b, r, p)
+        level = hierarchy.create_tiled_coarse_level(level.a, level.b, r, p)
         new_multilevel.level.append(level)
         if l < max_levels - 1:
             x_level = level.restrict(x_level)
@@ -142,7 +141,7 @@ def fmg(multilevel, nu_pre: int = 1, nu_post: int = 1, nu_coarsest: int = 10, nu
         r_norm = scaled_norm(level.operator(x0))
         x_norm = scaled_norm(x0)
         _LOGGER.debug("FMG level {} init |r| {:.8e} RER {:.5f}".format(l, r_norm, r_norm / x_norm))
-        relax_cycle = helmholtz.solve.cycle.Cycle(processor, cycle_index, coarsest - l + 1, finest=l)
+        relax_cycle = hm.hierarchy.cycle.Cycle(processor, cycle_index, coarsest - l + 1, finest=l)
         for _ in range(num_cycles):
             x = relax_cycle.run((x))
 
@@ -170,7 +169,7 @@ def fmg(multilevel, nu_pre: int = 1, nu_post: int = 1, nu_coarsest: int = 10, nu
 
 def create_transfer_operators(x, domain_size: int, threshold: float = 0.1, caliber: int = 2,
                               interpolation_method: str = "svd", max_coarsening_ratio: float = 0.5) -> \
-        Tuple[helmholtz.setup.coarsening.Coarsener, helmholtz.setup.interpolation.Interpolator]:
+        Tuple[hm.setup.coarsening.Coarsener, hm.setup.interpolation.Interpolator]:
     """
     Creates the next coarse level's R and P operators.
     Args:

@@ -1,8 +1,6 @@
 import scipy.sparse
 
 import helmholtz as hm
-import helmholtz.solve
-import helmholtz.repetitive
 
 
 class TestWindowSvd:
@@ -12,9 +10,8 @@ class TestWindowSvd:
         kh = 0.5
         window_shape = (n,)
         a = hm.linalg.helmholtz_1d_operator(kh, n)
-        relaxer = helmholtz.solve.relax.KaczmarzRelaxer(a, scipy.sparse.eye(a.shape[0]))
 
-        s, vh = helmholtz.repetitive.window_svd.get_window_svd(a, window_shape, num_sweeps=1000)
+        s, vh = hm.repetitive.window_svd.get_window_svd(a, window_shape, num_sweeps=1000)
 
         # For sufficiently smooth test vectors, the SVD should reveal two large singular values (corresponding to the
         # sine and cosine null-space components / left- and right-travelling waves) and the rest are small.
