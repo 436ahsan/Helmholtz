@@ -9,6 +9,7 @@ import scipy.sparse
 import helmholtz as hm
 import helmholtz.setup
 import helmholtz.setup_eigen.eigensolver
+import helmholtz.repetitive.hierarchy
 from helmholtz.linalg import scaled_norm
 
 _LOGGER = logging.getLogger(__name__)
@@ -41,8 +42,8 @@ def generate_test_matrix(a: scipy.sparse.spmatrix, num_growth_steps: int, growth
         multilevel: multilevel hierarchy on the largest (final) domain.
     """
     # Initialize test functions (to random) and hierarchy at coarsest level.
-    level =helmholtz.setup.multilevel.Level.create_finest_level(a)
-    multilevel =helmholtz.setup.multilevel.Multilevel(level)
+    level = helmholtz.setup.multilevel.Level.create_finest_level(a)
+    multilevel = helmholtz.setup.multilevel.Multilevel(level)
     # TODO(orenlivne): generalize to d-dimensions. This is specific to 1D.
     domain_shape = (a.shape[0],)
     x = helmholtz.solve.run.random_test_matrix(domain_shape, num_examples=num_examples)
@@ -113,7 +114,7 @@ def bootstap(x, lam, multilevel:helmholtz.setup.multilevel.Multilevel, max_level
     # Recreate all coarse levels. One down-pass, relaxing at each level, hopefully starting from improved x so the
     # process improves all levels.
     # TODO(orenlivne): add nested bootstrap cycles if needed.
-    new_multilevel =helmholtz.setup.multilevel.Multilevel(level)
+    new_multilevel = helmholtz.setup.multilevel.Multilevel(level)
     # Keep the x's of coarser levels in x_level; keep 'x' pointing to the finest test matrix.
     x_level = x
     for l in range(1, max_levels):
@@ -123,7 +124,7 @@ def bootstap(x, lam, multilevel:helmholtz.setup.multilevel.Multilevel, max_level
                                          aggregate_size=aggregate_size, threshold=threshold, caliber=caliber,
                                          interpolation_method=interpolation_method)
         # 'level' now becomes the next coarser level and x_level the corresponding test matrix.
-        level =helmholtz.setup.multilevel.Level.create_coarse_level(level.a, level.b, r, p)
+        level = helmholtz.repetitive.hierarchy.create_tiled_coarse_level(level.a, level.b, r, p)
         new_multilevel.level.append(level)
         x_level = level.restrict(x_level)
         b = np.zeros_like(x_level)

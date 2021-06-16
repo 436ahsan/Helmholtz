@@ -2,6 +2,7 @@
 coarse neighborhoods based on domain periodicity)."""
 import numpy as np
 import scipy.sparse
+from typing import Tuple
 
 import helmholtz as hm
 import helmholtz.setup.interpolation_fit
@@ -77,13 +78,13 @@ def create_interpolation(method: str, r: np.ndarray, x_aggregate_t: np.ndarray, 
         return Interpolator(np.tile(np.arange(nc, dtype=int)[:, None], r.shape[1]).transpose(),
                             r.transpose(), nc)
     elif method == "ls":
-        return _create_interpolation_least_squares(x_aggregate_t, xc_t, domain_size, nc, caliber)
+        return create_interpolation_least_squares(x_aggregate_t, xc_t, domain_size, nc, caliber)
     else:
         raise Exception("Unsupported interpolation method '{}'".format(method))
 
 
-def _create_interpolation_least_squares(x_aggregate_t: np.ndarray, xc_t: np.ndarray, domain_size: int, nc: int,
-                                        caliber: int) -> Interpolator:
+def create_interpolation_least_squares(x_aggregate_t: np.ndarray, xc_t: np.ndarray, domain_size: int, nc: int,
+                                       caliber: int) -> Interpolator:
     """Defines interpolation to an aggregate by LS fitting to coarse neighbors of each fine var. The global
     interpolation P is the tiling of the aggregate P over the domain."""
 
@@ -105,6 +106,34 @@ def _create_interpolation_least_squares(x_aggregate_t: np.ndarray, xc_t: np.ndar
     # Interpolation validation error = error[:, 1]
     data = error[:, 2:]
     return hm.setup.interpolation.Interpolator(nbhr[:, :caliber], data, nc)
+
+
+def create_interpolation_least_squares_auto_nbhrs(
+        x: np.ndarray, a: scipy.sparse.csr_matrix, r: scipy.sparse.csr_matrix) -> \
+        Tuple[scipy.sparse.csr_matrix, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """
+    Creates the interpolation operator P by least squares fitting from r*x to x. Interpolatory sets are automatically
+    determined by a's graph.
+    Args:
+        x_t: fine-level test matrix. shape = (num_fine_vars, num_examples).
+        a: fine-level operator (only its adjacency graph is used herer).
+        r: coarsening operator.
+
+    Returns:
+        interpolation matrix P,
+        relative fit error at all fine points,
+        relative validation error at all fine points,
+        relative test error at all fine points,
+        optimal alpha for all fine points.
+    """
+    # Define interpolation neighbors. We use as much neighbors of each fine point in an aggregate such that the coarse
+    # stencil is not increased beyond its size if we only interpolated the from aggregate's coarse variables. This is
+    # the union of all coarse variables in all aggregates of the points in i's fine-level (a) stencil.
+    nbhr = [np.unique(r[:, a[i].nonzero()[1]].nonzero()[0]) for i in range(x.shape[0])]
+    # Ridge regularization parameter (list of values).
+    alpha = np.array([0, 0.01, 0.1, 0.1, 1])
+    return hm.setup.interpolation_fit.create_interpolation_least_squares(
+        x.transpose(), r.dot(x).transpose(), nbhr, alpha)
 
 
 def _geometric_neighbors(w: int, nc: int):

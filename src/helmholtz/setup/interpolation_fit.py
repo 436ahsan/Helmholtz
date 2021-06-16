@@ -4,6 +4,7 @@ import numpy as np
 import scipy.linalg
 import sklearn.metrics.pairwise
 from numpy.linalg import norm
+from typing import List, Tuple
 
 _SMALL_NUMBER = 1e-15
 
@@ -172,6 +173,107 @@ def fit_interpolation(xc_fit, x_fit, xc_val, x_val, alpha, intercept: bool = Fal
         if isinstance(alpha, (list, np.ndarray)) else np.array(_solution_and_errors(alpha))
 
 
+def optimized_fit_interpolation(xc_fit, x_fit, xc_val, x_val, alpha: np.ndarray, intercept: bool = False,
+                                return_weights: bool = False) -> Tuple[float, np.ndarray]:
+    """
+    Fits interpolation from xc_fit to x_fit using Ridge regression and chooses the optimal regularization parameter
+    to minimize validation fit error.
+
+    Args:
+        xc_fit: coarse variable matrix of the k nearest neighbors of x_fit to fit interpolation from. Each column is a
+          coarse variable. Each row is a sample. Note: must have more rows than columns for an over-determined
+          least-squares.
+        x_fit: fine variable vector to fit interpolation to. Each column is a fine variable. Row are samples.
+        xc_val: coarse activation matrix of validation samples.
+        x_val: fine variable vector of validation samples.
+        alpha: Ridge regularization parameter (list of values).
+        intercept: whether to add an intercept or not.
+        return_weights: if True, returns the interpolation coefficients + errors. Otherwise, just errors.
+
+    Retuns: Tuple (alpha, info)
+        alpha: optimal regularization parameter
+        info: (2 + (k + intercept) * return_weights) vector containing the [interpolation coefficients and]
+        relative interpolation error on fitting samples and validation samples or each value in alpha. If
+        intercept = True, its coefficient is info[:, 2], and subsequent columns correspond to the nearest xc neighbors
+        in order of descending proximity.
+    """
+    info = fit_interpolation(xc_fit, x_fit, xc_val, x_val, alpha, intercept=intercept, return_weights=return_weights)
+    # Minimize validation error.
+    alpha_opt_index = np.argmin(info[:, 1])
+    return alpha[alpha_opt_index], info[alpha_opt_index]
+
+
+def create_interpolation_least_squares(
+        x: np.ndarray,
+        xc: np.ndarray,
+        nbhr: List[np.ndarray],
+        alpha: np.ndarray,
+        fit_samples: int = None,
+        val_samples: int = None,
+        test_samples: int = None) -> Tuple[scipy.sparse.csr_matrix, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """
+    Creates the next coarse level's R and P operators.
+    Args:
+        x: fine-level test matrix.
+        xc: coarse-level test matrix.
+        nbhr: list of neighbor lists for all fine points.
+        alpha: Ridge regularization parameter (list of values).
+        fit_samples: number of samples to use for fitting interpolation.
+        val_samples: number of samples to use for determining interpolation fitting regularization parameter.
+        test_samples: number of samples to use for testing interpolation generalization.
+
+    Returns:
+        interpolation matrix P,
+        relative fit error at all fine points,
+        relative validation error at all fine points,
+        relative test error at all fine points,
+        optimal alpha for all fine points.
+    """
+    # Divide into folds.
+    num_examples, n = x.shape
+    assert len(nbhr) == n
+    nc = xc.shape[1]
+    if fit_samples is None or val_samples is None or test_samples is None:
+        fit_samples, val_samples, test_samples = num_examples // 3, num_examples // 3, num_examples // 3
+    fit_range = (0, fit_samples)
+    val_range = (fit_samples, fit_samples + val_samples)
+    test_range = (fit_samples + val_samples, fit_samples + val_samples + test_samples)
+    xc_fit  = xc[fit_range [0]:fit_range [1]]
+    x_fit   = x [fit_range [0]:fit_range [1]]
+    xc_val  = xc[val_range [0]:val_range [1]]
+    x_val   = x [val_range [0]:val_range [1]]
+    xc_test = xc[test_range[0]:test_range[1]]
+    x_test  = x [test_range[0]:test_range[1]]
+
+    # Fit interpolation by least-squares.
+    result = [optimized_fit_interpolation(xc_fit[:, nbhr_i], x_fit[:, i], xc_val[:, nbhr_i], x_val[:, i],
+                                          alpha, return_weights=True)
+              for i, nbhr_i in enumerate(nbhr)]
+    alpha_opt = np.array([row[0] for row in result])
+    info = [row[1] for row in result]
+    # In each info element:
+    # Interpolation fit error = error[:, 0]
+    # Interpolation validation error = error[:, 1]
+    # Interpolation coefficients = error[:, 2:]
+    fit_error = np.array([info_i[0] for info_i in info])
+    val_error = np.array([info_i[1] for info_i in info])
+
+    # Build the sparse interpolation matrix.
+    row = np.concatenate(tuple([i] * len(nbhr_i) for i, nbhr_i in enumerate(nbhr)))
+    col = np.concatenate(tuple(nbhr))
+    data = np.concatenate(tuple(info_i[2:] for info_i in info))
+    p = scipy.sparse.coo_matrix((data, (row, col)), shape=(n, nc)).tocsr()
+
+    return p, fit_error, val_error, _relative_interpolation_error(p, x_test, xc_test), alpha_opt
+
+
 def _filtered_mean(x):
     """Returns the mean of x except large outliers."""
     return x[x <= 3 * np.median(x)].mean()
+
+
+def _relative_interpolation_error(p: scipy.sparse.csr_matrix, x: np.ndarray, xc: np.ndarray):
+    """Returns the relative interpolation error (error norm is L2 norm over all test vectors, for each fine
+    point)."""
+    px = p.dot(xc.transpose()).transpose()
+    return norm(x - px, axis=1) / norm(x, axis=1)

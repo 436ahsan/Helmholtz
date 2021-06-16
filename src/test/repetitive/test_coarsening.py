@@ -1,7 +1,7 @@
 import logging
 import sys
-
 import numpy as np
+from numpy.ma.testutils import assert_array_almost_equal
 
 import helmholtz as hm
 import helmholtz.setup
@@ -19,7 +19,7 @@ class TestCoarsening:
                             datefmt="%a, %d %b %Y %H:%M:%S")
         np.random.seed(1)
 
-    def test_coarsening(self):
+    def test_repetitive_coarsening(self):
         n = 32
         kh = 0.6
         num_sweeps = 100
@@ -27,7 +27,7 @@ class TestCoarsening:
         a = hm.linalg.helmholtz_1d_operator(kh, n)
 
         # Generate relaxed test matrix.
-        level =helmholtz.setup.multilevel.Level.create_finest_level(a)
+        level = helmholtz.setup.multilevel.Level.create_finest_level(a)
         x = hm.solve.run.random_test_matrix((n,))
         b = np.zeros_like(x)
         x, _ = helmholtz.solve.run.run_iterative_method(level.operator, lambda x: level.relax(x, b), x, num_sweeps=num_sweeps)
@@ -42,7 +42,7 @@ class TestCoarsening:
 
         assert r_csr.shape == (16, 32)
 
-    def test_coarsening_is_same_in_different_windows(self):
+    def test_repetitive_coarsening_is_same_in_different_windows(self):
         n = 32
         kh = 0.1 # 0.6
         num_sweeps = 100
@@ -50,7 +50,7 @@ class TestCoarsening:
         a = hm.linalg.helmholtz_1d_operator(kh, n)
 
         # Generate relaxed test matrix.
-        level =helmholtz.setup.multilevel.Level.create_finest_level(a)
+        level = helmholtz.setup.multilevel.Level.create_finest_level(a)
         x = helmholtz.solve.run.random_test_matrix((n,))
         b = np.zeros_like(x)
         x, _ = helmholtz.solve.run.run_iterative_method(level.operator, lambda x: level.relax(x, b), x, num_sweeps=num_sweeps)
@@ -65,3 +65,36 @@ class TestCoarsening:
         # R should not change much across different windows.
         mean_entry_error = np.mean(((np.std(r_by_offset, axis=0) / np.mean(np.abs(r_by_offset), axis=0)).flatten()))
         assert mean_entry_error <= 0.03
+
+    def test_create_coarsening_full_domain(self):
+        n = 16
+        kh = 0.6
+        num_sweeps = 100
+        aggregate_size = 4
+        a = hm.linalg.helmholtz_1d_operator(kh, n)
+
+        # Generate relaxed test matrix.
+        level = helmholtz.setup.multilevel.Level.create_finest_level(a)
+        x = hm.solve.run.random_test_matrix((n,))
+        b = np.zeros_like(x)
+        x, _ = helmholtz.solve.run.run_iterative_method(level.operator, lambda x: level.relax(x, b), x, num_sweeps=num_sweeps)
+
+        # Generate coarse variables (R) on the non-repetitive domain.
+        r, aggregates = hm.setup.coarsening.create_coarsening_full_domain(x, threshold=0.15)
+
+        assert [a.tolist() for a in aggregates] == [[0, 1, 2, 3], [4, 5, 6, 7], [8, 9, 10, 11], [12, 13, 14, 15]]
+        assert r.shape == (8, 16)
+        # To print r:
+        # print(','.join(np.array2string(y, separator=",", formatter={'float_kind':lambda x: "%.2f" % x})
+        # for y in np.array(r.todense())))
+        assert_array_almost_equal(
+            r.todense(), [
+            [0.58, 0.67, 0.46, 0.08, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00],
+            [-0.47, -0.01, 0.47, 0.75, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00],
+            [0.00, 0.00, 0.00, 0.00, -0.46, -0.62, -0.56, -0.30, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00],
+            [0.00, 0.00, 0.00, 0.00, 0.60, 0.20, -0.33, -0.71, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00],
+            [0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.44, 0.63, 0.57, 0.29, 0.00, 0.00, 0.00, 0.00],
+            [0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, -0.60, -0.19, 0.33, 0.70, 0.00, 0.00, 0.00, 0.00],
+            [0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, -0.37, -0.58, -0.59, -0.43],
+            [0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.65, 0.30, -0.23, -0.65]
+        ], decimal=2)

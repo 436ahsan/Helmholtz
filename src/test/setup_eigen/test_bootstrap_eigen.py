@@ -45,10 +45,10 @@ class TestBootstrapEigen:
         n = 16
         kh = 0.5
         a = hm.linalg.helmholtz_1d_operator(kh, n)
-        level =helmholtz.setup.multilevel.Level.create_finest_level(a)
-        multilevel =helmholtz.setup.multilevel.Multilevel(level)
+        level = helmholtz.setup.multilevel.Level.create_finest_level(a)
+        multilevel = helmholtz.setup.multilevel.Multilevel(level)
         x = helmholtz.solve.run.random_test_matrix((n,), num_examples=1)
-        multilevel =helmholtz.setup.multilevel.Multilevel(level)
+        multilevel = helmholtz.setup.multilevel.Multilevel(level)
         # Run enough Kaczmarz relaxations per lambda update (not just 1 relaxation) so we converge to the minimal one.
         nu = 5
         lam = 0

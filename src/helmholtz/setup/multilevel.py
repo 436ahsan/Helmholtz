@@ -30,15 +30,10 @@ class Level:
     def create_finest_level(a):
         return Level(a, scipy.sparse.eye(a.shape[0]), None, None, None, None)
 
-    @staticmethod
-    def create_coarse_level(a, b, r, p):
-        num_aggregates = a.shape[0] // r.asarray().shape[1]
-        r_csr = r.tile(num_aggregates)
-        p_csr = p.tile(num_aggregates)
-        # Form Galerkin coarse-level operator.
-        ac = (r_csr.dot(a)).dot(p_csr)
-        bc = (r_csr.dot(b)).dot(p_csr)
-        return Level(ac, bc, r, p, r_csr, p_csr)
+    @property
+    def size(self):
+        """Returns the number of variables in this level."""
+        return self.a.shape[0]
 
     def print(self):
         _LOGGER.info("a = \n" + str(self.a.toarray()))

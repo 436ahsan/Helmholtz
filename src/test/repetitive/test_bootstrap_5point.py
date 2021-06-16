@@ -130,8 +130,8 @@ class TestBootstrap5Point:
 
         # Initialize test functions (to random) and hierarchy at coarsest level.
         a = hm.linalg.helmholtz_1d_5_point_operator(kh, n)
-        level =helmholtz.setup.multilevel.Level.create_finest_level(a)
-        multilevel =helmholtz.setup.multilevel.Multilevel(level)
+        level = helmholtz.setup.multilevel.Level.create_finest_level(a)
+        multilevel = helmholtz.setup.multilevel.Multilevel(level)
         domain_shape = (a.shape[0],)
         x = hm.solve.run.random_test_matrix(domain_shape, num_examples=num_examples)
         assert norm(a.dot(x)) / norm(x) == pytest.approx(3.155, 1e-3)
