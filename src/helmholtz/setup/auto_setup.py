@@ -7,6 +7,7 @@ import numpy as np
 import scipy.sparse
 
 import helmholtz as hm
+import helmholtz.solve
 import helmholtz.setup.coarsening as coarsening
 import helmholtz.setup.interpolation as interpolation
 import helmholtz.setup.multilevel as hsl
@@ -21,7 +22,7 @@ def setup(a: scipy.sparse.spmatrix,
           num_bootstrap_steps: int = 1,
           num_sweeps: int = 10,
           num_examples: int = None, print_frequency: int = None,
-          interpolation_method: str = "svd",
+          interpolation_method: str = "ls",
           threshold: float = 0.1,
           max_coarsest_level_size: int = 10) -> Tuple[np.ndarray, np.ndarray, hsl.Multilevel]:
     """
@@ -52,9 +53,10 @@ def setup(a: scipy.sparse.spmatrix,
     x = helmholtz.solve.run.random_test_matrix(domain_shape, num_examples=num_examples)
     # Improve vectors with 1-level relaxation.
     _LOGGER.info("Relax at level {}".format(finest))
+    b = np.zeros_like(x)
     x, conv_factor = helmholtz.solve.run.run_iterative_method(
         level.operator, lambda x: level.relax(x, b), x,num_sweeps=num_sweeps)
-    _LOGGER.info("Relax convergence factor {:.3f}".format(relax))
+    _LOGGER.info("Relax convergence factor {:.3f}".format(conv_factor))
 
     # Bootstrap with an increasingly deeper hierarchy (add one level at a time).
     for num_levels in range(2, max_levels + 1):
@@ -92,6 +94,7 @@ def bootstap(x, multilevel: hsl.Multilevel, num_levels: int,
     # TODO(orenlivne): update parameters of relaxation cycle to reasonable values if needed.
     def relax_cycle(x):
         return hm.solve.relax_cycle.relax_cycle(multilevel, 1.0, 2, 2, 4).run(x)
+    level = multilevel.level[0]
     x, _ = helmholtz.solve.run.run_iterative_method(level.operator, relax_cycle, x, num_sweeps)
 
     # Recreate all coarse levels. One down-pass, relaxing at each level, hopefully starting from improved x so the
@@ -102,11 +105,11 @@ def bootstap(x, multilevel: hsl.Multilevel, num_levels: int,
     x_level = x
     for l in range(1, num_levels):
         _LOGGER.info("Coarsening level {}->{}".format(l - 1, l))
-        r, aggregates = create_coarsening(x_level, threshold)
-        p = _create_interpolation(r, x_level)
+        r, aggregates = hm.setup.coarsening.create_coarsening_full_domain(x_level, threshold=threshold)
+        p = _create_interpolation(x_level, level.a, r, interpolation_method)
 
         # 'level' now becomes the next coarser level and x_level the corresponding test matrix.
-        level = hsl.Level.create_coarse_level(level.a, level.b, r, p)
+        level = _create_coarse_level(level.a, level.b, r, p)
         new_multilevel.level.append(level)
         if l < num_levels - 1:
             x_level = level.restrict(x_level)
@@ -118,17 +121,23 @@ def bootstap(x, multilevel: hsl.Multilevel, num_levels: int,
     return x, new_multilevel
 
 
-def _create_interpolation(r, x_level):
+def _create_interpolation(x: np.ndarray, a: scipy.sparse.csr_matrix, r: scipy.sparse.csr_matrix, method: str) -> \
+    scipy.sparse.csr_matrix:
     if method == "svd":
         p = r.transpose()
     elif method == "ls":
-        p = create_interpolation(x_level, a, r)
+        p, fit_error, val_error, test_error, alpha_opt = \
+            hm.setup.interpolation.create_interpolation_least_squares_auto_nbhrs(x, a, r)
+        _LOGGER.info("P error: fit {:.3f} val {:.3f} test {:.3f} alpha mean {:.3f}".format(
+            max(fit_error), max(val_error), max(test_error), alpha_opt.mean()
+        ))
     else:
         raise Exception("Unsupported interpolation method '{}'".format(method))
     return p
 
 
-def create_coarse_level(a, b, r: np.ndarray, p: np.ndarray) -> hsl.Level:
+def _create_coarse_level(a: scipy.sparse.csr_matrix, b: scipy.sparse.csr_matrix,
+                         r: scipy.sparse.csr_matrix, p: scipy.sparse.csr_matrix) -> hsl.Level:
     """
     Creates a tiled coarse level.
     Args:
@@ -139,10 +148,7 @@ def create_coarse_level(a, b, r: np.ndarray, p: np.ndarray) -> hsl.Level:
 
     Returns: coarse level object.
     """
-    num_aggregates = a.shape[0] // r.asarray().shape[1]
-    r_csr = r.tile(num_aggregates)
-    p_csr = p.tile(num_aggregates)
     # Form Galerkin coarse-level operator.
-    ac = (r_csr.dot(a)).dot(p_csr)
-    bc = (r_csr.dot(b)).dot(p_csr)
-    return helmholtz.setup.multilevel.Level(ac, bc, r, p, r_csr, p_csr)
+    ac = (r.dot(a)).dot(p)
+    bc = (r.dot(b)).dot(p)
+    return helmholtz.setup.multilevel.Level(ac, bc, None, None, r, p)

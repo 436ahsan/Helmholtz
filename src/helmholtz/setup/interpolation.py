@@ -132,8 +132,12 @@ def create_interpolation_least_squares_auto_nbhrs(
     nbhr = [np.unique(r[:, a[i].nonzero()[1]].nonzero()[0]) for i in range(x.shape[0])]
     # Ridge regularization parameter (list of values).
     alpha = np.array([0, 0.01, 0.1, 0.1, 1])
+    num_examples = x.shape[1]
     return hm.setup.interpolation_fit.create_interpolation_least_squares(
-        x.transpose(), r.dot(x).transpose(), nbhr, alpha)
+        x.transpose(), r.dot(x).transpose(), nbhr, alpha,
+        fit_samples=int(0.5 * num_examples),
+        val_samples=int(0.25 * num_examples),
+        test_samples=int(0.25 * num_examples))
 
 
 def _geometric_neighbors(w: int, nc: int):

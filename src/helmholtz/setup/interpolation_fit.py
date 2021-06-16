@@ -149,6 +149,7 @@ def fit_interpolation(xc_fit, x_fit, xc_val, x_val, alpha, intercept: bool = Fal
     if intercept:
         xc_fit = np.concatenate((np.ones((xc_fit.shape[0], 1)), xc_fit), axis=1)
     m, n = xc_fit.shape
+    assert m > n, "Number of samples must be > number of variables for LS fitting."
     x_fit_norm = norm(x_fit)
 
     # The SVD computation part that does not depend on alpha.
