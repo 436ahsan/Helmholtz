@@ -92,7 +92,7 @@ class EigenProcessor(hm.hierarchy.processor.Processor):
         lc = l + 1
         coarse_level = self._multilevel.level[lc]
         x, lam = self._x[l], self._lam
-        xc_initial = coarse_level.restrict(x)
+        xc_initial = coarse_level.coarsen(x)
         self._x_initial[lc] = xc_initial
         self._x[lc] = xc_initial
         self._b[lc] = coarse_level.restrict(self._b[l] - level.operator(x, lam)) + \

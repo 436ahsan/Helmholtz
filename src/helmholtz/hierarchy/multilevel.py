@@ -17,12 +17,24 @@ class Level:
     """A single level in the multilevel hierarchy."""
 
     def __init__(self, a, b, relaxer, r, p, r_csr, p_csr):
+        """
+        Creates a level in the multilevel hierarchy.
+        Args:
+            a: level operator.
+            b: level mass matrix.
+            relaxer: relaxation execution object.
+            r: coarsening operator (type of coarse variables that this level is).
+            p: this-level-to-next-finer-level interpolation.
+            r_csr: coarsening operator in CSR matrix form (for repetitive problems).
+            p_csr: interpolation operator in CSR matrix form (for repetitive problems).
+        """
         self.a = a
         self.b = b
         self.r = r
         self.p = p
         self._r_csr = r_csr
         self._p_csr = p_csr
+        self._restriction_csr = p_csr.transpose() if p_csr is not None else None
         self._relaxer = relaxer
 
     @staticmethod
@@ -117,6 +129,17 @@ class Level:
         return self._relaxer.step(x, b, lam=lam)
 
     def restrict(self, x: np.array) -> np.array:
+        """
+        Returns the restriction action P^T*x.
+        Args:
+            x: vector of size n or a matrix of size n x m.
+
+        Returns:
+            P^T*x.
+        """
+        return self._restriction_csr.dot(x)
+
+    def coarsen(self, x: np.array) -> np.array:
         """
         Returns the coarsening action R*x.
         Args:

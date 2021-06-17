@@ -16,7 +16,7 @@ class TestBootstrap5Point:
         """Fixed random seed for deterministic results."""
         np.set_printoptions(precision=6, linewidth=1000)
         for handler in logging.root.handlers[:]: logging.root.removeHandler(handler)
-        logging.basicConfig(stream=sys.stdout, level=logging.DEBUG, format="%(message)s")
+        logging.basicConfig(stream=sys.stdout, level=logging.WARN, format="%(message)s")
         np.random.seed(0)
 
     def test_run_1_level_relax(self):
@@ -84,7 +84,7 @@ class TestBootstrap5Point:
 
         ac_0 = coarse_level.a[0]
         coarse_level.print()
-        assert_array_equal(ac_0.nonzero()[1], [0, 7, 1])
+        assert_array_equal(ac_0.nonzero()[1], [0, 1, 7])
         assert_array_almost_equal(ac_0.data, [-1.176528,  0.578403,  0.578403])
 
         # Vectors have much lower residual after 2-level relaxation cycles.

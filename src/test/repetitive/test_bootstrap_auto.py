@@ -19,7 +19,7 @@ class TestBootstrapAuto:
         """Fixed random seed for deterministic results."""
         np.set_printoptions(precision=6, linewidth=1000)
         for handler in logging.root.handlers[:]: logging.root.removeHandler(handler)
-        logging.basicConfig(stream=sys.stdout, level=logging.DEBUG, format="%(message)s")
+        logging.basicConfig(stream=sys.stdout, level=logging.WARN, format="%(message)s")
         np.random.seed(0)
         np.set_printoptions(linewidth=200, precision=2)
 
@@ -68,9 +68,9 @@ class TestBootstrapAuto:
 
         # Test two-level cycle convergence for A*x=0.
         two_level_cycle = lambda x: hm.solve.solve_cycle.solve_cycle(multilevel, 1.0, 1, 1).run(x)
-        # FMG start so x has a reasonable initial guess.
-        x, conv_factor = hm.solve.run.run_iterative_method(level.operator, two_level_cycle, x, 20)
-        assert conv_factor == pytest.approx(0.375, 1e-2)
+        x0 = np.random.random((a.shape[0], ))
+        x, conv_factor = hm.solve.run.run_iterative_method(level.operator, two_level_cycle, x0, 20)
+        assert conv_factor == pytest.approx(0.23, 1e-2)
 
 
     def test_laplace_2_level_bootstrap(self):
@@ -106,12 +106,14 @@ class TestBootstrapAuto:
 
         ac_0 = coarse_level.a[0]
         coarse_level.print()
-        assert_array_equal(ac_0.nonzero()[1], [7, 6, 2, 1, 0])
-        assert_array_almost_equal(ac_0.data, [0.55, -0.08, -0.1, 0.59, -0.96], decimal=2)
+        assert_array_equal(ac_0.nonzero()[1], [0, 1, 2, 3, 5, 6, 7])
+        assert_array_almost_equal(ac_0.data,
+                                  [-0.941028,  0.564876, -0.107981,  0.014992,  0.013662, -0.112899,  0.568408],
+                                  decimal=5)
 
         # Vectors have lower residual after 2-level relaxation cycles than after relaxation only.
         assert (hm.linalg.scaled_norm_of_matrix(a.dot(x)) / hm.linalg.scaled_norm_of_matrix(x)).mean() == \
-               pytest.approx(0.0438, 1e-2)
+               pytest.approx(0.0315, 1e-2)
 
     def test_helmholtz_coarsening(self):
         n = 16
@@ -154,12 +156,19 @@ class TestBootstrapAuto:
         assert norm(a.dot(x)) / norm(x) == pytest.approx(2.91, 1e-2)
 
         # Residual norm decreases fast during the first 3 bootstrap cycles, then saturates.
-        expected_residual_norms = [0.175, 0.049, 0.0637, 0.0626, 0.0509, 0.0464, 0.0442, 0.04278]
+        expected_residual_norms = [0.175, 0.0677, 0.0502, 0.0473, 0.0444, 0.044, 0.0417, 0.0454]
+        expected_conv_factor = [0.36, 0.36, 0.36, 0.36, 0.36, 0.36, 0.36, 0.36]
 
         # Relax vector + coarsen in first iteration; then 2-level cycle + improve hierarchy (bootstrap).
         for i, expected_residual_norm in enumerate(expected_residual_norms):
             x, multilevel = hm.setup.auto_setup.bootstap(x, multilevel, max_levels, num_sweeps=10)
             assert norm(a.dot(x)) / norm(x) == pytest.approx(expected_residual_norm, 1e-2)
+
+            # Test two-level cycle convergence for A*x=0.
+            two_level_cycle = lambda x: hm.solve.solve_cycle.solve_cycle(multilevel, 1.0, 1, 1).run(x)
+            x0 = np.random.random((a.shape[0], ))
+            _, conv_factor = hm.solve.run.run_iterative_method(level.operator, two_level_cycle, x0, 20)
+            assert conv_factor == pytest.approx(expected_conv_factor[i], 1e-2)
 
     # def test_2_level_bootstrap_least_squares_interpolation(self):
     #     n = 16

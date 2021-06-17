@@ -123,7 +123,7 @@ def bootstap(x, lam, multilevel: hm.hierarchy.multilevel.Multilevel, max_levels:
         # 'level' now becomes the next coarser level and x_level the corresponding test matrix.
         level = hm.repetitive.hierarchy.create_tiled_coarse_level(level.a, level.b, r, p)
         new_multilevel.level.append(level)
-        x_level = level.restrict(x_level)
+        x_level = level.coarsen(x_level)
         b = np.zeros_like(x_level)
         _LOGGER.info("Relax at level {}".format(l))
         x_level, lam, _ = hm.solve.run.run_iterative_eigen_method(

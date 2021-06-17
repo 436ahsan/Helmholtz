@@ -17,7 +17,7 @@ class TestBootstrapRepetitive:
         """Fixed random seed for deterministic results."""
         np.set_printoptions(precision=6, linewidth=1000)
         for handler in logging.root.handlers[:]: logging.root.removeHandler(handler)
-        logging.basicConfig(stream=sys.stdout, level=logging.DEBUG, format="%(message)s")
+        logging.basicConfig(stream=sys.stdout, level=logging.WARN, format="%(message)s")
         np.random.seed(0)
 
     def test_run_1_level_relax(self):
@@ -85,7 +85,7 @@ class TestBootstrapRepetitive:
 
         ac_0 = coarse_level.a[0]
         coarse_level.print()
-        assert_array_equal(ac_0.nonzero()[1], [0, 7, 1])
+        assert_array_equal(ac_0.nonzero()[1], [0, 1, 7])
         assert_array_almost_equal(ac_0.data, [-1.001991,  0.499005,  0.499005])
 
         # Vectors have much lower residual after 2-level relaxation cycles.
@@ -172,7 +172,7 @@ class TestBootstrapRepetitive:
 
 #        assert lam == pytest.approx(0.0977590650225, 1e-3)
 #        assert np.mean([level.rq(x[:, i]) for i in range(x.shape[1])]) == pytest.approx(0.097759, 1e-3)
-        assert conv_factor == pytest.approx(0.205, 1e-2)
+        assert conv_factor == pytest.approx(0.171, 1e-2)
 
     @unittest.skip("LS interpolation causes NaNs in this run")
     def test_2_level_bootstrap_least_squares_interpolation(self):

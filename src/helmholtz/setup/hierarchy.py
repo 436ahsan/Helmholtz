@@ -16,9 +16,10 @@ def create_coarse_level(a: scipy.sparse.csr_matrix, b: scipy.sparse.csr_matrix,
 
     Returns: coarse level object.
     """
-    # Form Galerkin coarse-level operator.
-    ac = (r.dot(a)).dot(p)
-    bc = (r.dot(b)).dot(p)
+    # Form the SYMMETRIC Galerkin coarse-level operator.
+    pt = p.transpose()
+    ac = (pt.dot(a)).dot(p)
+    bc = (pt.dot(b)).dot(p)
     relaxer = hm.solve.relax.KaczmarzRelaxer(ac, bc)
     return hm.hierarchy.multilevel.Level(ac, bc, relaxer, r, p, r, p)
 

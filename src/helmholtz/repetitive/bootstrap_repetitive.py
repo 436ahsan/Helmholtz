@@ -115,7 +115,7 @@ def bootstap(x, multilevel: hm.hierarchy.multilevel.Multilevel, max_levels: int,
         level = hierarchy.create_tiled_coarse_level(level.a, level.b, r, p)
         new_multilevel.level.append(level)
         if l < max_levels - 1:
-            x_level = level.restrict(x_level)
+            x_level = level.coarsen(x_level)
             b = np.zeros_like(x_level)
             _LOGGER.info("Relax at level {}".format(l))
             x_level, _ = hm.solve.run.run_iterative_method(level.operator, lambda x: level.relax(x, b), x_level,

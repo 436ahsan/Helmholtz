@@ -17,7 +17,7 @@ class TestBootstrapEigen:
         """Fixed random seed for deterministic results."""
         np.set_printoptions(precision=6, linewidth=1000)
         for handler in logging.root.handlers[:]: logging.root.removeHandler(handler)
-        logging.basicConfig(stream=sys.stdout, level=logging.DEBUG, format="%(message)s")
+        logging.basicConfig(stream=sys.stdout, level=logging.WARN, format="%(message)s")
         np.random.seed(0)
 
     def test_bootstrap_1level(self):

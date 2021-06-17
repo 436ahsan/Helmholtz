@@ -21,9 +21,10 @@ def create_tiled_coarse_level(a: scipy.sparse.spmatrix, b: scipy.sparse.spmatrix
     num_aggregates = a.shape[0] // r.asarray().shape[1]
     r_csr = r.tile(num_aggregates)
     p_csr = p.tile(num_aggregates)
-    # Form Galerkin coarse-level operator.
-    ac = (r_csr.dot(a)).dot(p_csr)
-    bc = (r_csr.dot(b)).dot(p_csr)
+    # Form the SYMMETRIC Galerkin coarse-level operator.
+    pt = p_csr.transpose()
+    ac = (pt.dot(a)).dot(p_csr)
+    bc = (pt.dot(b)).dot(p_csr)
     relaxer = hm.solve.relax.KaczmarzRelaxer(ac, bc)
     return multilevel.Level(ac, bc, relaxer, r, p, r_csr, p_csr)
 

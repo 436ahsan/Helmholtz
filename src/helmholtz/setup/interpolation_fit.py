@@ -265,7 +265,7 @@ def create_interpolation_least_squares(
     data = np.concatenate(tuple(info_i[2:] for info_i in info))
     p = scipy.sparse.coo_matrix((data, (row, col)), shape=(n, nc)).tocsr()
 
-    return p, fit_error, val_error, _relative_interpolation_error(p, x_test, xc_test), alpha_opt
+    return p, fit_error, val_error, relative_interpolation_error(p, x_test, xc_test), alpha_opt
 
 
 def _filtered_mean(x):
@@ -273,8 +273,11 @@ def _filtered_mean(x):
     return x[x <= 3 * np.median(x)].mean()
 
 
-def _relative_interpolation_error(p: scipy.sparse.csr_matrix, x: np.ndarray, xc: np.ndarray):
+def relative_interpolation_error(p: scipy.sparse.csr_matrix, x: np.ndarray, xc: np.ndarray):
     """Returns the relative interpolation error (error norm is L2 norm over all test vectors, for each fine
     point)."""
     px = p.dot(xc.transpose()).transpose()
-    return norm(x - px, axis=1) / norm(x, axis=1)
+    if x.ndim == 1:
+        return (x - px) / x
+    else:
+        return norm(x - px, axis=1) / norm(x, axis=1)

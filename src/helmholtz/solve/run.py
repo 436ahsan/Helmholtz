@@ -29,7 +29,7 @@ def run_iterative_method(operator, method, x: np.ndarray, num_sweeps: int = 30, 
         conv_factor: asymptotic convergence factor (of the last iteration) of the RER.
     """
     # Print the error and residual norm of the first test function.
-    x0 = x[:, 0]
+    x0 = x[:, 0] if x.ndim == 2 else x
     r_norm = norm(operator(x0))
     rer = r_norm / norm(x0)
     _LOGGER.debug("{:5d} |r| {:.8e} RER {:.5f}".format(0, r_norm, rer))
@@ -43,7 +43,7 @@ def run_iterative_method(operator, method, x: np.ndarray, num_sweeps: int = 30, 
         r_norm_old = r_norm
         rer_old = rer
         x = method(x)
-        x0 = x[:, 0]
+        x0 = x[:, 0] if x.ndim == 2 else x
         r_norm = norm(operator(x0))
         rer = r_norm / norm(x0)
         if i % print_frequency == 0:

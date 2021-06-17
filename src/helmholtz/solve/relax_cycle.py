@@ -70,7 +70,7 @@ class RelaxCycleProcessor(hm.hierarchy.processor.Processor):
         lc = l + 1
         coarse_level = self._multilevel.level[lc]
         x = self._x[l]
-        xc_initial = coarse_level.restrict(x)
+        xc_initial = coarse_level.coarsen(x)
         self._x_initial[lc] = xc_initial
         self._x[lc] = xc_initial
         self._b[lc] = coarse_level.restrict(self._b[l] - level.operator(x)) + coarse_level.operator(xc_initial)
@@ -107,7 +107,7 @@ class RelaxCycleProcessor(hm.hierarchy.processor.Processor):
     def _print_state(self, level_ind, title):
         level = self._multilevel.level[level_ind]
         if self._debug:
-            x = self._x[l]
+            x = self._x[level_ind]
             r_norm = scaled_norm(b[:, 0] - level.operator(x[:, 0]))
             x_norm = scaled_norm(x[:, 0])
             _LOGGER.debug("{:<5d}    {:<15}    {:.4e}    {:.4e}".format(

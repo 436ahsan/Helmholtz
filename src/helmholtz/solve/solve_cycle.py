@@ -5,12 +5,29 @@ from scipy.sparse.linalg import spsolve
 
 import helmholtz as hm
 import helmholtz.hierarchy.multilevel as multilevel
+from helmholtz.linalg import scaled_norm
 
 _LOGGER = logging.getLogger(__name__)
 
 
 def solve_cycle(multilevel: multilevel.Multilevel, cycle_index: float, nu_pre: int, nu_post: int,
                 debug: bool = False, num_levels: int = None, finest: int = 0):
+    """
+    Creates a multilevel solution cycle of A*x=b. Note: x can either be of shape (n, m) with m >= 2 or (n, ), but not
+    (n, 1).
+
+    Args:
+        multilevel:
+        cycle_index:
+        nu_pre:
+        nu_post:
+        debug:
+        num_levels:
+        finest:
+
+    Returns:
+
+    """
     if num_levels is None:
         num_levels = len(multilevel)
     processor = SolutionCycleProcessor(multilevel, nu_pre, nu_post, debug=debug)
@@ -66,7 +83,7 @@ class SolutionCycleProcessor(hm.hierarchy.processor.Processor):
         lc = l + 1
         coarse_level = self._multilevel.level[lc]
         x = self._x[l]
-        xc_initial = coarse_level.restrict(x)
+        xc_initial = coarse_level.coarsen(x)
         self._x_initial[lc] = xc_initial
         self._x[lc] = xc_initial
         self._b[lc] = coarse_level.restrict(self._b[l] - level.operator(x)) + coarse_level.operator(xc_initial)
@@ -93,8 +110,9 @@ class SolutionCycleProcessor(hm.hierarchy.processor.Processor):
 
     def _print_state(self, level_ind, title):
         level = self._multilevel.level[level_ind]
+        b = self._b[level_ind]
         if self._debug:
-            x = self._x[l]
+            x = self._x[level_ind]
             r_norm = scaled_norm(b[:, 0] - level.operator(x[:, 0]))
             x_norm = scaled_norm(x[:, 0])
             _LOGGER.debug("{:<5d}    {:<15}    {:.4e}    {:.4e}".format(
