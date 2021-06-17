@@ -46,7 +46,7 @@ def setup(a: scipy.sparse.spmatrix,
     domain_shape = (a.shape[0],)
     x = hm.solve.run.random_test_matrix(domain_shape, num_examples=num_examples)
     # Improve vectors with 1-level relaxation.
-    _LOGGER.info("Relax at level {}".format(finest))
+    _LOGGER.info("Relax at level {} size {}".format(finest, level.size))
     b = np.zeros_like(x)
     x, conv_factor = hm.solve.run.run_iterative_method(
         level.operator, lambda x: level.relax(x, b), x,num_sweeps=num_sweeps)
@@ -90,6 +90,11 @@ def bootstap(x, multilevel: hm.hierarchy.multilevel.Multilevel, num_levels: int,
     level = multilevel.level[0]
     x, _ = hm.solve.run.run_iterative_method(level.operator, relax_cycle, x, num_sweeps)
 
+    # By passing, report on the speed of relaxation cycle at this setup stage.
+    x0 = np.random.random((level.a.shape[0], 1))
+    _, c = hm.solve.run.run_iterative_method(level.operator, relax_cycle, x0, 30)
+    _LOGGER.info("Relax cycle conv factor {:.3f}".format(c))
+
     # Recreate all coarse levels. One down-pass, relaxing at each level, hopefully starting from improved x so the
     # process improves all levels.
     # TODO(orenlivne): add nested bootstrap cycles if needed.
@@ -99,10 +104,13 @@ def bootstap(x, multilevel: hm.hierarchy.multilevel.Multilevel, num_levels: int,
     for l in range(1, num_levels):
         _LOGGER.info("Coarsening level {}->{}".format(l - 1, l))
         r, aggregates = hm.setup.coarsening.create_coarsening_full_domain(x_level, threshold=threshold)
+        _LOGGER.info("Aggregate sizes {}".format(np.array([len(aggregate) for aggregate in aggregates])))
+        # _LOGGER.info("Aggregate {}".format(aggregates))
         p = _create_interpolation(x_level, level.a, r, interpolation_method)
 
         # 'level' now becomes the next coarser level and x_level the corresponding test matrix.
         level = hierarchy.create_coarse_level(level.a, level.b, r, p)
+        _LOGGER.info("Level {} size {}".format(l, level.size))
         new_multilevel.level.append(level)
         if l < num_levels - 1:
             x_level = level.coarsen(x_level)
@@ -121,6 +129,9 @@ def _create_interpolation(x: np.ndarray, a: scipy.sparse.csr_matrix, r: scipy.sp
     elif method == "ls":
         p, fit_error, val_error, test_error, alpha_opt = \
             hm.setup.interpolation.create_interpolation_least_squares_auto_nbhrs(x, a, r)
+        # _LOGGER.info("fit error {}".format(fit_error))
+        # _LOGGER.info("val error {}".format(val_error))
+        # _LOGGER.info("test error {}".format(test_error))
         _LOGGER.info("P max error: fit {:.3f} val {:.3f} test {:.3f}; alpha mean {:.3f}".format(
             max(fit_error), max(val_error), max(test_error), alpha_opt.mean()
         ))

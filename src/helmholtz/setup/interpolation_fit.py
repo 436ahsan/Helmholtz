@@ -280,4 +280,4 @@ def relative_interpolation_error(p: scipy.sparse.csr_matrix, x: np.ndarray, xc: 
     if x.ndim == 1:
         return (x - px) / x
     else:
-        return norm(x - px, axis=1) / norm(x, axis=1)
+        return norm(x - px, axis=0) / norm(x, axis=0)

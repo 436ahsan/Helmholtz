@@ -105,8 +105,8 @@ class TestInterpolationFit:
               0.36677 , 0.535579, 0.064572, 0.57947 ])
         assert_array_almost_equal(val_error, [0.104392, 0.527721, 0.115536, 0.54828 , 0.09621 , 0.518178,
               0.618695, 0.604389, 0.155411, 0.65563 ])
-        assert_array_almost_equal(test_error, [0.518372, 0.448774, 0.379705, 0.526088, 0.513733, 0.350078,
-              0.596376, 0.484866, 0.559725, 0.54294 ])
+        assert_array_almost_equal(test_error, [0.180962, 0.534083, 0.126773, 0.659037, 0.150969, 0.639413,
+              0.605375, 0.601363, 0.15255 , 0.563358])
 
         # To print p:
         # print(','.join(np.array2string(y, separator=",", formatter={'float_kind':lambda x: "%.2f" % x})

@@ -30,7 +30,7 @@ class TestInterpolation:
         assert np.mean(alpha_opt) == pytest.approx(0.0015625)
         assert max(fit_error) == pytest.approx(0.0286, 1e-2)
         assert max(val_error) == pytest.approx(0.0355, 1e-2)
-        assert max(test_error) == pytest.approx(0.058, 1e-2)
+        assert max(test_error) == pytest.approx(0.0350, 1e-2)
 
         assert p.shape == (32, 16)
         # To print p:

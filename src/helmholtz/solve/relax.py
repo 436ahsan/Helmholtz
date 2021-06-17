@@ -57,7 +57,7 @@ class GsRelaxer:
         self._a = a.tocsr()
         self._m = scipy.sparse.tril(a).tocsr()
 
-    def step(self, x: np.array, b: np.array) -> np.array:
+    def step(self, x: np.array, b: np.array, lam: float = 0) -> np.array:
         """
             Executes a Gauss-Seidel sweep on A*x = b.
         Args:
