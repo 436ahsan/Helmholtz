@@ -57,8 +57,8 @@ class SolutionCycleProcessor(hm.hierarchy.processor.Processor):
 
     def initialize(self, l, num_levels, x):
         if self._debug:
-            _LOGGER.debug("-" * 80)
-            _LOGGER.debug("{:<5}    {:<15}    {:<10}    {:<10}".format("Level", "Operation", "|R|", "RER"))
+            _LOGGER.info("-" * 80)
+            _LOGGER.info("{:<5}    {:<15}    {:<10}    {:<10}".format("Level", "Operation", "|R|", "RER"))
         # Allocate quantities at all levels.
         self._x = [None] * len(self._multilevel)
         self._b = [None] * len(self._multilevel)
@@ -113,7 +113,7 @@ class SolutionCycleProcessor(hm.hierarchy.processor.Processor):
         b = self._b[level_ind]
         if self._debug:
             x = self._x[level_ind]
-            r_norm = scaled_norm(b[:, 0] - level.operator(x[:, 0]))
-            x_norm = scaled_norm(x[:, 0])
-            _LOGGER.debug("{:<5d}    {:<15}    {:.4e}    {:.4e}".format(
+            r_norm = scaled_norm(b - level.operator(x))
+            x_norm = scaled_norm(x)
+            _LOGGER.info("{:<5d}    {:<15}    {:.4e}    {:.4e}".format(
                 level_ind, title, r_norm, r_norm / x_norm))

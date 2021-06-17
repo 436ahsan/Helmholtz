@@ -121,7 +121,7 @@ def _create_interpolation(x: np.ndarray, a: scipy.sparse.csr_matrix, r: scipy.sp
     elif method == "ls":
         p, fit_error, val_error, test_error, alpha_opt = \
             hm.setup.interpolation.create_interpolation_least_squares_auto_nbhrs(x, a, r)
-        _LOGGER.info("P error: fit {:.3f} val {:.3f} test {:.3f} alpha mean {:.3f}".format(
+        _LOGGER.info("P max error: fit {:.3f} val {:.3f} test {:.3f}; alpha mean {:.3f}".format(
             max(fit_error), max(val_error), max(test_error), alpha_opt.mean()
         ))
     else:
