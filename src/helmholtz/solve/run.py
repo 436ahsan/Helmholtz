@@ -32,9 +32,10 @@ def run_iterative_method(operator, method, x: np.ndarray, num_sweeps: int = 30, 
     x0 = x[:, 0] if x.ndim == 2 else x
     r_norm = norm(operator(x0))
     rer = r_norm / norm(x0)
-    _LOGGER.debug("{:5d} |r| {:.8e} RER {:.5f}".format(0, r_norm, rer))
+    if print_frequency is not None:
+        _LOGGER.info("{:5d} |r| {:.8e} RER {:.5f}".format(0, r_norm, rer))
     # Run 'num_sweeps' relaxation sweeps.
-    if print_frequency is None:
+    if print_frequency == 0:
         print_frequency = num_sweeps // 10
     r_norm_history = [None] * (num_sweeps + 1)
     r_norm_history[0] = r_norm
@@ -46,8 +47,8 @@ def run_iterative_method(operator, method, x: np.ndarray, num_sweeps: int = 30, 
         x0 = x[:, 0] if x.ndim == 2 else x
         r_norm = norm(operator(x0))
         rer = r_norm / norm(x0)
-        if i % print_frequency == 0:
-            _LOGGER.debug("{:5d} |r| {:.8e} ({:.5f}) RER {:.5f} ({:.5f}) {:.5f}".format(
+        if print_frequency is not None and i % print_frequency == 0:
+            _LOGGER.info("{:5d} |r| {:.8e} ({:.5f}) RER {:.5f} ({:.5f}) {:.5f}".format(
                 i, r_norm, r_norm / max(1e-30, r_norm_old), rer, rer / max(1e-30, rer_old), norm(x0)))
         r_norm_history[i] = r_norm
         if i >= min_sweeps and r_norm < residual_stop_value:

@@ -1,0 +1,287 @@
+\documentclass{article}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{authblk}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\usepackage{booktabs}
+
+\newcommand{\bbeta}{\boldsymbol\beta}
+\newcommand{\bt}{\boldsymbol\tau}
+\newcommand{\bta}{\boldsymbol\ta}
+\newcommand{\bOmega}{\boldsymbol\Omega}
+\newcommand{\bY}{\mathbf{Y}}
+\newcommand{\cC}{\mathcal{C}}
+\newcommand{\cG}{\mathcal{G}}
+\newcommand{\st}{v_{\ta}}
+\newcommand{\ta}{\theta}
+\newcommand{\lla}{\longleftarrow}
+\newcommand{\G}{\mathcal{G}}
+\newcommand{\I}{\mathbb{I}}
+\newcommand{\Normal}{\mathcal{N}}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\bX}{\mathbf{X}}
+
+\title{General Automated Rules of Multilevel Coarsening: The 1D Helmholtz Equation}
+\author{}
+
+%\author[1]{Achi Brandt}
+%\author[2]{Oren Livne}
+%\affil[1]{The Weizmann Institute of Science,Department of Applied Mathematics \& Computer Science, 76100 Rehovot, Israel. Email: achibr@gmail.com}
+%\affil[2]{Educational Testing Service, 660 Rosedale Road, Attn: MS-12, T-197, Princeton, NJ 08540. Email: olivne@ets.org}
+%\author[3]{James Brannick} % Add affiliation
+%\author[4]{Karsten Khal}} % Add affiliation
+% In the ordering that makes sense.
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+TBA
+% Multigrid solvers have been successful in solving numerous scientific and and engineering systems. Typically, a hierarchy of increasingly coarser levels are constructed from the original fine equation, such that each level reduces a certain range of error components, and combined in a multigrid cycle that has an optimal convergence rate. Notwithstanding, optimal multigrid design is still very difficult to design for indefinite problems, highly nonlinear problems, and huge systems where even linear complexity is not good enough. Algebraic multigrid solvers automate the coarsening process, but are still limited in application.
+
+% In this work we develop AutoAMG, a new Bootstrap Algebraic Multigrid (BAMG) algorithm for constructing an efficient multilevel hierarchy. We focus on developing automatic criteria for deriving the coarse variables (based on local singular value decompositions) and interpolation operators (via regularized least-squares fitting) with as little assumptions as possible about the input system. The approach is demonstrated on the one-dimensional Helmholtz equation on a periodic domain. This model is an example where standard multigrid solvers has been notoriously difficult to develop, as the coarse variables have a completely different character (rays) than fine-level variables (waves). AutoAMG produces both near-null space functions, and a multilevel hierarchy of highly accurate coarse levels.
+
+% We discuss future generalizations to the multi-dimensional Helmholtz equation, and  systematic upscaling of highly repetitive non-linear systems arising in fluid flows and molecular dynamics.
+\end{abstract}
+
+\section{Introduction}
+\label{intro}
+Multigrid (MG) solvers have been very successful in solving a wide variety of scientific and engineering problems with optimal efficiency \cite{review}. Typically, a hierarchy of coarse levels is constructed from the original system, and combined in a multigrid cycle to obtain a fast iterative solver. There are several reasons for further generalizing these multigrid methods: (a) it takes expertise and a tedious manual development process to tailor the methods to different \emph{systems} of Partial Differential Equations (PDEs) and \emph{indefinite problems}; (b) for many systems, even attaining linear complexity is not good enough, since the number of variables is huge. Such systems on the other hand are typically \emph{highly repetitive}, in the sense that the same small set of governing equations (or Hamiltonian terms) keep repeating itself throughout the physical domain. (c) The methods do not perform well for \emph{highly nonlinear cases}, where configurations cannot be decomposed into weakly-interacting local and non-local parts.
+
+In this work we formulate general, automated rules to construct a multilevel hierarchy of coarse levels of a given system. Some principles are new; some are already known, but are combined in a more systematic way. We first illustrate the rules for a specific task: constructing a fast multilevel linear solver of the the 1D Helmholtz equation on a periodic domain, tackling reason (a). We then discuss how to economize the hierarchy in case of a repetitive system: the 1D Helholtz equation with constant wave number on an increasingly larger periodic domain (reason (b)).
+
+The 1D Helmholtz equation is a good model problem for our purposes. First, the coarse-level variables have a completely different character (rays/geometric optics) than fine-level variables (waves/electromagnetics). The proper type of variables needs to be automatically selected at each level. Second, the Helmholtz operator has Almost Zero Modes (AZMs; i.e., near-null space components), which are not reduced by the fine-level relaxation and need to be accurately approximated by coarse levels. Unlike diffusion PDEs, these are not geometrically smooth functions. In 1D, they can be represented by two basis functions $\varphi_-$ and $\varphi_+$. That is, each AZM can be written as $A_- \varphi_+ A_+ \varphi_+$ where $A_{\pm}$ are smooth functions (``rays''). (The 2D problem introduces the further difficulty that AZMs are composed of waves in an infinite number of directions.)  Creating a multigrid solver that properly approximates AZMs and automatically detects the transition from waves to rays, has thus been a notoriously difficult task \cite{wave_ray, later_papers}.) Our coarsening rules lead to an algorithm that finds both low-residual ``test functions'' that contain linear combinations of those AZMs, and a multilevel hierarchy that accurately represents them at all levels and can be used for an efficient 1D Helmholtz solver. This setting factors out other difficulties that a numerical solver of the PDE must treat (radiation boundary conditions are necessary; boundary effects; and diffraction effects of domain features of size comparable with the wavelength; phase error), to focus on the derivation of the interior-domain coarsening.
+
+\subsection{Our Contribution}
+First, we develop general principles and automatic rules of multilevel coarsening (Sec.~\ref{rules}). These rules are applicable to the fast iterative solution of linear algebraic systems; discretized nonlinear problems and systems of PDEs (such as the Navier Stokes equations); systematic upscaling (coarsening of a repetitive equation on a large domain using local windows); and numerical homogenization, in which the fine levels are never or rarely visited during the simulation.
+
+Second, we develop AutoAMG, a multilevel algorithm that finds low-residual functions, an accurate multilevel hierarchy, and a fast linear solver, for the 1D Helmholtz equation on a periodic domain. AutoAMG is a completely automatic Bootstrap Algebraic Multigrid (BAMG) procedure that does not exploit specific properties of the Helmholtz operator, such as the exponential form the AZMs. It is much simpler than a specifically tailored approach  \cite{wave_ray, later_papers}. In particular, it provides a stepping stone towards a multilevel solver of the multi-dimensional Helmholtz equation.
+
+\subsection{Related Work}
+{\bf
+\begin{itemize}
+    \item Multilevel Helmholtz solvers \cite{wave_ray, later_papers}.
+    \item Bootstrap papers.
+    \item Neural networks (with Eran) where the SVD was applied to network compression and inspired the current work.
+\end{itemize}
+}
+
+The paper is organized as follows. In Sec.~\ref{rules} we first lay out the general rules of multilevel coarsening. We then apply them to solving the 1D Helmholtz problem on a fixed periodic domain in in Sec.~\ref{helm_linear}. In Sec.~\ref{helm_repetitive}, we illustrate how to exploit equation repetition, again on the 1D Helmholtz equation. Finally, we discuss further generalizations and future research directions in Sec.~\ref{future}.
+
+\section{General Rules of Multilevel Coarsening}
+\label{rules}
+The goal of these rules is to simplify the task of developing multilevel solvers for new problems, by generalizing ad-hoc and specialized coarsening processes into a set of general, automated procedures.
+\begin{enumerate}
+    \item {\bf Coarsening by examples.} Test Functions (TFs) are unit-norm functions with small residuals \cite{lamg, bamg}, i.e., examples of algebraically smooth errors. During the coarsening process, the set of TFs is gradually improved and enriched via bootstrapping (see the next item). The coarsening is derived {\it locally} from these functions (Sec.~\ref{svd}--\ref{interpolation}).
+    \item {\bf Bootstrapping.} During the multilevel setup process, initial test functions are generated by fine-level relaxation sweeps, from which a coarse level can be derived. Using the coarse level, a multilevel relaxation cycle can smooth the TFs much faster. As TFs become smoother, more levels are added to the hierarchy. Slow-to-converge errors that emerge from the current multilevel cycle are added to the TF set. In extreme cases, global Almost Zero Modes (AZMs), i.e., near-null-space eigenvectors, should be computed, and the coarsening adapted to fit them, to obtain an efficient multilevel solver. See Sec.~\ref{bootstrap}.
+    \item {\bf SVD coarsening.} The coarse variables (both their {\it type} and {\it number}) should be derived using a Singular Value Decomposition (SVD) of TF values on small aggregates of fine-level variables. Aggregates can be chosen geometrically, in geometric problems; more generally, they should be sets of fine variables that are highly correlated across all TFs. See Sec.~\ref{svd_coarsening}.
+    \item {\bf Numerical performance predictors.} The potential multilevel efficiency can be estimated before the interpolation and coarse equations are derived, using direct numerical predictors that vastly generalize Local Fourier Analysis (LFA) for PDEs. The mock cycle (also known as habituated compatible relaxation \cite{mg_guide, cr_oren}) can be used to gauge the quality of the coarsening and compare different coarsening schemes.
+    \item {\bf Least-squares interpolation.} An initial interpolation is simply the transpose of the SVD coarsening operator; in some cases, it may be good enough. More generally, it can be derived {\it locally} by regularized least-squares fitting to TF values. The interpolatory set can be chosen to maximize interpolation accuracy while controlling the coarse-level operator's fill-in; Sec.~\ref{interpolation}.
+	\item {\bf Exploiting repetitive structure by sampling.} In case of repetitive equations, much fewer TFs can be used; from each TF, many {\it local windows} can be sampled and used for the SVD coarsening and interpolation construction. The coarsening is also repetitive, so its derivation is completely local. TFs still need to be derived on increasingly larger domain to obtain smaller residuals.
+	\item {\bf Systematic upscaling.} In cases where the number of variables renders even a linear-scaling algorithm probitively expensive (e.g., the Helmholtz equation with a constant wave number on a meshsize small enough to obtain a small pointwise discretization error is a good example), coarsening derived for a small domain can be used to solve a problem on a much larger domain. For problems with a huge number of variables, highly accurate FAS coarse equations can be derived, and TFs can be improved in only local windows to obtain sub-linear complexity. (Sec.~\ref{upscaling}).
+\end{enumerate}
+
+\section{1D Helmholtz: Linear Solver}
+\label{helm_linear}
+As a first example, we consider the 1D Helmholtz equation
+\begin{equation}
+	\label{helm1d}
+	(A u)(x) := \Delta u(x) + K(x)^2 u(x) = F(x)\,,\qquad x \in [0,L]\,,
+\end{equation}
+with periodic boundary conditions $u(x) = u(x + L)$. (This also encompasses a simplified version of the Kohn-Sham equation in electronic structure calculations, with a fixed energy $\lambda$ and potential $V(x)$, where $K^2(x) = \lambda - V(x)$ and $F(x) \equiv 0$.) The problem is discretized on a uniform grid with meshsize $h$ into the algebraic system by
+\begin{equation}
+	\label{level0}
+	A^h u^h = f^h\,.
+\end{equation}
+Our goals are (a) find $M$ \emph{Test Functions (TFs)}: $u_1\,\dots,u_M$ of unit $l_2$ norm with small $\|A^h u^h\|$; i.e., near-null-space components of $A^h$; (b) construct a multilevel hierarchy that accurately approximates the test functions, and gives rise to an optimal linear solver of (\ref{level0}), i.e., it attains $\varepsilon$-residual accuracy $\|A^h u^h - f^h \| \leq\varepsilon$ in $O(n \log 1/\varepsilon)$ operations.
+
+$h$ is assumed to be small enough to resolve the wavelength and provide good local pointwise discretization accuracy. (We do not worry at this point about decreasing $h$ further to obtain pointwise accuracy on a large domain that does not have a phase error, as in such resolutions simple geometric coarsening can be employed. Thus they are irrelevant to the challenge of coarsening the indefinite system and automatically transitioning from wave-type variables to ray-type coarse variables in the multilevel hierarchy.)
+
+The test functions are an approximation to the eigenvectors of $A$ corresponding to the $M$ smallest eigenvalues. We do not insist on finding the exact orthogonal basis.
+
+\subsection{Discretization}
+\label{discretization}
+Eq.~(\ref{helm_1d}) is discretized on a uniform grid with meshize $h$ and $n$ points $x_j = j h$, $j= 0,\dots,n-1$; references to indices larger than $n - 1$ or negative are understood as periodic, i.e., $j \text{ mod } n$), and meshsize $h = L/n$. We denote the discrete approximation by $u^h := (u^h_0,\dots,u^h_{n-1})^T$.
+
+To ensure that special properties of tridiagonal matrices are not being exploited (as in total reduction), 
+do not mask the true efficiency of the algorithm, we test both the $3$-point second-order finite difference discretization 
+$$ (A^h u^h)_j = u_{j-1} + (-2 + k_j^2) u_j + u_{j+1} = f_j$$
+and $5$-point  fourth-order discretization
+$$ (A^h u^h)_j = \frac{1}{12} \left( -u_{j-2} + 16 u_{j-1} + (-30 + 12 k_j^2) u_j + 16 u_{j+1} - u_{j+2} \right) = f_j\,, $$
+for all $j = 0,\dots,n-1$, where $f_j := h^2 f(x_j)$ and $k_j := h K(x_j)$.
+
+\subsection{Initial Vectors}
+Since $A$ is indefinite, we use a robust smoother: Kaczmarz relaxation in lexicographic ordering. While for special cases (e.g. $k h = 0$), better smoothers are available (e.g., red-black Gauss-Seidel), Kaczmarz relaxation is guaranteed to smooth the error \cite{amg_theory}, so we keep the approach general.
+
+Initial vectors are obtained by $\nu$ Kacmzarz relaxations on $A x = 0$, starting from $\text{rand}[-1, 1]$. $x$ is normalized to unit $l_2$ norm at the end. There is no need to normalize after each relaxation sweep, since we are solving a homogeneous equation (and anyway,the norm doesn't change much unless a huge number of relaxations is performed). 
+
+{\bf What $\nu$ should we use to get a good enough initial guess for two-level boostrapping?}
+
+\subsection{Coarse-level Construction}
+We omit the $h$ superscripts in this section and use quantities without superscripts (e.g., $A$, $x$) to denote fine-level quantities and $c$-superscripted quantities (e.g., $A^c, x^c$) to denote coarse-level quantities.
+
+\subsubsection{SVD Coarsening}
+\label{svd_coarsening}
+Given a fixed-size discrete domain with $n$ and test functions $x_1,\dots,x_M$ on this domain, we derive the coarsening matrix $R_w: w_c \times w$ separately in each \emph{aggregate} (consisting of $w = 2-4$ consecutive gridpoints). The coarsening matrix over the entire domain is the block diagonal matrix $R: n_c \times n$
+\begin{equation}
+	R := \text{diag} \left\{ \underbrace{R_w, R_w, \dots, ... R_w }_{\frac{n}{w}}  \right\} \,.
+\end{equation}
+
+$R_w$ depends on an accuracy threshold $\varepsilon$ and minimum coarsening ratio $0 < \rho < 1$. Start with $w = 2$. The test functions provide $M$ samples of low-residual functions over the aggregate, $u^m_j= (u_{m,j},\dots,u_{k,j+w})$ for $m = 1,\dots,M$. We compute the SVD decomposition $X = U \Sigma V^T$ of the $m \times w$ matrix $X$ whose rows are the windows, where $\Sigma = \text{diag}\left\{\sigma_1, \dots, \sigma_m \right\}$ and $\sigma_1 \geq \sigma_2 \geq \cdots$. Let $w_c$ be the smallest number such that
+\begin{equation}
+	\left(\frac{\sum_{j=n_c+1}^m \sigma_j^2}{\sum_{j=1}^m \sigma_j^2 } \right)^{\frac12} < \varepsilon.
+	\label{r_accuracy}
+\end{equation}
+Then $R_w := V(1:w_c,:)$ is the sub-matrix of $V$ consisting of the first $w_c$ rows of $V$. (\ref{r_accuracy}) guarantees an $\varepsilon$-relative reconstruction error of $X$ in the Frobenius norm \cite{svd}. $M$ must be larger than $w$, say $M \geq 4 w$, to avoid SVD over-fitting.
+
+If $w_c/w > \rho$, we double the window size $w$ and recalculate $R$ until a large enough window is reached such that $w_c/w \leq \rho$. If the relaxation method is a good smoother that quickly reduces the error (and thus our test functions, since we relax on $A x = 0$) into a lower-dimensional space, such a value of $w$ can be found.  {\bf How can we determine $M$ in advance if we don't know the window size $w$ in advance?}
+
+The SVD yields coarse variables that are less sensitive to relaxation than pointwise coarsening (i.e., selecting one or several fine gridpoints as coarse variables, which corresponds to $R_w = [1,\underbrace{0,\dots,0}_{w-1}]$), as shown by comparing mock cycle rates Sec.~\ref{mock_cycle}. It also automatically selects the number of coarse variables $w_c$ per aggregate.
+
+{\bf Add explanation on the particular nature of the coarse vars for the 1D Helmholtz: two waves, i.e., combination of sines and cosines. Add figure.}
+
+\subsubsection{Quantitative Performance Prediction}
+
+\subsubsection{Least-squares Interpolation}
+As for $R$, we derive an interpolation matrix $P_w$ on an aggregate of size $w$, and then create a block diagonal$P_{n \times n_c}$ interpolation matrix over the entire domain from the aggregate interpolation matrices.
+
+The \emph{interpolatory set} (the set of coarse variables used to interpolate to a target fine gridpoint) can be the set of coarse variables of its aggregate. In this case, the optimal interpolation that minimizes the interpolation error of the test functions is $P_w = R_w^T$ (as the truncated SVD is the best low-rank approximation in the Frobenius norm).
+
+While this choice may be sufficient in some problems, even in the Laplace case ($k=0$), $R_w^T$ is a piecewise-constant geometric interpolation (with the window size $w = 2, w_c = 1$, where only one principal component already explains most of the energy -- the constant vector), which only yields marginal multilevel efficiency (two-level, but but not multilevel $h$-independent convergence). Linear interpolation is required to obtain the full multilevel efficiency.
+
+Thus, we increase $P_w$'s accuracy by including in the interpolatory set as many coarse variables as possible without increasing the coarse operator's density. A general rule is to use the union of all coarse variables in all aggregates of the fine gridpoints appearing in the target gridpoint's stencil.
+
+The \emph{interpolation weights} are determined by least-square fitting to test samples.
+
+{\bf include a description of the LS process: fitting set, fit with regularization parameter $\alpha$. Validation set: use to determine $\alpha$. $\alpha$ is global across all fine gridpoints in an aggregate. Test set: test the interpolation accuracy on samples we haven't used to ensure no overfitting.
+}
+
+\begin{equation}
+	\min_p \sum_m \left( x_{m,i} - \sum_j p_{ij} x_{m,j} \right)^2 + \alpha \left( \sum_m (x_{m,i})^2 \right) \left(\sum_j p_{ij}^2\right) 
+\end{equation}
+
+\subsection{Multilevel Bootstrapping}
+
+\subsection{Numerical Results}
+We test two discretizations of the Helmholtz operator $A = -\Delta + k^2 I$: a $3$-point second order stencil , and a $5$-point $4th$ order finite-differences $A^h = [-1, 16, -30 + 12 (kh)^2, 16, -1]$. The $5$-point stencil avoids any properties particular to 1D tridiagonal systems that lead to easier coarsening (e.g., as in total reduction).
+
+\subsubsection{Quantitative Performance Prediction}
+%\label{mock_cycle}
+
+{\bf Smoothing Factor:} The Fourier mode analysis is done for a fixed $k = K h$.
+
+The traditional smoothing factor \cite[Sec. ??]{guide} assumes that the coarse level perfectly reduces all scaled frequencies $\theta$ with $|\theta| leq \frac{\pi}{\rho}$ and leaves intact all high frequencies $|\theta| > \frac{\pi}{\rho}$, where $\rho$ is the coarsening factor. However, since our coarsening is designed to represent near null-space components of the Helmholtz operator instead of smooth functions, the smoothing factor definition should be modified to
+\begin{equation}
+	\overline{\mu} := \max_{\theta \in HF} \left| R(\theta) \right|\,,
+\end{equation}
+where $R$ is the relaxation amplification factor. HF is the set of relevant high-frequency components: the set of $[n/\rho]$ frequencies $\theta$ with smallest $|A(\theta)|$ value.
+
+{\bf TODO: James and Karsten calculated the traditional Kaczmarz smoothing factor to be $0.75$, but for which $k$ and coarsening factor? Add a table here of $\overline{\mu}$ vs. $k$ and $\rho$. Also add a column with the smoothing factor to the mock cycle table below so we can compare elevant numbers. Also note: can calculate $\overline{\mu}$ by running Fourier components through Kaczmarz to numerically calculate its amplification matrix.}
+
+{\bf Mock Cycle}
+To gauge the quality of the coarse variable set, we compared the mock cycle convergence factors with SVD coarsening, $1:2$ pointwise coarsening ($R_w = [1, 0]$) and averaging coarsening with $1:2$ coarsening ratio ($R_w = [1, 1]$). for different $kh$ values and $\nu$ relaxations per cycle. Kaczmarz relaxation was used in all cases; for $kh=0$ only, we also tested Gauss-Seidel relaxation for comparison. The SVD coarsening was based on test vectors obtained by $100$ relaxations of $\text{random}[-1,1]$ starting vectors, a $w=4$-point aggregate to calculate the SVD, and accuracy threshold of  $\varepsilon=0.1$. Two principal components were selected as coarse variables for all $kh$, so all three coarsening schemes have coarsening ratio $\rho = 0.5$.
+ 
+\begin{table}
+{\small
+\begin{tabular}{l|cccc|cccc|cccc}
+\toprule
+& \multicolumn{4}{c|}{SVD Coarsening} & \multicolumn{4}{|c|}{Pointwise Coarsening} & \multicolumn{4}{|c}{Averaging Coarsening} \\
+$k$ &  $\nu=1$ &  $2$ &  $3$ &  $4$ &  $1$ &  $2$ &  $3$ &  $4$ &  $1$ &  $2$ &  $3$ &  $4$ \\
+\midrule
+GS &       0.30 &       0.11 &       0.07 &       0.02 &      0.65 &      0.60 &      0.57 &      0.54 &       0.32 &       0.12 &       0.07 &       0.02 \\
+0.0   &       0.42 &       0.22 &       0.15 &       0.12 &      0.49 &      0.55 &      0.49 &      0.50 &       0.45 &       0.21 &       0.19 &       0.15 \\
+0.1   &       0.46 &       0.22 &       0.15 &       0.13 &      0.50 &      0.55 &      0.48 &      0.48 &       0.42 &       0.20 &       0.19 &       0.15 \\
+0.2   &       0.45 &       0.24 &       0.15 &       0.12 &      0.51 &      0.58 &      0.50 &      0.48 &       0.45 &       0.21 &       0.19 &       0.16 \\
+0.3   &       0.46 &       0.23 &       0.15 &       0.12 &      0.49 &      0.56 &      0.50 &      0.49 &       0.42 &       0.20 &       0.20 &       0.15 \\
+0.4   &       0.49 &       0.24 &       0.16 &       0.12 &      0.50 &      0.58 &      0.53 &      0.49 &       0.49 &       0.20 &       0.20 &       0.18 \\
+0.5   &       0.51 &       0.25 &       0.16 &       0.13 &      0.53 &      0.55 &      0.49 &      0.47 &       0.47 &       0.22 &       0.21 &       0.20 \\
+0.6   &       0.52 &       0.30 &       0.13 &       0.14 &      0.56 &      0.52 &      0.53 &      0.48 &       0.52 &       0.22 &       0.20 &       0.21 \\
+0.7   &       0.57 &       0.25 &       0.15 &       0.13 &      0.61 &      0.51 &      0.53 &      0.46 &       0.54 &       0.25 &       0.22 &       0.24 \\
+0.8   &       0.60 &       0.30 &       0.15 &       0.11 &      0.64 &      0.44 &      0.50 &      0.52 &       0.49 &       0.24 &       0.23 &       0.26 \\
+0.9   &       0.63 &       0.35 &       0.17 &       0.15 &      0.67 &      0.39 &      0.49 &      0.51 &       0.63 &       0.34 &       0.20 &       0.27 \\
+1.0   &       0.60 &       0.29 &       0.14 &       0.10 &      0.74 &      0.46 &      0.43 &      0.50 &       0.69 &       0.48 &       0.25 &       0.25 \\
+\bottomrule
+\end{tabular}
+}
+\caption{Mock cycle convergence factors for a grid of size $n=32$. The first row corresponds to the Laplace operator and Gauss-Seidel. All other rows refer to Kaczmarz relaxation. $\nu$ is the number of relaxations per cycle.}
+\end{table}
+
+The pointwise coarsening convergence factors is bounded by $0.5$ as the error function $1,0,1,\dots$ is reduced only by a meager $0.5$ factor by relaxation. In practice, a multigrid cycle with pointwise coarsening converges faster. Generally, mock cycle predictions can be pessimistic, and cases where their prediction is quantitatively accurate should be identified based on numerical experimentation. Here, it is more accurate when the coarse variables are averages. As expected, the SVD coarsening is equivalent to averaging for the Laplace case, but trumps simple averaging for $k = O(1)$, which is substantiates its use for upscaling. The convergence improves with $\nu$ up to $3$ relaxation sweeps.
+
+Finally, in line with geometric multigrid theory, Gauss-Seidel is a better smoother for the Laplace case, but Kaczmarz relaxation provides adequate convergence as well in that case, while its efficiency is maintained for all values of $0 \leq k \leq 1$. All results are independent of $n$, for $n \geq 16$.
+
+\subsection{2-level}
+{\bf 
+\begin{itemize}
+\item Start with $n=96$ at level 1. 
+\item Show 2-level rates of solving $A x = 0$ for $n=96$ as a function of number of bootstrap cycles. Test function residuals.
+\item  Then show convergence for increasingly larger $n$ with the same coarsening.
+\item How do the SVD components look like.
+\item Performance vs. window size. Number of components.
+\end{itemize}
+}
+
+\subsubsection{3-level}
+
+\subsubsection{Multilevel Setup and Solution}
+
+\section{1D Helmholtz: Repetitive Coarsening}
+\label{helm_repetitive}
+
+\subsection{Wave to Ray Transition}
+{\bf Interpretation of coarse stencils as rotations after diagonalizing the center block.}
+
+{\bf Show limit of stencil coefficients of coarse equations after many coarsening levels and afer few. Is it elliptic / Ray?}
+
+\section{Future Directions}
+\label{future}
+
+\subsection{The Multi-dimensional Helmholtz Equation}
+\label{multidim}
+
+\subsection{Systematic Upscaling}
+\label{upscaling}
+Many physical systems involve a huge number of variables, such that even attaining linear complexity is not good enough, since the number of variables is huge. Such systems on the other hand are typically \emph{highly repetitive}, in the sense that the same small set of governing equations (or Hamiltonian terms) keep repeating itself throughout the physical domain. 
+
+Consider for instance the 1D Helmholtz equation with constant $K(x) \equiv K$ on a large domain of size $L$. AutoAMG can be adapted to take advantage of the periodicity to derive the coarse equations locally, and use the 
+
+\begin{itemize}
+\item {\bf Step 1: local derivation but still using the entire level for relaxation.}
+We start with a small $L$ and construct the AutoAMG hierarchy and test functions. The coarsening matrix is derived on a single aggregate; that is, we compute $R_w: w_c \times w$ of an \emph{aggregate} (consisting of $w = 2-4$ consecutive gridpoints) using the SVD, and then  tile (copy) these coarse variables to obtain an $n_c \times n$ block diagonal coarsening matrix $R$
+\begin{equation}
+	R := \text{diag} \left\{ \underbrace{R_w, R_w, \dots, ... R_w }_{\frac{n}{w}}  \right\} \,.
+\end{equation}
+To calculate the local SVD and $R^w$, we can derive from each test function \emph{many test samples}: $n$ windows of size $w$: $x^k_i = (x_{k,i},\dots,x_{k,i+w})$, a total of $Kw$ windows. Thus, in fact, a very small $M$ (even $M=1$) is sufficient here. $P$ is similarly derived over a single aggregate and tiled to the entire domain.
+
+\item {\bf Step 2: domain growing; but still using the entire fine level for relaxation.} We then double $L$ and tile the test vectors and $P$, $R$ and $A^c$ over the twice-larger domain. For each domain doubling, we add another coarse level to the hierarchy. 
+
+\item {\bf Step 3: use only local windows on the fine levels and FAS} to obtain sub-linear complexity.
+\end{itemize}
+
+{\bf When do we grow the domain? Do we add more levels on a fixed-size domain of size $n$ gridpoints until we get to $O(\log n)$ levels and a coarsest grid with only a few points, before growing the domain, so that we get a full multilevel cycle that reduces the error by a fixed factor in $O(n)$ operations; or, do we start with level 1 on $n$ points, create level $2$ with $n/2$ points, improve the hierarchy with $2$-level cycles, then consider level $2$ on $n$ points as our finest level, and coarsen it using $2$-level cycles, and so on, i.e., recursive homogenization with $2$ level-cycles only, but increasingly larger domains?}
+
+\subsection{$\tau$-Homogenization}
+\label{hom}
+The FAS coarse-level equations depend on the fine level only through the fine-to-coarse $\tau$ correction:
+\begin{equation}
+	A^c x^c = P^T b + \tau\,,\qquad \tau :=  A^c \overline{x}^c - P^T A x = (A^c R - P^T A) x\,,
+	\label{fas}
+\end{equation}
+where $\overline{x}^c := R x$ is the restricted fine-level approximate solution (and initial coarse level approximation). Thus, $\tau_I$ depends on a local neighborhood of fine-level values near the coarse gridpoint $I$, and thus in turn on neighboring coarse-level values $x^c_J$. We can thus attempt to \emph{homogenize} (\ref{fas}) to only depend on $x^c$  by fitting a rule $\tau \approx Q x^c$ with some interpolation matrix $Q$. $Q$ can be found using a least-squares fit, just like for the BAMG interpolation $P$, namely,
+\begin{equation}
+	\min_p \sum_m \left( \tau_{m,I} - \sum_j q_{IJ} x^c_{m,J} \right)^2 + \alpha \left( \sum_m (\tau_{mI})^2 \right) \left(\sum_j q_{IJ}^2\right) \,.
+\end{equation}
+
+\begin{itemize}
+    \item Local relaxation.
+	\item Non-linear problems (e.g., fluid flows): use FAS; fine-level windows for different coarse solution values.
+	\item Molecular dynamics: $\tau$ homogenization may lead to discovering different physical laws at different scales.
+	\item Non-geometric and non-local problems (e.g., NNs): use correlations instead of locality graph to define aggregates.
+\end{itemize}
+
+\bibliographystyle{plain}
+\bibliography{mg.bib}
+
+\end{document}

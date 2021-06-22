@@ -4,6 +4,7 @@ import logging
 import numpy as np
 import scipy.sparse
 from typing import Tuple
+from scipy.linalg import norm
 
 import helmholtz as hm
 import helmholtz.setup.hierarchy as hierarchy
@@ -15,10 +16,12 @@ def setup(a: scipy.sparse.spmatrix,
           max_levels: int = 100000,
           num_bootstrap_steps: int = 1,
           num_sweeps: int = 10,
-          num_examples: int = None, print_frequency: int = None,
+          num_examples: int = None,
+          print_frequency: int = None,
           interpolation_method: str = "ls",
           threshold: float = 0.1,
-          max_coarsest_level_size: int = 10) -> Tuple[np.ndarray, np.ndarray, hm.hierarchy.multilevel.Multilevel]:
+          max_coarsest_level_size: int = 10,
+          x: np.ndarray = None) -> Tuple[np.ndarray, np.ndarray, hm.hierarchy.multilevel.Multilevel]:
     """
     Creates low-residual test functions and multilevel hierarchy for solving A*x=b.
     Args:
@@ -44,21 +47,25 @@ def setup(a: scipy.sparse.spmatrix,
     multilevel = hm.hierarchy.multilevel.Multilevel(level)
     # TODO(orenlivne): generalize to d-dimensions. This is specific to 1D.
     domain_shape = (a.shape[0],)
-    x = hm.solve.run.random_test_matrix(domain_shape, num_examples=num_examples)
+    if x is None:
+        x = hm.solve.run.random_test_matrix(domain_shape, num_examples=num_examples)
     # Improve vectors with 1-level relaxation.
     _LOGGER.info("Relax at level {} size {}".format(finest, level.size))
     b = np.zeros_like(x)
     x, conv_factor = hm.solve.run.run_iterative_method(
         level.operator, lambda x: level.relax(x, b), x,num_sweeps=num_sweeps)
     _LOGGER.info("Relax convergence factor {:.3f}".format(conv_factor))
+    _LOGGER.info("RER {:.3f}".format(norm(a.dot(x)) / norm(x)))
 
     # Bootstrap with an increasingly deeper hierarchy (add one level at a time).
     for num_levels in range(2, max_levels + 1):
-        _LOGGER.info("bootstrap with {} levels".format(x.shape[0], num_levels))
+        _LOGGER.info("-" * 80)
+        _LOGGER.info("bootstrap at grid size {} with {} levels".format(x.shape[0], num_levels))
         for i in range(num_bootstrap_steps):
             _LOGGER.info("Bootstrap step {}/{}".format(i + 1, num_bootstrap_steps))
             x, multilevel = bootstap(x, multilevel, num_levels, num_sweeps=num_sweeps, print_frequency=print_frequency,
                                      interpolation_method=interpolation_method, threshold=threshold)
+            _LOGGER.info("RER {:.3f}".format(norm(a.dot(x)) / norm(x)))
         if multilevel.level[-1].size <= max_coarsest_level_size:
             break
     return x, multilevel
@@ -92,7 +99,8 @@ def bootstap(x, multilevel: hm.hierarchy.multilevel.Multilevel, num_levels: int,
 
     # By passing, report on the speed of relaxation cycle at this setup stage.
     x0 = np.random.random((level.a.shape[0], 1))
-    _, c = hm.solve.run.run_iterative_method(level.operator, relax_cycle, x0, 30)
+    _, c = hm.solve.run.run_iterative_method(level.operator, relax_cycle, x0, num_sweeps=num_sweeps,
+                                             print_frequency=print_frequency)
     _LOGGER.info("Relax cycle conv factor {:.3f}".format(c))
 
     # Recreate all coarse levels. One down-pass, relaxing at each level, hopefully starting from improved x so the
@@ -106,6 +114,9 @@ def bootstap(x, multilevel: hm.hierarchy.multilevel.Multilevel, num_levels: int,
         r, aggregates = hm.setup.coarsening.create_coarsening_full_domain(x_level, threshold=threshold)
         _LOGGER.info("Aggregate sizes {}".format(np.array([len(aggregate) for aggregate in aggregates])))
         # _LOGGER.info("Aggregate {}".format(aggregates))
+        mock_conv_factor = np.array(
+            [hm.setup.auto_setup.mock_cycle_conv_factor(level, r, nu) for nu in np.arange(1, 6, dtype=int)])
+        _LOGGER.info("Mock cycle conv factor {}".format(np.array2string(mock_conv_factor, precision=3)))
         p = _create_interpolation(x_level, level.a, r, interpolation_method)
 
         # 'level' now becomes the next coarser level and x_level the corresponding test matrix.
@@ -120,6 +131,15 @@ def bootstap(x, multilevel: hm.hierarchy.multilevel.Multilevel, num_levels: int,
                 level.operator, lambda x: level.relax(x, b), x_level,
                 num_sweeps=num_sweeps, print_frequency=print_frequency)
     return x, new_multilevel
+
+
+def mock_cycle_conv_factor(level, r, num_relax_sweeps):
+    b = np.zeros((level.size,))
+    return hm.solve.run.run_iterative_method(
+        level.operator,
+        hm.solve.mock_cycle.MockCycle(lambda x, b: level.relax(x, b), r, num_relax_sweeps),
+        hm.solve.run.random_test_matrix((level.size,), num_examples=1),
+        num_sweeps=10)[1]
 
 
 def _create_interpolation(x: np.ndarray, a: scipy.sparse.csr_matrix, r: scipy.sparse.csr_matrix, method: str) -> \

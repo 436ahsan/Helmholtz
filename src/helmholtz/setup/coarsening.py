@@ -116,8 +116,8 @@ def _create_aggregate_coarsening(x, threshold, max_coarsening_ratio, max_aggrega
         nc, n = r.shape
         coarsening_by_aggregate_size[n] = r
         coarsening_ratio = nc / n
-        _LOGGER.debug("SVD {:2d} x {:2d} nc {} cr {:.2f} error {:.3f} Singular vals {}"
-                      " error {}".format(x_aggregate_t.shape[0], x_aggregate_t.shape[1], nc, coarsening_ratio,
+        _LOGGER.debug("SVD {:2d} x {:2d} nc {} cr {:.2f} err {:.3f} sigma {}"
+                      " err {}".format(x_aggregate_t.shape[0], x_aggregate_t.shape[1], nc, coarsening_ratio,
                                          (sum(s[nc:] ** 2) / sum(s ** 2)) ** 0.5,
                                          np.array2string(s, separator=", ", precision=2),
                                          np.array2string(
