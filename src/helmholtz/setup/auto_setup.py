@@ -16,7 +16,8 @@ def setup(a: scipy.sparse.spmatrix,
           max_levels: int = 100000,
           num_bootstrap_steps: int = 1,
           num_sweeps: int = 10,
-          num_examples: int = None,
+          num_examples: int = 20,
+          num_test_examples: int = 5,
           print_frequency: int = None,
           interpolation_method: str = "ls",
           threshold: float = 0.1,
@@ -29,13 +30,15 @@ def setup(a: scipy.sparse.spmatrix,
         max_levels: maximum number of levels in the hierarchy.
         num_bootstrap_steps:  number of bootstrap steps to perform at each level.
         num_sweeps: number of relaxations or cycles to run on fine-level vectors to improve them.
-        num_examples: number of test functions to generate. If None, uses 4 * np.prod(window_shape).
+        num_examples: total number of test functions to generate.
+        num_test_examples: number of test functions dedicated to testing (do not participate in SVD, LS fit).
         print_frequency: print debugging convergence statements per this number of relaxation cycles/sweeps.
           None means no printouts.
         interpolation_method: type of interpolation ("svd"|"ls").
         threshold: SVD coarsening accuracy threshold.
         max_coarsest_level_size: stop coarsening when we reach a coarse level with size <= max_coarsest_level_size
             (unless max_levels has been reached first).
+        x: optional test function initial guess. If None, we start with random[-1,1]/
 
     Returns:
         x: test matrix on the largest (final) domain.
@@ -52,9 +55,9 @@ def setup(a: scipy.sparse.spmatrix,
     # Improve vectors with 1-level relaxation.
     _LOGGER.info("Relax at level {} size {}".format(finest, level.size))
     b = np.zeros_like(x)
-    x, conv_factor = hm.solve.run.run_iterative_method(
+    x, relax_conv_factor = hm.solve.run.run_iterative_method(
         level.operator, lambda x: level.relax(x, b), x,num_sweeps=num_sweeps)
-    _LOGGER.info("Relax convergence factor {:.3f}".format(conv_factor))
+    _LOGGER.info("Relax convergence factor {:.3f}".format(relax_conv_factor))
     _LOGGER.info("RER {:.3f}".format(norm(a.dot(x)) / norm(x)))
 
     # Bootstrap with an increasingly deeper hierarchy (add one level at a time).
@@ -64,26 +67,32 @@ def setup(a: scipy.sparse.spmatrix,
         for i in range(num_bootstrap_steps):
             _LOGGER.info("Bootstrap step {}/{}".format(i + 1, num_bootstrap_steps))
             x, multilevel = bootstap(x, multilevel, num_levels, num_sweeps=num_sweeps, print_frequency=print_frequency,
-                                     interpolation_method=interpolation_method, threshold=threshold)
+                                     interpolation_method=interpolation_method, threshold=threshold,
+                                     num_test_examples=num_test_examples)
             _LOGGER.info("RER {:.3f}".format(norm(a.dot(x)) / norm(x)))
         if multilevel.level[-1].size <= max_coarsest_level_size:
             break
     return x, multilevel
 
 
-def bootstap(x, multilevel: hm.hierarchy.multilevel.Multilevel, num_levels: int,
-             num_sweeps: int = 10, threshold: float = 0.1, interpolation_method: str = "ls",
-             print_frequency: int = None) -> \
-        Tuple[np.ndarray, hm.hierarchy.multilevel.Multilevel]:
+def bootstap(x, multilevel: hm.hierarchy.multilevel.Multilevel, num_levels: int, relax_conv_factor: float,
+             num_sweeps: int = 10,
+             threshold: float = 0.1,
+             interpolation_method: str = "ls",
+             num_test_examples: int = 5,
+             print_frequency: int = None) -> Tuple[np.ndarray, hm.hierarchy.multilevel.Multilevel]:
     """
     Improves test functions and a multilevel hierarchy on a fixed-size domain by bootstrapping.
     Args:
         x: test matrix.
         multilevel: initial multilevel hierarchy.
         num_levels: number of levels in the returned multilevel hierarchy.
+        relax_conv_factor: relaxation convergence factor over the first 'num_sweeps', starting from a random
+            initial guess.
         num_sweeps: number of relaxations or cycles to run on fine-level vectors to improve them.
         threshold: relative reconstruction error threshold. Determines nc.
         interpolation_method: type of interpolation ("svd"|"ls").
+        num_test_examples: number of test functions dedicated to testing (do not participate in SVD, LS fit).
         print_frequency: print debugging convergence statements per this number of relaxation cycles/sweeps.
           None means no printouts.
 
@@ -95,13 +104,26 @@ def bootstap(x, multilevel: hm.hierarchy.multilevel.Multilevel, num_levels: int,
     def relax_cycle(x):
         return hm.solve.relax_cycle.relax_cycle(multilevel, 1.0, 2, 2, 4).run(x)
     level = multilevel.level[0]
-    x, _ = hm.solve.run.run_iterative_method(level.operator, relax_cycle, x, num_sweeps)
 
-    # By passing, report on the speed of relaxation cycle at this setup stage.
-    x0 = np.random.random((level.a.shape[0], 1))
-    _, c = hm.solve.run.run_iterative_method(level.operator, relax_cycle, x0, num_sweeps=num_sweeps,
-                                             print_frequency=print_frequency)
-    _LOGGER.info("Relax cycle conv factor {:.3f}".format(c))
+    # First, test relaxation cycle convergence on a random vector. If slow, this yields a yet unseen slow to converge
+    # error to add to the test function set, and indicate that we should NOT attempt to improve the current TFs with
+    # relaxation cycle, since it will do more harm than good.
+    y, conv_factor = hm.solve.run.run_iterative_method(level.operator, relax_cycle,
+                                                       np.random.random((level.a.shape[0], 1)),
+                                                       num_sweeps=num_sweeps, print_frequency=print_frequency)
+    y = y.flatten()
+    coarse_level = multilevel.level[1] if len(multilevel.level) > 1 else None
+    _LOGGER.info("Relax cycle conv factor {:.3f} asymptotic RQ {:.3f} RER {:.3f} P error {:.3f}".format(
+        conv_factor, level.rq(y), norm(level.operator(y)) / norm(y),
+        norm(y - coarse_level.p.dot(coarse_level.r.dot(y))) / norm(y) if coarse_level is not None else -1))
+
+    if conv_factor < relax_conv_factor:
+        # Relaxation cycle is more efficient than relaxation, smooth the previous vectors.
+        _LOGGER.info("Improving vectors by relaxation cycles")
+    else:
+        # Prepend the vector y to x, since our folds are sorted as fit, then test.
+        x = np.concatenate((y[:, None], x), axis=1)
+        _LOGGER.info("Added vector to TF set, #examples {}".format(x.shape[1]))
 
     # Recreate all coarse levels. One down-pass, relaxing at each level, hopefully starting from improved x so the
     # process improves all levels.
@@ -111,13 +133,25 @@ def bootstap(x, multilevel: hm.hierarchy.multilevel.Multilevel, num_levels: int,
     x_level = x
     for l in range(1, num_levels):
         _LOGGER.info("Coarsening level {}->{}".format(l - 1, l))
-        r, aggregates = hm.setup.coarsening.create_coarsening_full_domain(x_level, threshold=threshold)
-        _LOGGER.info("Aggregate sizes {}".format(np.array([len(aggregate) for aggregate in aggregates])))
+        x_fit, x_test = x_level[:, :-num_test_examples], x_level[:, -num_test_examples:]
+
+        # Create the coarsening operator R.
+        r, aggregates, nc, energy_error = \
+            hm.setup.coarsening.create_coarsening_full_domain(x_fit, threshold=threshold)
+        _LOGGER.info("Agg {}".format(np.array([len(aggregate) for aggregate in aggregates])))
+        _LOGGER.info("nc  {}".format(nc))
+        _LOGGER.info("Energy error mean {:.4f} max {:.4f}".format(np.mean(energy_error), np.max(energy_error)))
         # _LOGGER.info("Aggregate {}".format(aggregates))
         mock_conv_factor = np.array(
             [hm.setup.auto_setup.mock_cycle_conv_factor(level, r, nu) for nu in np.arange(1, 6, dtype=int)])
         _LOGGER.info("Mock cycle conv factor {}".format(np.array2string(mock_conv_factor, precision=3)))
+
+        # Create the interpolation operator P.
         p = _create_interpolation(x_level, level.a, r, interpolation_method)
+        for title, x_set in (("fit", x_fit), ("test", x_test)):
+            error = norm(x_set - p.dot(r.dot(x_set)), axis=0) / norm(x_set, axis=0)
+            _LOGGER.info("{:<4s} set size {:<2d} P error mean {:.2f} max {:.2f}".format(
+                title, len(error), np.mean(error), np.max(error)))
 
         # 'level' now becomes the next coarser level and x_level the corresponding test matrix.
         level = hierarchy.create_coarse_level(level.a, level.b, r, p)

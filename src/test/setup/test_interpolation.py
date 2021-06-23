@@ -22,7 +22,7 @@ class TestInterpolation:
         b = np.zeros_like(x)
         x, _ = hm.solve.run.run_iterative_method(level.operator, lambda x: level.relax(x, b), x, num_sweeps=num_sweeps)
         # Generate coarse variables (R) on the non-repetitive domain.
-        r, aggregates = hm.setup.coarsening.create_coarsening_full_domain(x, threshold=0.15)
+        r, aggregates, nc, energy_error = hm.setup.coarsening.create_coarsening_full_domain(x, threshold=0.15)
 
         p, fit_error, val_error, test_error, alpha_opt = \
             hm.setup.interpolation.create_interpolation_least_squares_auto_nbhrs(x, a, r)

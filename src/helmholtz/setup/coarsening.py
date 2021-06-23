@@ -50,7 +50,9 @@ def create_coarsening(x_aggregate_t, threshold: float) -> Tuple[Coarsener, np.nd
     Returns:
         coarsening operator nc x {aggregate_size}, list of all singular values on aggregate.
     """
+#    print(x_aggregate_t)
     u, s, vh = svd(x_aggregate_t)
+#    print(s, vh)
     nc = _get_interpolation_caliber(s, np.array([threshold]))[0]
     return Coarsener(vh[:nc]), s
 
@@ -72,15 +74,19 @@ def create_coarsening_full_domain(x, threshold: float = 0.1, max_coarsening_rati
     start = 0
     r_aggregate = []
     aggregates = []
+    nc = []
+    energy_error = []
     while start < x.shape[0]:
-        r = _create_aggregate_coarsening(x, threshold, max_coarsening_ratio, max_aggregate_size, start)
+        r, e = _create_aggregate_coarsening(x, threshold, max_coarsening_ratio, max_aggregate_size, start)
         r_aggregate.append(r)
+        energy_error.append(e)
         aggregate_size = r.shape[1]
         aggregates.append(np.arange(start, start + aggregate_size))
+        nc.append(r.shape[0])
         start += aggregate_size
 
     # Merge all aggregate coarsening operators.
-    return scipy.sparse.block_diag(r_aggregate).tocsr(), aggregates
+    return scipy.sparse.block_diag(r_aggregate).tocsr(), aggregates, np.array(nc), energy_error
 
 
 def _create_aggregate_coarsening(x, threshold, max_coarsening_ratio, max_aggregate_size, start):
@@ -105,6 +111,7 @@ def _create_aggregate_coarsening(x, threshold, max_coarsening_ratio, max_aggrega
     coarsening_by_aggregate_size = {aggregate_size: np.ones((1, 1))}
     # While the aggregate has room for expansion nor reached the end of the domain, and we haven't obtained the target
     # coarsening ratio yet, expand the aggregate and calculate a 'threshold'-tolerance SVD coarsening.
+    energy_error = 1
     while (aggregate_size <= max_aggregate_size // aggregate_expansion_factor) and (end < x.shape[0]) and \
             (coarsening_ratio > max_coarsening_ratio):
         aggregate_size *= aggregate_expansion_factor
@@ -116,19 +123,21 @@ def _create_aggregate_coarsening(x, threshold, max_coarsening_ratio, max_aggrega
         nc, n = r.shape
         coarsening_by_aggregate_size[n] = r
         coarsening_ratio = nc / n
+        energy_error = (sum(s[nc:] ** 2) / sum(s ** 2)) ** 0.5
         _LOGGER.debug("SVD {:2d} x {:2d} nc {} cr {:.2f} err {:.3f} sigma {}"
                       " err {}".format(x_aggregate_t.shape[0], x_aggregate_t.shape[1], nc, coarsening_ratio,
-                                         (sum(s[nc:] ** 2) / sum(s ** 2)) ** 0.5,
-                                         np.array2string(s, separator=", ", precision=2),
-                                         np.array2string(
+                                       energy_error, np.array2string(s, separator=", ", precision=2),
+                                       np.array2string(
                                              (1 - np.cumsum(s ** 2) / sum(s ** 2)) ** 0.5, separator=", ",
                                              precision=2)))
     r, n = min(((r, n) for n, r in coarsening_by_aggregate_size.items()), key=lambda item: item[0].shape[0] / item[1])
+    if r.shape[0] == aggregate_size:
+        energy_error = 0
     if r.shape[0] / aggregate_size > max_coarsening_ratio:
         _LOGGER.warning("Could not find a good coarsening ratio for aggregate {}:{}, n {} nc {} cr {:.2f}".format(
             start, start + n, n, r.shape[0], r.shape[0] / n
         ))
-    return r
+    return r, energy_error
 
 
 def _relative_reconstruction_error(s):

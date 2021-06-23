@@ -155,13 +155,19 @@ class TestBootstrapAuto:
         x = hm.solve.run.random_test_matrix((a.shape[0],), num_examples=num_examples)
         assert norm(a.dot(x)) / norm(x) == pytest.approx(2.91, 1e-2)
 
+        # Smooth TF by relaxation.
+        b = np.zeros_like(x)
+        x, relax_conv_factor = hm.solve.run.run_iterative_method(
+            level.operator, lambda x: level.relax(x, b), x, num_sweeps=num_sweeps)
+        assert norm(a.dot(x)) / norm(x) == pytest.approx(0.08, 1e-2)
+
         # Residual norm decreases fast during the first 3 bootstrap cycles, then saturates.
         expected_residual_norms = [0.175, 0.0677, 0.0502, 0.0473, 0.0444, 0.044, 0.0417, 0.0454]
         expected_conv_factor = [0.36, 0.36, 0.36, 0.36, 0.36, 0.36, 0.36, 0.36]
 
         # Relax vector + coarsen in first iteration; then 2-level cycle + improve hierarchy (bootstrap).
         for i, expected_residual_norm in enumerate(expected_residual_norms):
-            x, multilevel = hm.setup.auto_setup.bootstap(x, multilevel, max_levels, num_sweeps=10)
+            x, multilevel = hm.setup.auto_setup.bootstap(x, multilevel, max_levels, relax_conv_factor, num_sweeps=10)
             assert norm(a.dot(x)) / norm(x) == pytest.approx(expected_residual_norm, 1e-2)
 
             # Test two-level cycle convergence for A*x=0.
