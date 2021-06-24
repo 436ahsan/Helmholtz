@@ -120,6 +120,7 @@ def bootstap(x, multilevel: hm.hierarchy.multilevel.Multilevel, num_levels: int,
     if conv_factor < relax_conv_factor:
         # Relaxation cycle is more efficient than relaxation, smooth the previous vectors.
         _LOGGER.info("Improving vectors by relaxation cycles")
+        x, _ = hm.solve.run.run_iterative_method(level.operator, relax_cycle, x, num_sweeps)
     else:
         # Prepend the vector y to x, since our folds are sorted as fit, then test.
         x = np.concatenate((y[:, None], x), axis=1)
@@ -143,7 +144,7 @@ def bootstap(x, multilevel: hm.hierarchy.multilevel.Multilevel, num_levels: int,
         _LOGGER.info("Energy error mean {:.4f} max {:.4f}".format(np.mean(energy_error), np.max(energy_error)))
         # _LOGGER.info("Aggregate {}".format(aggregates))
         mock_conv_factor = np.array(
-            [hm.setup.auto_setup.mock_cycle_conv_factor(level, r, nu) for nu in np.arange(1, 6, dtype=int)])
+            [hm.setup.auto_setup.mock_cycle_conv_factor(level, r, nu) for nu in np.arange(1, 12, dtype=int)])
         _LOGGER.info("Mock cycle conv factor {}".format(np.array2string(mock_conv_factor, precision=3)))
 
         # Create the interpolation operator P.

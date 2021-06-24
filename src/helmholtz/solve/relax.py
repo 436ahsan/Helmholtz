@@ -55,14 +55,18 @@ class KaczmarzRelaxer:
 class GsRelaxer:
     """Implements Gauss-Seidel relaxation for A*x=b."""
 
-    def __init__(self, a: scipy.sparse.spmatrix) -> None:
+    def __init__(self, a: scipy.sparse.spmatrix, block_size=1) -> None:
         """
         Creates a Gauss-Seidel relaxer for A*x=b.
         Args:
             a: left-hand-side matrix.
+            block_size: block size, for block Gauss-Seidel.
         """
         self._a = a.tocsr()
-        self._m = scipy.sparse.tril(a).tocsr()
+        if block_size == 1:
+            self._m = scipy.sparse.tril(a).tocsr()
+        else:
+            self._m = block_tril(a, block_size)
 
     def step(self, x: np.array, b: np.array, lam: float = 0) -> np.array:
         """
@@ -78,3 +82,10 @@ class GsRelaxer:
         if delta.ndim < x.ndim:
             delta = delta[:, None]
         return x + delta
+
+
+def block_tril(a, block_size):
+    block_sizes = np.array([block_size] * (a.shape[0] // block_size))
+    end_index = np.concatenate(tuple(i * [ind] for i, ind in zip(block_sizes, np.cumsum(block_sizes))))
+    lower_part = a.nonzero()[1] < end_index[a.nonzero()[0]]
+    return scipy.sparse.csr_matrix((a.data[lower_part], (a.nonzero()[0][lower_part], a.nonzero()[1][lower_part])), shape=a.shape)

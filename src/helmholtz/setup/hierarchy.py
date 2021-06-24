@@ -24,14 +24,16 @@ def create_coarse_level(a: scipy.sparse.csr_matrix, b: scipy.sparse.csr_matrix,
     return hm.hierarchy.multilevel.Level(ac, bc, relaxer, r, p, r, p)
 
 
-def create_finest_level(a: scipy.sparse.spmatrix) -> multilevel.Level:
+def create_finest_level(a: scipy.sparse.spmatrix, relaxer=None) -> multilevel.Level:
     """
     Creates a repetitive domain finest level.
     Args:
         a: fine-level operator (stiffness matrix).
+        relaxer: optional relaxation scheme. Defaults to Kaczmarz.
 
     Returns: finest level object.
     """
     b = scipy.sparse.eye(a.shape[0])
-    relaxer = hm.solve.relax.KaczmarzRelaxer(a, b)
-    return hm.hierarchy.multilevel.Level.create_finest_level(a, relaxer)
+    if relaxer is None:
+        relaxer = hm.solve.relax.KaczmarzRelaxer(a, b)
+    return multilevel.Level.create_finest_level(a, relaxer)
