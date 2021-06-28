@@ -11,7 +11,7 @@ _LOGGER = logging.getLogger(__name__)
 
 
 def run_iterative_method(operator, method, x: np.ndarray, num_sweeps: int = 30, print_frequency: int = None,
-                         residual_stop_value: float = 1e-10) -> np.ndarray:
+                         residual_stop_value: float = 1e-10, conv_factor_type: str = "residual") -> np.ndarray:
     """
     Runs an solve method on A*x=0 and measures the convergence rate.
 
@@ -23,6 +23,7 @@ def run_iterative_method(operator, method, x: np.ndarray, num_sweeps: int = 30, 
         print_frequency: print debugging convergence statements per this number of sweeps.
           None means no printouts.
         residual_stop_value: stop iteration when norm(operator(x)) < residual_stop_value.
+        conv_factor_type: "residual"|"rer", convergence metric to use for defining the convergence factor.
 
     Returns:
         e: relaxed test matrix.
@@ -39,6 +40,8 @@ def run_iterative_method(operator, method, x: np.ndarray, num_sweeps: int = 30, 
         print_frequency = num_sweeps // 10
     r_norm_history = [None] * (num_sweeps + 1)
     r_norm_history[0] = r_norm
+    rer_history = [None] * (num_sweeps + 1)
+    rer_history[0] = rer
     min_sweeps = 5
     for i in range(1, num_sweeps + 1):
         r_norm_old = r_norm
@@ -51,14 +54,17 @@ def run_iterative_method(operator, method, x: np.ndarray, num_sweeps: int = 30, 
             _LOGGER.info("{:5d} |r| {:.8e} ({:.5f}) RER {:.5f} ({:.5f}) {:.5f}".format(
                 i, r_norm, r_norm / max(1e-30, r_norm_old), rer, rer / max(1e-30, rer_old), norm(x0)))
         r_norm_history[i] = r_norm
+        rer_history[i] = rer
         if i >= min_sweeps and r_norm < residual_stop_value:
             r_norm_history = r_norm_history[:i + 1]
+            rer_history = rer_history[:i + 1]
             break
     # return x, r_norm / r_norm_old
     # Average convergence factor over the last 5 steps. Exclude first cycle.
     last_steps = min(5, len(r_norm_history) - 2)
+    history = r_norm_history if conv_factor_type == "residual" else rer_history
     return x, (None if num_sweeps < 5 else
-           (r_norm_history[-1] / r_norm_history[-last_steps - 1]) ** (1 / last_steps))
+           (history[-1] / history[-last_steps - 1]) ** (1 / last_steps))
 
 
 def run_iterative_eigen_method(operator, method, x: np.ndarray, lam, num_sweeps: int = 30, print_frequency: int = None,

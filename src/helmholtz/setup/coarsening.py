@@ -22,7 +22,8 @@ class Coarsener:
             r: {aggregate_size} x {aggregate_size} coarse variable definition over an aggregate. Includes all possible
                 coarse vars, out of which we select nc based on an energy threshold in tile().
         """
-        self._r = r
+        # Convert matrix to array if needed.
+        self._r = np.array(r)
 
     def asarray(self) -> scipy.sparse.csr_matrix:
         """ Returns the dense coarsening matrix on an aggregate."""

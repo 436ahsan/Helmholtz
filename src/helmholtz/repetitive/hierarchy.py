@@ -29,7 +29,7 @@ def create_tiled_coarse_level(a: scipy.sparse.spmatrix, b: scipy.sparse.spmatrix
     return multilevel.Level(ac, bc, relaxer, r, p, r_csr, p_csr)
 
 
-def create_finest_level(a: scipy.sparse.spmatrix, relaxer: None) -> multilevel.Level:
+def create_finest_level(a: scipy.sparse.spmatrix, relaxer=None) -> multilevel.Level:
     """
     Creates a repetitive domain finest level.
     Args:

@@ -49,7 +49,7 @@ class TestBootstrapAuto:
         x, multilevel = hm.setup.auto_setup.setup(a, max_levels=2, num_examples=20, num_sweeps=20,
                                                          threshold=0.2)
 
-        assert x.shape == (16, 20)
+        assert x.shape == (16, 21)
 
         assert len(multilevel) == 2
 
@@ -64,13 +64,13 @@ class TestBootstrapAuto:
 
         # Test that test vector residuals are small.
         assert (hm.linalg.scaled_norm_of_matrix(a.dot(x)) / hm.linalg.scaled_norm_of_matrix(x)).mean() == \
-               pytest.approx(0.120, 1e-2)
+               pytest.approx(0.252, 1e-2)
 
         # Test two-level cycle convergence for A*x=0.
         two_level_cycle = lambda x: hm.solve.solve_cycle.solve_cycle(multilevel, 1.0, 1, 1).run(x)
         x0 = np.random.random((a.shape[0], ))
         x, conv_factor = hm.solve.run.run_iterative_method(level.operator, two_level_cycle, x0, 20)
-        assert conv_factor == pytest.approx(0.23, 1e-2)
+        assert conv_factor == pytest.approx(0.196, 1e-2)
 
 
     def test_laplace_2_level_bootstrap(self):
@@ -83,7 +83,7 @@ class TestBootstrapAuto:
         x, multilevel = hm.setup.auto_setup.setup(a, max_levels=2, num_examples=20, num_sweeps=20,
                                                          threshold=0.2, num_bootstrap_steps=2)
 
-        assert x.shape == (16, 20)
+        assert x.shape == (16, 21)
         assert len(multilevel) == 2
 
         # The coarse level should be Galerkin coarsening with piecewise constant interpolation.
@@ -93,7 +93,7 @@ class TestBootstrapAuto:
         p = coarse_level.p
         assert_array_equal(p[0].nonzero()[0], [0, 0, 0])
         assert_array_equal(p[0].nonzero()[1], [0, 1, 7])
-        assert_array_almost_equal(p[0].data, [-0.73, 0.13, -0.11], decimal=2)
+        assert_array_almost_equal(p[0].data, [-0.74, 0.13, -0.09], decimal=2)
         # Row sums are ~ constant.
         assert np.array(p.sum(axis=1)).flatten().mean() == pytest.approx(-0.707, 1e-2)
         assert np.array(p.sum(axis=1)).flatten().std() < 1e-4
@@ -108,12 +108,12 @@ class TestBootstrapAuto:
         coarse_level.print()
         assert_array_equal(ac_0.nonzero()[1], [0, 1, 2, 3, 5, 6, 7])
         assert_array_almost_equal(ac_0.data,
-                                  [-0.941028,  0.564876, -0.107981,  0.014992,  0.013662, -0.112899,  0.568408],
+                                  [-0.946088, 0.569588, -0.105618, 0.014087, 0.010783, -0.10681, 0.563984],
                                   decimal=5)
 
         # Vectors have lower residual after 2-level relaxation cycles than after relaxation only.
         assert (hm.linalg.scaled_norm_of_matrix(a.dot(x)) / hm.linalg.scaled_norm_of_matrix(x)).mean() == \
-               pytest.approx(0.0315, 1e-2)
+               pytest.approx(0.05, 1e-2)
 
     def test_helmholtz_coarsening(self):
         n = 16
@@ -123,7 +123,7 @@ class TestBootstrapAuto:
         x, multilevel = hm.setup.auto_setup.setup(a, max_levels=2, num_examples=20, num_sweeps=20,
                                                          threshold=0.2)
 
-        assert x.shape == (16, 20)
+        assert x.shape == (16, 21)
 
         assert len(multilevel) == 2
 
@@ -137,7 +137,7 @@ class TestBootstrapAuto:
         coarse_level.print()
 
         assert (hm.linalg.scaled_norm_of_matrix(a.dot(x)) / hm.linalg.scaled_norm_of_matrix(x)).mean() == \
-               pytest.approx(0.145, 1e-2)
+               pytest.approx(0.266, 1e-2)
 
     def test_helmholtz_2_level_bootstrap_cycles_reduce_test_function_residual(self):
         """We improve vectors by relaxation -> coarsening creation -> 2-level relaxation cycles.
@@ -158,8 +158,8 @@ class TestBootstrapAuto:
         # Smooth TF by relaxation.
         b = np.zeros_like(x)
         x, relax_conv_factor = hm.solve.run.run_iterative_method(
-            level.operator, lambda x: level.relax(x, b), x, num_sweeps=num_sweeps)
-        assert norm(a.dot(x)) / norm(x) == pytest.approx(0.08, 1e-2)
+            level.operator, lambda x: level.relax(x, b), x, num_sweeps=100)
+        assert norm(a.dot(x)) / norm(x) == pytest.approx(0.123, 1e-2)
 
         # Residual norm decreases fast during the first 3 bootstrap cycles, then saturates.
         expected_residual_norms = [0.175, 0.0677, 0.0502, 0.0473, 0.0444, 0.044, 0.0417, 0.0454]

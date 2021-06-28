@@ -66,7 +66,8 @@ def setup(a: scipy.sparse.spmatrix,
         _LOGGER.info("bootstrap at grid size {} with {} levels".format(x.shape[0], num_levels))
         for i in range(num_bootstrap_steps):
             _LOGGER.info("Bootstrap step {}/{}".format(i + 1, num_bootstrap_steps))
-            x, multilevel = bootstap(x, multilevel, num_levels, num_sweeps=num_sweeps, print_frequency=print_frequency,
+            x, multilevel = bootstap(x, multilevel, num_levels, relax_conv_factor,
+                                     num_sweeps=num_sweeps, print_frequency=print_frequency,
                                      interpolation_method=interpolation_method, threshold=threshold,
                                      num_test_examples=num_test_examples)
             _LOGGER.info("RER {:.3f}".format(norm(a.dot(x)) / norm(x)))
@@ -148,7 +149,7 @@ def bootstap(x, multilevel: hm.hierarchy.multilevel.Multilevel, num_levels: int,
         _LOGGER.info("Mock cycle conv factor {}".format(np.array2string(mock_conv_factor, precision=3)))
 
         # Create the interpolation operator P.
-        p = _create_interpolation(x_level, level.a, r, interpolation_method)
+        p = create_interpolation(x_level, level.a, r, interpolation_method)
         for title, x_set in (("fit", x_fit), ("test", x_test)):
             error = norm(x_set - p.dot(r.dot(x_set)), axis=0) / norm(x_set, axis=0)
             _LOGGER.info("{:<4s} set size {:<2d} P error mean {:.2f} max {:.2f}".format(
@@ -177,7 +178,7 @@ def mock_cycle_conv_factor(level, r, num_relax_sweeps):
         num_sweeps=10)[1]
 
 
-def _create_interpolation(x: np.ndarray, a: scipy.sparse.csr_matrix, r: scipy.sparse.csr_matrix, method: str) -> \
+def create_interpolation(x: np.ndarray, a: scipy.sparse.csr_matrix, r: scipy.sparse.csr_matrix, method: str) -> \
     scipy.sparse.csr_matrix:
     if method == "svd":
         p = r.transpose()

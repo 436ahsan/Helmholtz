@@ -7,7 +7,7 @@ import scipy.sparse.linalg
 class KaczmarzRelaxer:
     """Implements Kaczmarz relaxation for (A-lam*B)*x = b."""
 
-    def __init__(self, a: scipy.sparse.spmatrix, b: scipy.sparse.spmatrix) -> None:
+    def __init__(self, a: scipy.sparse.spmatrix, b: scipy.sparse.spmatrix, block_size: int = 1) -> None:
         """
         Creates a Kaczmarz relaxer for (A-lam*B)*x=b .
         Args:
@@ -20,9 +20,15 @@ class KaczmarzRelaxer:
         self._bt = b.transpose()
         # Storing M = lower triangular parts of (A-lam*B)*(A-lam*B)^T in CSR format (the Kaczmarz splitting matrix) for
         # linear solve efficiency.
-        self._ma = scipy.sparse.tril(a.dot(self._at)).tocsr()
-        self._m_cross = scipy.sparse.tril(a.dot(self._bt) + b.dot(self._at)).tocsr()
-        self._mb = scipy.sparse.tril(b.dot(self._bt)).tocsr()
+
+        if block_size == 1:
+            splitter = scipy.sparse.tril
+        else:
+            splitter = lambda a: block_tril(a, block_size)
+
+        self._ma = splitter(a.dot(self._at)).tocsr()
+        self._m_cross = splitter(a.dot(self._bt) + b.dot(self._at)).tocsr()
+        self._mb = splitter(b.dot(self._bt)).tocsr()
         self._at = self._at.tocsr()
 
     def step(self, x: np.array, b: np.array, lam: float = 0) -> np.array:
@@ -55,7 +61,7 @@ class KaczmarzRelaxer:
 class GsRelaxer:
     """Implements Gauss-Seidel relaxation for A*x=b."""
 
-    def __init__(self, a: scipy.sparse.spmatrix, block_size=1, omega: float = 1.0) -> None:
+    def __init__(self, a: scipy.sparse.spmatrix, block_size: int = 1, omega: float = 1.0) -> None:
         """
         Creates a Gauss-Seidel relaxer for A*x=b.
         Args:

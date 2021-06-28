@@ -230,3 +230,11 @@ def create_transfer_operators(x, domain_size: int, threshold: float = 0.1, calib
                                               r.asarray(), x_disjoint_aggregate_t, xc_disjoint_aggregate_t,
                                               domain_size, nc, caliber)
     return r, p, s
+
+
+def create_repetitive_coarsening(x, num_windows, aggregate_size, threshold):
+    """Returns a coarsening of a repetitive Helmholtz problem a from windows of the test matrix x."""
+    return hm.setup.coarsening.create_coarsening(
+        np.concatenate(tuple(hm.linalg.get_window(x, offset, aggregate_size)
+                                     for offset in range(num_windows)), axis=1).transpose(),
+        threshold)

@@ -133,6 +133,27 @@ def tile_array(r: np.ndarray, n: int) -> scipy.sparse.csr_matrix:
     return scipy.sparse.block_diag(tuple(r for _ in range(n))).tocsr()
 
 
+def helmholtz_1d_discrete_operator(kh: float, discretization: str, n: int) -> scipy.sparse.dia_matrix:
+    """
+    Returns the normalized FD-discretized 1D Helmholtz operator with periodic boundary conditions. The discretization
+    stencil is [1, -2 + (kh)^2, -1].
+
+    Args:
+        kh: k*h, where k is a the wave number and h is the meshsize.
+        discretization: "3-point"|"5-point", discretization scheme.
+        n: size of grid.
+
+    Returns:
+        Helmholtz operator (as a sparse matrix).
+    """
+    if discretization == "3-point":
+        return helmholtz_1d_operator(kh, n)
+    elif discretization == "5-point":
+        return helmholtz_1d_5_point_operator(kh, n)
+    else:
+        raise Exception("Unsupported discretization {}".format(discretization))
+
+
 def helmholtz_1d_operator(kh: float, n: int) -> scipy.sparse.dia_matrix:
     """
     Returns the normalized FD-discretized 1D Helmholtz operator with periodic boundary conditions. The discretization
