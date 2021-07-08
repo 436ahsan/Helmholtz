@@ -108,7 +108,8 @@ def create_interpolation_least_squares(x_aggregate_t: np.ndarray, xc_t: np.ndarr
 
 
 def create_interpolation_least_squares_auto_nbhrs(
-        x: np.ndarray, a: scipy.sparse.csr_matrix, r: scipy.sparse.csr_matrix) -> \
+        x: np.ndarray, a: scipy.sparse.csr_matrix, r: scipy.sparse.csr_matrix, neighborhood: str = "extended",
+        num_test_examples: int = 5) -> \
         Tuple[scipy.sparse.csr_matrix, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """
     Creates the interpolation operator P by least squares fitting from r*x to x. Interpolatory sets are automatically
@@ -117,6 +118,9 @@ def create_interpolation_least_squares_auto_nbhrs(
         x_t: fine-level test matrix. shape = (num_fine_vars, num_examples).
         a: fine-level operator (only its adjacency graph is used herer).
         r: coarsening operator.
+        neighborhood: "aggregate"|"extended" coarse neighborhood to interpolate from: only coarse variables in the
+            aggregate, or the R*A*R^T sparsity pattern.
+        num_test_examples: number of test functions dedicated to testing (do not participate in SVD, LS fit).
 
     Returns:
         interpolation matrix P,
@@ -128,15 +132,21 @@ def create_interpolation_least_squares_auto_nbhrs(
     # Define interpolation neighbors. We use as much neighbors of each fine point in an aggregate such that the coarse
     # stencil is not increased beyond its size if we only interpolated the from aggregate's coarse variables. This is
     # the union of all coarse variables in all aggregates of the points in i's fine-level (a) stencil.
-    nbhr = [np.unique(r[:, a[i].nonzero()[1]].nonzero()[0]) for i in range(x.shape[0])]
+    if neighborhood == "aggregate":
+        nbhr = [r[:, i].nonzero()[0] for i in range(x.shape[0])]
+    elif neighborhood == "extended":
+        nbhr = [np.unique(r[:, a[i].nonzero()[1]].nonzero()[0]) for i in range(x.shape[0])]
+    else:
+        raise Exception("Unsupported neighborhood type {}".format(neighborhood))
     # Ridge regularization parameter (list of values).
     alpha = np.array([0, 0.01, 0.1, 0.1, 1])
     num_examples = x.shape[1]
+    num_fit_examples = num_examples - num_test_examples
     return hm.setup.interpolation_fit.create_interpolation_least_squares(
         x.transpose(), r.dot(x).transpose(), nbhr, alpha,
-        fit_samples=int(0.5 * num_examples),
-        val_samples=int(0.25 * num_examples),
-        test_samples=int(0.25 * num_examples))
+        fit_samples=int(0.8 * num_fit_examples),
+        val_samples=int(0.2 * num_fit_examples),
+        test_samples=num_fit_examples)
 
 
 def _geometric_neighbors(w: int, nc: int):

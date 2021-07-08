@@ -1,8 +1,9 @@
 import numpy as np
 import pytest
-from numpy.ma.testutils import assert_array_almost_equal
+from numpy.ma.testutils import assert_array_equal, assert_array_almost_equal
 
 import helmholtz as hm
+import helmholtz.analysis
 
 
 class TestInterpolation:
@@ -21,6 +22,7 @@ class TestInterpolation:
         x = hm.solve.run.random_test_matrix((n,))
         b = np.zeros_like(x)
         x, _ = hm.solve.run.run_iterative_method(level.operator, lambda x: level.relax(x, b), x, num_sweeps=num_sweeps)
+        assert x.shape == (32, 128)
         # Generate coarse variables (R) on the non-repetitive domain.
         r, aggregates, nc, energy_error = hm.setup.coarsening.create_coarsening_full_domain(x, threshold=0.15)
 
@@ -85,3 +87,20 @@ class TestInterpolation:
              0.58, 0.25], [0.14, -0.18, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00,
                            0.39, 0.42]
         ], decimal=2)
+
+    def test_create_interpolation_least_squares_auto_nbhrs_ideal_tvs(self):
+        n = 32
+        kh = 0.6
+        a = hm.linalg.helmholtz_1d_operator(kh, n).tocsr()
+        # Generate relaxed test matrix.
+        x, _ = helmholtz.analysis.ideal.ideal_tv(a, 10)
+        assert x.shape == (32, 10)
+        # Generate coarse variables (R) on the non-repetitive domain.
+        r, aggregates, nc, energy_error = hm.setup.coarsening.create_coarsening_full_domain(x, threshold=0.15)
+
+        aggregate_size = np.array([len(aggregate) for aggregate in aggregates])
+        assert_array_equal(aggregate_size, [8, 4, 4, 8, 4, 4])
+        assert_array_equal(nc, [4, 2, 2, 4, 2, 2])
+
+        p, fit_error, val_error, test_error, alpha_opt = \
+            hm.setup.interpolation.create_interpolation_least_squares_auto_nbhrs(x, a, r, neighborhood="aggregate")

@@ -16,5 +16,5 @@ def ideal_tv(a, num_examples):
     ind = np.argsort(np.abs(lam))
     lam = lam[ind]
     v = v[:, ind]
-    return v[:, :num_examples], lam
+    return np.array(v[:, :num_examples]), lam
 

@@ -281,3 +281,28 @@ def relative_interpolation_error(p: scipy.sparse.csr_matrix, x: np.ndarray, xc: 
         return (x - px) / x
     else:
         return norm(x - px, axis=0) / norm(x, axis=0)
+
+
+def update_interpolation(p: scipy.sparse.csr_matrix, e, ec, nbhr: np.ndarray, threshold: float = 0.1) -> \
+    scipy.sparse.csr_matrix:
+    """
+    Updates an interpolation for a new vector using Kaczmarz (minimum move from current interpolation while
+    satisfying |e-P*ec| <= t.
+
+    Args:
+        p: old interpolation matrix.
+        e: new test vector.
+        ec: coarse representation of e.
+        nbhr: (i, j) index pairs indicating the sparsity pattern of the interpolation update.
+        threshold: coarsening accuracy threshold in e.
+
+    Returns:
+        updated interpolation. Sparsity pattern = p's pattern union nbhr.
+    """
+    r = e - p.dot(ec)
+    s = np.sign(r)
+    # Lagrange multiplier.
+    row, col = zip(*sorted(set(zip(i, j)) + set(nbhr[:, 0], nbhr[:, 1])))
+    E = ec[row, col]
+    lam = (r - s * (t ** 0.5)) / np.sum(E ** 2, axis=1)
+    return p + lam * E

@@ -7,13 +7,17 @@ import scipy.sparse.linalg
 class KaczmarzRelaxer:
     """Implements Kaczmarz relaxation for (A-lam*B)*x = b."""
 
-    def __init__(self, a: scipy.sparse.spmatrix, b: scipy.sparse.spmatrix, block_size: int = 1) -> None:
+    def __init__(self, a: scipy.sparse.spmatrix, b: scipy.sparse.spmatrix = None, block_size: int = 1,
+                 reverse: bool = False) -> None:
         """
         Creates a Kaczmarz relaxer for (A-lam*B)*x=b .
         Args:
             a: left-hand-side matrix.
             b: mass matrix, if non-None.
+            reverse: iff True, run in reverse lex order instead of lex order.
         """
+        if b is None:
+            b = scipy.sparse.eye(a.shape[0])
         self._a = a.tocsr()
         self._at = a.transpose()
         self._b = b.tocsr()
@@ -21,10 +25,17 @@ class KaczmarzRelaxer:
         # Storing M = lower triangular parts of (A-lam*B)*(A-lam*B)^T in CSR format (the Kaczmarz splitting matrix) for
         # linear solve efficiency.
 
-        if block_size == 1:
-            splitter = scipy.sparse.tril
+        if reverse:
+            if block_size == 1:
+                splitter = scipy.sparse.triu
+            else:
+                # TODO(oren): To be implemented.
+                splitter = lambda a: block_triu(a, block_size)
         else:
-            splitter = lambda a: block_tril(a, block_size)
+            if block_size == 1:
+                splitter = scipy.sparse.tril
+            else:
+                splitter = lambda a: block_tril(a, block_size)
 
         self._ma = splitter(a.dot(self._at)).tocsr()
         self._m_cross = splitter(a.dot(self._bt) + b.dot(self._at)).tocsr()
@@ -96,3 +107,19 @@ def block_tril(a, block_size):
     end_index = np.concatenate(tuple(i * [ind] for i, ind in zip(block_sizes, np.cumsum(block_sizes))))
     lower_part = a.nonzero()[1] < end_index[a.nonzero()[0]]
     return scipy.sparse.csr_matrix((a.data[lower_part], (a.nonzero()[0][lower_part], a.nonzero()[1][lower_part])), shape=a.shape)
+
+
+class SymmetricKaczmarzRelaxer:
+    """Implements forward-backward Kaczmarz relaxation for (A-lam*B)*x = b."""
+
+    def __init__(self, a: scipy.sparse.spmatrix, b: scipy.sparse.spmatrix, block_size: int = 1, num_sweeps: int = 1) -> None:
+        self._relax_forward = KaczmarzRelaxer(a, b, block_size=block_size, reverse=False)
+        self._relax_backward = KaczmarzRelaxer(a, b, block_size=block_size, reverse=True)
+        self._num_sweeps = num_sweeps
+
+    def step(self, x: np.array, b: np.array, lam: float = 0) -> np.array:
+        for i in range(self._num_sweeps):
+            x = self._relax_forward.step(x, b, lam=lam)
+        for i in range(self._num_sweeps):
+            x = self._relax_backward.step(x, b, lam=lam)
+        return x
