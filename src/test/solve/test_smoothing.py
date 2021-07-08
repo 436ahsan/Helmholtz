@@ -21,7 +21,7 @@ class TestSmoothing(unittest.TestCase):
         operator = lambda x: a.dot(x)
 
         kaczmarz = hm.solve.relax.KaczmarzRelaxer(a, scipy.sparse.eye(a.shape[0]))
-        p, conv = hm.solve.smoothing.shrinkage_factor(operator, kaczmarz, (n, ))
+        p, conv = hm.solve.smoothing.shrinkage_factor(operator, lambda x: kaczmarz, (n, ))
         assert_array_almost_equal(p, [3., 0.69307541,  1.86489, -0.16283799])
 
         # GS is a more efficient smoother and takes longer to slow down.

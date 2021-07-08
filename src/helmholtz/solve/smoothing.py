@@ -45,7 +45,7 @@ def shrinkage_factor(operator, method, domain_shape: np.ndarray, num_examples: i
         i += 1
         r_norm_old = r_norm
         rer_old = rer
-        x = method.step(x, b)
+        x = method(x)
         r_norm = norm(operator(x), axis=0)
         rer = r_norm / norm(x, axis=0)
         conv_factor = np.mean(rer / np.clip(rer_old, 1e-30, None))
@@ -81,7 +81,8 @@ def plot_fitted_conv_model(p, conv, ax, title: str = "Relax"):
     x = np.arange(1, len(conv) + 1)
     ax.plot(x, conv, "o")
     xd = np.linspace(1, len(conv) + 1, 100)
-    ax.plot(xd, _conv_model(xd, *p), label=r"{} $\mu_0 = {:.2f}, n_0 = {:.2f}$".format(title, p[0], p[1]))
+    ax.plot(xd, _conv_model(xd, *p), label=r"{} $\mu_0 = {:.2f}, n_0 = {:.2f}, p = {:.1f}$".format(
+        title, p[1], p[0], p[3]))
     ax.set_ylabel("RER Reduction")
     ax.set_xlabel("Sweep #")
     ax.grid(True)
