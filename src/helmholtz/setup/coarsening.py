@@ -59,7 +59,8 @@ def create_coarsening(x_aggregate_t, threshold: float) -> Tuple[Coarsener, np.nd
 
 
 def create_coarsening_full_domain(x, threshold: float = 0.1, max_coarsening_ratio: float = 0.5,
-                                  max_aggregate_size: int = 8) -> Tuple[scipy.sparse.csr_matrix, List[np.ndarray]]:
+                                  max_aggregate_size: int = 8, fixed_aggregate_size: int = None) -> \
+        Tuple[scipy.sparse.csr_matrix, List[np.ndarray]]:
     """
     Creates the next coarse level's SVD coarsening operator R on a full domain (non-repetitive).
     Args:
@@ -78,7 +79,8 @@ def create_coarsening_full_domain(x, threshold: float = 0.1, max_coarsening_rati
     nc = []
     energy_error = []
     while start < x.shape[0]:
-        r, e = _create_aggregate_coarsening(x, threshold, max_coarsening_ratio, max_aggregate_size, start)
+        r, e = _create_aggregate_coarsening(x, threshold, max_coarsening_ratio, max_aggregate_size, start,
+                                            fixed_aggregate_size=fixed_aggregate_size)
         r_aggregate.append(r)
         energy_error.append(e)
         aggregate_size = r.shape[1]
@@ -90,7 +92,8 @@ def create_coarsening_full_domain(x, threshold: float = 0.1, max_coarsening_rati
     return scipy.sparse.block_diag(r_aggregate).tocsr(), aggregates, np.array(nc), energy_error
 
 
-def _create_aggregate_coarsening(x, threshold, max_coarsening_ratio, max_aggregate_size, start):
+def _create_aggregate_coarsening(x, threshold, max_coarsening_ratio, max_aggregate_size, start,
+                                 fixed_aggregate_size: int = None):
     """
     Creates the next coarse level's SVD coarsening operator R.
     Args:
@@ -113,9 +116,17 @@ def _create_aggregate_coarsening(x, threshold, max_coarsening_ratio, max_aggrega
     # While the aggregate has room for expansion nor reached the end of the domain, and we haven't obtained the target
     # coarsening ratio yet, expand the aggregate and calculate a 'threshold'-tolerance SVD coarsening.
     energy_error = 1
-    while (aggregate_size <= max_aggregate_size // aggregate_expansion_factor) and (end < x.shape[0]) and \
+    # TODO(orenlivne): find a better strategy to locate aggregate size that does not involve incremental strategy
+    # (which is a lot more expensive than multiplicative).
+    # while (aggregate_size <= max_aggregate_size // aggregate_expansion_factor) and (end < x.shape[0]) and \
+    #         (coarsening_ratio > max_coarsening_ratio):
+        #aggregate_size *= aggregate_expansion_factor
+    if fixed_aggregate_size is not None:
+        aggregate_size = fixed_aggregate_size
+    while (aggregate_size < max_aggregate_size) and (end < x.shape[0]) and \
             (coarsening_ratio > max_coarsening_ratio):
-        aggregate_size *= aggregate_expansion_factor
+        if fixed_aggregate_size is None:
+            aggregate_size += 1
         end = min(start + aggregate_size, domain_size)
         x_aggregate_t = x[start:end].transpose()
         r, s = hm.setup.coarsening.create_coarsening(x_aggregate_t, threshold)
@@ -131,10 +142,12 @@ def _create_aggregate_coarsening(x, threshold, max_coarsening_ratio, max_aggrega
                                        np.array2string(
                                              (1 - np.cumsum(s ** 2) / sum(s ** 2)) ** 0.5, separator=", ",
                                              precision=2)))
+        if fixed_aggregate_size is not None:
+            break
     r, n = min(((r, n) for n, r in coarsening_by_aggregate_size.items()), key=lambda item: item[0].shape[0] / item[1])
     if r.shape[0] == aggregate_size:
         energy_error = 0
-    if r.shape[0] / aggregate_size > max_coarsening_ratio:
+    if r.shape[0] / aggregate_size > max_coarsening_ratio and fixed_aggregate_size is None:
         _LOGGER.warning("Could not find a good coarsening ratio for aggregate {}:{}, n {} nc {} cr {:.2f}".format(
             start, start + n, n, r.shape[0], r.shape[0] / n
         ))

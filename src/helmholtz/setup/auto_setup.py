@@ -152,8 +152,10 @@ def bootstap(x, multilevel: hm.hierarchy.multilevel.Multilevel, num_levels: int,
         p = create_interpolation(x_level, level.a, r, interpolation_method)
         for title, x_set in (("fit", x_fit), ("test", x_test)):
             error = norm(x_set - p.dot(r.dot(x_set)), axis=0) / norm(x_set, axis=0)
-            _LOGGER.info("{:<4s} set size {:<2d} P error mean {:.2f} max {:.2f}".format(
-                title, len(error), np.mean(error), np.max(error)))
+            error_a = norm(level.a.dot(x_set - p.dot(r.dot(x_set))), axis=0) / norm(x_set, axis=0)
+            _LOGGER.info(
+                "{:<4s} set size {:<2d} P L2 error mean {:.2f} max {:.2f} A error mean {:.2f} max {:.2f}".format(
+                    title, len(error), np.mean(error), np.max(error), np.mean(error_a), np.max(error_a)))
 
         # 'level' now becomes the next coarser level and x_level the corresponding test matrix.
         level = hierarchy.create_coarse_level(level.a, level.b, r, p)
@@ -170,7 +172,6 @@ def bootstap(x, multilevel: hm.hierarchy.multilevel.Multilevel, num_levels: int,
 
 
 def mock_cycle_conv_factor(level, r, num_relax_sweeps):
-    b = np.zeros((level.size,))
     return hm.solve.run.run_iterative_method(
         level.operator,
         hm.solve.mock_cycle.MockCycle(lambda x, b: level.relax(x, b), r, num_relax_sweeps),

@@ -11,7 +11,8 @@ _LOGGER = logging.getLogger(__name__)
 
 
 def shrinkage_factor(operator, method, domain_shape: np.ndarray, num_examples: int = 5,
-                     slow_conv_factor: float = 0.95, print_frequency: int = None, max_sweeps: int = 100) -> float:
+                     slow_conv_factor: float = 0.95, print_frequency: int = None, max_sweeps: int = 100,
+                     leeway_sweeps: int = 3) -> float:
     """
     Returns the shrinkage factor of an iterative method, the residual-to-error ratio (RER) reduction in the first
     num_sweeps steps for A*x = 0, starting from an initial guess.
@@ -25,6 +26,8 @@ def shrinkage_factor(operator, method, domain_shape: np.ndarray, num_examples: i
         slow_conv_factor: stop when convergence factor exceeds this number.
         print_frequency: print debugging convergence statements per this number of sweeps.
         max_sweeps: maximum number of iterations to run.
+        leeway_factor: leeway factor to allow in maximum efficiency point in calculating the point of diminishing
+            returns.
 
     Returns:
         e: relaxed test matrix.
@@ -34,7 +37,6 @@ def shrinkage_factor(operator, method, domain_shape: np.ndarray, num_examples: i
     x = hm.solve.run.random_test_matrix(domain_shape, num_examples=num_examples)
     r_norm = norm(operator(x), axis=0)
     rer = r_norm / norm(x, axis=0)
-    rer_initial = rer
     if print_frequency is not None:
         _LOGGER.info("{:5d} |r| {:.8e} RER {:.5f}".format(0, np.mean(r_norm), np.mean(rer)))
     b = np.zeros_like(x)
@@ -45,7 +47,7 @@ def shrinkage_factor(operator, method, domain_shape: np.ndarray, num_examples: i
         i += 1
         r_norm_old = r_norm
         rer_old = rer
-        x = method(x)
+        x = method(x, b)
         r_norm = norm(operator(x), axis=0)
         rer = r_norm / norm(x, axis=0)
         conv_factor = np.mean(rer / np.clip(rer_old, 1e-30, None))
@@ -56,10 +58,15 @@ def shrinkage_factor(operator, method, domain_shape: np.ndarray, num_examples: i
         rer_history.append(rer)
     rer_history = np.array(rer_history)
 
-    # Fit a piecewise constant/power-law-with-intercept to RER convergence reduction.
+    # Find point of diminishing returns. Allow for leeway of 10% from the maximum efficiency point.
+    reduction = np.mean(rer_history / rer_history[0], axis=1)
+    efficiency = reduction ** (1 / np.clip(np.arange(rer_history.shape[0]), 1e-2, None))
+    #index = np.where(efficiency <= min(efficiency) * leeway_factor)[0][-1]
+    index = min(np.argmin(efficiency) + leeway_sweeps, len(efficiency) - 1)
+    factor = efficiency[index]
+    # RER convergence factor.
     conv = np.mean(np.exp(np.diff(np.log(rer_history), axis=0)), axis=1)
-    p = _fit_conv_model(conv)
-    return p, conv
+    return factor, index, rer_history, conv
 
 
 def _conv_model(x, x0, y0, c, p):
@@ -83,6 +90,15 @@ def plot_fitted_conv_model(p, conv, ax, title: str = "Relax"):
     xd = np.linspace(1, len(conv) + 1, 100)
     ax.plot(xd, _conv_model(xd, *p), label=r"{} $\mu_0 = {:.2f}, n_0 = {:.2f}, p = {:.1f}$".format(
         title, p[1], p[0], p[3]))
+    ax.set_ylabel("RER Reduction")
+    ax.set_xlabel("Sweep #")
+    ax.grid(True)
+
+
+def plot_diminishing_returns_point(factor, num_sweeps, conv, ax, title: str = "Relax", color: str = "b"):
+    x = np.arange(1, len(conv) + 1)
+    ax.plot(x, conv, "o", color=color, label=r"{} $\mu = {:.2f}, i = {}$".format(title, factor, num_sweeps))
+    ax.scatter([num_sweeps], [conv[num_sweeps - 1]], 120, facecolors='none', edgecolors=color)
     ax.set_ylabel("RER Reduction")
     ax.set_xlabel("Sweep #")
     ax.grid(True)

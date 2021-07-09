@@ -21,13 +21,17 @@ class TestSmoothing(unittest.TestCase):
         operator = lambda x: a.dot(x)
 
         kaczmarz = hm.solve.relax.KaczmarzRelaxer(a, scipy.sparse.eye(a.shape[0]))
-        p, conv = hm.solve.smoothing.shrinkage_factor(operator, lambda x: kaczmarz, (n, ))
-        assert_array_almost_equal(p, [3., 0.69307541,  1.86489, -0.16283799])
+        factor, num_sweeps, _, _ = hm.solve.smoothing.shrinkage_factor(operator, lambda x, b: kaczmarz.step(x, b), (n, ),
+                                                           print_frequency=1, max_sweeps=20)
+        assert factor == pytest.approx(0.73, 1e-2)
+        assert num_sweeps == 6
 
-        # GS is a more efficient smoother and takes longer to slow down.
+        # GS is a more efficient smoother, thus takes less to slow down.
         gs = hm.solve.relax.GsRelaxer(a)
-        p, conv = hm.solve.smoothing.shrinkage_factor(operator, gs, (n, ), print_frequency=1, max_sweeps=5)
-        assert_array_almost_equal(p, [4.03305045,  0.56684545,  1.68422643, -0.33782641])
+        factor, num_sweeps, _, _ = hm.solve.smoothing.shrinkage_factor(operator, lambda x, b: gs.step(x, b), (n, ),
+                                                            print_frequency=1, max_sweeps=20)
+        assert factor == pytest.approx(0.60, 1e-2)
+        assert num_sweeps == 6
 
     def test_shrinkage_factor_helmholtz(self):
         n = 96
@@ -36,10 +40,14 @@ class TestSmoothing(unittest.TestCase):
         operator = lambda x: a.dot(x)
 
         kaczmarz = hm.solve.relax.KaczmarzRelaxer(a, scipy.sparse.eye(a.shape[0]))
-        p, conv = hm.solve.smoothing.shrinkage_factor(operator, kaczmarz, (n, ), slow_conv_factor=0.99)
-        assert_array_almost_equal(p, [ 3.666572,  0.691874,  1.003036, -1.535012])
+        factor, num_sweeps, _, _ = hm.solve.smoothing.shrinkage_factor(operator, lambda x, b: kaczmarz.step(x, b), (n, ),
+                                                           print_frequency=1, max_sweeps=20)
+        assert factor == pytest.approx(0.74, 1e-2)
+        assert num_sweeps == 6
 
         # GS is more efficient than Kaczmarz here too, but diverges.
         gs = hm.solve.relax.GsRelaxer(a)
-        p, conv = hm.solve.smoothing.shrinkage_factor(operator, gs, (n, ), slow_conv_factor=1.1)
-        assert_array_almost_equal(p, [ 3.639491,  0.520149,  1.000983, -8.711164])
+        factor, num_sweeps, _, _ = hm.solve.smoothing.shrinkage_factor(operator, lambda x, b: gs.step(x, b), (n, ),
+                                                            print_frequency=1, max_sweeps=20)
+        assert factor == pytest.approx(0.64, 1e-2)
+        assert num_sweeps == 5
