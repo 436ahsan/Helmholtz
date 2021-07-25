@@ -81,7 +81,8 @@ def bootstap(x, multilevel: hm.hierarchy.multilevel.Multilevel, num_levels: int,
              threshold: float = 0.1,
              interpolation_method: str = "ls",
              num_test_examples: int = 5,
-             print_frequency: int = None) -> Tuple[np.ndarray, hm.hierarchy.multilevel.Multilevel]:
+             print_frequency: int = None,
+             fixed_aggregate_size: int = None) -> Tuple[np.ndarray, hm.hierarchy.multilevel.Multilevel]:
     """
     Improves test functions and a multilevel hierarchy on a fixed-size domain by bootstrapping.
     Args:
@@ -96,6 +97,7 @@ def bootstap(x, multilevel: hm.hierarchy.multilevel.Multilevel, num_levels: int,
         num_test_examples: number of test functions dedicated to testing (do not participate in SVD, LS fit).
         print_frequency: print debugging convergence statements per this number of relaxation cycles/sweeps.
           None means no printouts.
+        fixed_aggregate_size: if not None, forces this aggregate size throughout the domain.
 
     Returns:
         improved x, multilevel hierarchy with the same number of levels.
@@ -139,7 +141,8 @@ def bootstap(x, multilevel: hm.hierarchy.multilevel.Multilevel, num_levels: int,
 
         # Create the coarsening operator R.
         r, aggregates, nc, energy_error = \
-            hm.setup.coarsening.create_coarsening_full_domain(x_fit, threshold=threshold)
+            hm.setup.coarsening.create_coarsening_domain(x_fit, threshold=threshold,
+                                                         fixed_aggregate_size=fixed_aggregate_size)
         _LOGGER.info("Agg {}".format(np.array([len(aggregate) for aggregate in aggregates])))
         _LOGGER.info("nc  {}".format(nc))
         _LOGGER.info("Energy error mean {:.4f} max {:.4f}".format(np.mean(energy_error), np.max(energy_error)))

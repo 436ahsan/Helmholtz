@@ -40,26 +40,25 @@ class Coarsener:
         return hm.linalg.tile_array(self.asarray(), n)
 
 
-def create_coarsening(x_aggregate_t, threshold: float) -> Tuple[Coarsener, np.ndarray]:
+def create_coarsening(x_aggregate_t, threshold: float, nc: int = None) -> Tuple[Coarsener, np.ndarray]:
     """
     Generates R (coarse variables) on an aggregate from SVD principal components.
 
     Args:
         x_aggregate_t: fine-level test matrix on an aggregate, transposed.
         threshold: relative reconstruction error threshold. Determines nc.
+        nc: if not None, overrides threshold with this fixed number of principal components.
 
     Returns:
         coarsening operator nc x {aggregate_size}, list of all singular values on aggregate.
     """
-#    print(x_aggregate_t)
     u, s, vh = svd(x_aggregate_t)
-#    print(s, vh)
-    nc = _get_interpolation_caliber(s, np.array([threshold]))[0]
+    nc = nc if nc is not None else _get_interpolation_caliber(s, np.array([threshold]))[0]
     return Coarsener(vh[:nc]), s
 
 
-def create_coarsening_full_domain(x, threshold: float = 0.1, max_coarsening_ratio: float = 0.5,
-                                  max_aggregate_size: int = 8, fixed_aggregate_size: int = None) -> \
+def create_coarsening_domain(x, threshold: float = 0.1, max_coarsening_ratio: float = 0.5,
+                             max_aggregate_size: int = 8, fixed_aggregate_size: int = None) -> \
         Tuple[scipy.sparse.csr_matrix, List[np.ndarray]]:
     """
     Creates the next coarse level's SVD coarsening operator R on a full domain (non-repetitive).

@@ -274,3 +274,22 @@ def pairwise_cos_similarity(x: np.ndarray, y: np.ndarray = None, squared: bool =
         return (x.transpose().dot(y) ** 2) / np.clip((x2[:, None] * y2[None, :]), 1e-15, None)
     else:
         return x.transpose().dot(y) / np.clip((x2[:, None] * y2[None, :]) ** 0.5, 1e-15, None)
+
+
+def csr_vappend(a: scipy.sparse.csr_matrix, b: scipy.sparse.csr_matrix) -> scipy.sparse.csr_matrix:
+    """
+    Takes in 2 csr_matrices and appends the second one to the bottom of the first one.
+    Much faster than scipy.sparse.vstack but assumes the type to be csr and overwrites
+    the first matrix instead of copying it. The data, indices, and indptr still get copied.
+
+    Args:
+        a: top matrix.
+        b: bottom matrix.
+
+    Returns: concatenated matrix.
+    """
+    a.data = np.hstack((a.data,b.data))
+    a.indices = np.hstack((a.indices,b.indices))
+    a.indptr = np.hstack((a.indptr,(b.indptr + a.nnz)[1:]))
+    a._shape = (a.shape[0]+b.shape[0],b.shape[1])
+    return a

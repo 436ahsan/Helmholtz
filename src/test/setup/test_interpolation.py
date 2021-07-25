@@ -24,7 +24,7 @@ class TestInterpolation:
         x, _ = hm.solve.run.run_iterative_method(level.operator, lambda x: level.relax(x, b), x, num_sweeps=num_sweeps)
         assert x.shape == (32, 128)
         # Generate coarse variables (R) on the non-repetitive domain.
-        r, aggregates, nc, energy_error = hm.setup.coarsening.create_coarsening_full_domain(x, threshold=0.15)
+        r, aggregates, nc, energy_error = hm.setup.coarsening.create_coarsening_domain(x, threshold=0.15)
 
         p, fit_error, val_error, test_error, alpha_opt = \
             hm.setup.interpolation.create_interpolation_least_squares_auto_nbhrs(x, a, r)
@@ -96,7 +96,7 @@ class TestInterpolation:
         x, _ = helmholtz.analysis.ideal.ideal_tv(a, 10)
         assert x.shape == (32, 10)
         # Generate coarse variables (R) on the non-repetitive domain.
-        r, aggregates, nc, energy_error = hm.setup.coarsening.create_coarsening_full_domain(x, threshold=0.15)
+        r, aggregates, nc, energy_error = hm.setup.coarsening.create_coarsening_domain(x, threshold=0.15)
 
         aggregate_size = np.array([len(aggregate) for aggregate in aggregates])
         assert_array_equal(aggregate_size, [8, 4, 4, 8, 4, 4])

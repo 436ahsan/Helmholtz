@@ -79,7 +79,7 @@ class TestCoarsening:
         x, _ = hm.solve.run.run_iterative_method(level.operator, lambda x: level.relax(x, b), x, num_sweeps=num_sweeps)
 
         # Generate coarse variables (R) on the non-repetitive domain.
-        r, aggregates, nc, energy_error = hm.setup.coarsening.create_coarsening_full_domain(x, threshold=0.15)
+        r, aggregates, nc, energy_error = hm.setup.coarsening.create_coarsening_domain(x, threshold=0.15)
 
         assert [a.tolist() for a in aggregates] == [[0, 1, 2, 3], [4, 5, 6, 7], [8, 9, 10, 11], [12, 13, 14, 15]]
         assert r.shape == (8, 16)

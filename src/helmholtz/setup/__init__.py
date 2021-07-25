@@ -1,1 +1,1 @@
-from . import coarsening, interpolation, interpolation_fit, auto_setup
+from . import coarsening, coarsening_uniform, interpolation, interpolation_fit, auto_setup
