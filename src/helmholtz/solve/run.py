@@ -34,7 +34,7 @@ def run_iterative_method(operator, method, x: np.ndarray, num_sweeps: int = 30, 
     r_norm = norm(operator(x0))
     rer = r_norm / norm(x0)
     if print_frequency is not None:
-        _LOGGER.info("{:5d} |r| {:.8e} RER {:.5f}".format(0, r_norm, rer))
+        _LOGGER.info("{:5d} |r| {:.3e} RER {:.5f}".format(0, r_norm, rer))
     # Run 'num_sweeps' relaxation sweeps.
     if print_frequency == 0:
         print_frequency = num_sweeps // 10
@@ -51,7 +51,7 @@ def run_iterative_method(operator, method, x: np.ndarray, num_sweeps: int = 30, 
         r_norm = norm(operator(x0))
         rer = r_norm / norm(x0)
         if print_frequency is not None and i % print_frequency == 0:
-            _LOGGER.info("{:5d} |r| {:.8e} ({:.5f}) RER {:.5f} ({:.5f}) {:.5f}".format(
+            _LOGGER.info("{:5d} |r| {:.3e} ({:.5f}) RER {:.5f} ({:.5f}) {:.3f}".format(
                 i, r_norm, r_norm / max(1e-30, r_norm_old), rer, rer / max(1e-30, rer_old), norm(x0)))
         r_norm_history[i] = r_norm
         rer_history[i] = rer
@@ -90,7 +90,7 @@ def run_iterative_eigen_method(operator, method, x: np.ndarray, lam, num_sweeps:
     x0 = x[:, 0]
     r_norm = norm(operator(x0, lam))
     lam_error = 1
-    _LOGGER.debug("{:5d} |r| {:.8e} lam {:.5f}".format(0, r_norm, lam))
+    _LOGGER.debug("{:5d} |r| {:.4e} lam {:.5f}".format(0, r_norm, lam))
     # Run 'num_sweeps' relaxation sweeps.
     if print_frequency is None:
         print_frequency = num_sweeps // 10
@@ -106,7 +106,7 @@ def run_iterative_eigen_method(operator, method, x: np.ndarray, lam, num_sweeps:
         r_norm = norm(operator(x0, lam))
         lam_error = np.abs(lam - lam_old)
         if i % print_frequency == 0:
-            _LOGGER.debug("{:5d} |r| {:.8e} ({:.5f}) lam {:.5f} ({:.5f})".format(
+            _LOGGER.debug("{:5d} |r| {:.4e} ({:.5f}) lam {:.5f} ({:.5f})".format(
                 i, r_norm, r_norm / max(1e-30, r_norm_old), lam, lam_error / max(1e-30, lam_error_old)))
         r_norm_history[i] = r_norm
         if i >= min_sweeps and r_norm < residual_stop_value:

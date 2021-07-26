@@ -140,12 +140,22 @@ def bootstap(x, multilevel: hm.hierarchy.multilevel.Multilevel, num_levels: int,
         x_fit, x_test = x_level[:, :-num_test_examples], x_level[:, -num_test_examples:]
 
         # Create the coarsening operator R.
-        r, aggregates, nc, energy_error = \
-            hm.setup.coarsening.create_coarsening_domain(x_fit, threshold=threshold,
-                                                         fixed_aggregate_size=fixed_aggregate_size)
-        _LOGGER.info("Agg {}".format(np.array([len(aggregate) for aggregate in aggregates])))
-        _LOGGER.info("nc  {}".format(nc))
-        _LOGGER.info("Energy error mean {:.4f} max {:.4f}".format(np.mean(energy_error), np.max(energy_error)))
+        aggregate_size_values = np.array([2, 4, 6])
+        nu_values = np.arange(1, 6, dtype=int)
+        max_conv_factor = 0.3
+        r, aggregate_size, nc, cr, mean_energy_error, nu, mock_conv, mock_work, mock_efficiency = \
+            hm.setup.coarsening_uniform.get_optimal_coarsening(
+                level, x, aggregate_size_values, nu_values, max_conv_factor=max_conv_factor)
+        _LOGGER.info("R {} a {} nc {} cr {:.2f} mean_energy_error {:.4f}; mock cycle nu {} conv {:.2f} "
+                     "efficiency {:.2f}".format(
+            r.shape, aggregate_size, nc, cr, mean_energy_error, nu, mock_conv, mock_efficiency))
+
+        # r, aggregates, nc, energy_error = \
+        #     hm.setup.coarsening.create_coarsening_domain(x_fit, threshold=threshold,
+        #                                                  fixed_aggregate_size=fixed_aggregate_size)
+        # _LOGGER.info("Agg {}".format(np.array([len(aggregate) for aggregate in aggregates])))
+        # _LOGGER.info("nc  {}".format(nc))
+        # _LOGGER.info("Energy error mean {:.4f} max {:.4f}".format(np.mean(energy_error), np.max(energy_error)))
         # _LOGGER.info("Aggregate {}".format(aggregates))
         mock_conv_factor = np.array(
             [hm.setup.auto_setup.mock_cycle_conv_factor(level, r, nu) for nu in np.arange(1, 12, dtype=int)])

@@ -66,7 +66,7 @@ def create_coarsening_domain_uniform(x, aggregate_size,
                                              shape=(r_last.shape[0], r_last.shape[1] + offset)).todense()
             # Merge the two.
             r = scipy.sparse.vstack((r, r_last))
-        yield r, mean_energy_error[nc]
+        yield r, mean_energy_error[nc - 1]
 
 
 def get_optimal_coarsening(level, x, aggregate_size_values, nu_values, max_conv_factor):
@@ -111,9 +111,11 @@ def get_optimal_coarsening(level, x, aggregate_size_values, nu_values, max_conv_
         work[mock_conv_factor <= max_conv_factor],
         efficiency[mock_conv_factor <= max_conv_factor]
     )).transpose()
+    print(candidate)
     best_index = np.argmin(candidate[:, -1])
     i, aggregate_size, nc, cr, mean_energy_error, nu, mock_conv, mock_work, mock_efficiency = candidate[best_index]
-    return r_values[int(i)], aggregate_size, nc, cr, mean_energy_error, nu, mock_conv, mock_work, mock_efficiency
+    return r_values[int(i)], int(aggregate_size), int(nc), cr, mean_energy_error, nu, mock_conv, mock_work, \
+        mock_efficiency
 
 
 def get_aggregate_starts(domain_size, aggregate_size):

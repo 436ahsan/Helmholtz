@@ -12,7 +12,7 @@ _LOGGER = logging.getLogger(__name__)
 
 def shrinkage_factor(operator, method, domain_shape: np.ndarray, num_examples: int = 5,
                      slow_conv_factor: float = 0.95, print_frequency: int = None, max_sweeps: int = 100,
-                     leeway_sweeps: int = 3) -> float:
+                     leeway_factor: float = 1.2) -> float:
     """
     Returns the shrinkage factor of an iterative method, the residual-to-error ratio (RER) reduction in the first
     num_sweeps steps for A*x = 0, starting from an initial guess.
@@ -26,46 +26,65 @@ def shrinkage_factor(operator, method, domain_shape: np.ndarray, num_examples: i
         slow_conv_factor: stop when convergence factor exceeds this number.
         print_frequency: print debugging convergence statements per this number of sweeps.
         max_sweeps: maximum number of iterations to run.
-        leeway_sweeps: number of sweeps to allow past the point of diminishing returns in estimating where slowness
-            starts.
+        leeway_factor: efficiency inflation factor past the point of diminishing returns to use in estimating where
+            slowness starts.
 
     Returns:
-        e: relaxed test matrix.
-        conv_factor: asymptotic convergence factor (of the last iteration) of the RER.
+        mu: shrinkage factor.
+        index: Point of Diminishing Returns (PODR) index into the residual_history array.
+        residual_history: residual norm run history array.
+        conv_history: residual norm convergence factor run history array.
+        conv_factor: asymptotic convergence factor estimate. This is only good for detecting a strong divergence or
+            convergence, and not meant to be quantitatively accurate for slow, converging iterations.
     """
 #    assert num_examples > 1
     x = hm.solve.run.random_test_matrix(domain_shape, num_examples=num_examples)
+    x_norm = norm(x, axis=0)
     r_norm = norm(operator(x), axis=0)
-    rer = r_norm / norm(x, axis=0)
+    rer = r_norm / x_norm
     if print_frequency is not None:
-        _LOGGER.info("{:5d} |r| {:.8e} RER {:.5f}".format(0, np.mean(r_norm), np.mean(rer)))
+        _LOGGER.info("Iter     |r|                 |x|         RER")
+        _LOGGER.info("{:<5d} {:.3e}            {:.3e}    {:.3f}".format(
+            0, np.mean(r_norm), np.mean(x_norm), np.mean(rer)))
     b = np.zeros_like(x)
-    conv_factor = 0
+    rer_conv_factor = 0
     i = 0
-    history = [r_norm]
-    while conv_factor < slow_conv_factor and i < max_sweeps:
+    residual_history = [r_norm]
+    # reduction = [np.ones_like(r_norm)]
+    # efficiency = list(reduction[0] ** (1 / 1e-2))
+    while rer_conv_factor < slow_conv_factor and i < max_sweeps:
         i += 1
         r_norm_old = r_norm
         rer_old = rer
         x = method(x, b)
         r_norm = norm(operator(x), axis=0)
-        rer = r_norm / norm(x, axis=0)
-        conv_factor = np.mean(rer / np.clip(rer_old, 1e-30, None))
+        x_norm = norm(x, axis=0)
+        rer = r_norm / x_norm
+        rer_conv_factor = np.mean(rer / np.clip(rer_old, 1e-30, None))
         if print_frequency is not None and i % print_frequency == 0:
-            _LOGGER.info("{:5d} |r| {:.8e} ({:.5f}) RER {:.5f} ({:.5f}) {:.5f}".format(
-                i, np.mean(r_norm), np.mean(r_norm / np.clip(r_norm_old, 1e-30, None)),
-                np.mean(rer), conv_factor, np.mean(norm(x, axis=0))))
-        history.append(r_norm)
-    history = np.array(history)
+            _LOGGER.info("{:<5d} {:.3e} ({:.3f})    {:.3e}    {:.3f} ({:.3f})".format(
+                i, np.mean(r_norm), np.mean(r_norm / np.clip(r_norm_old, 1e-30, None)), np.mean(x_norm),
+                np.mean(rer), rer_conv_factor))
+        residual_history.append(r_norm)
+        # red = np.mean(r_norm / history[0])
+        # reduction.append(red)
+        # efficiency.append(red ** (1 / i))
+    residual_history = np.array(residual_history)
+    # reduction = np.array(reduction)
+    # efficiency = np.array(efficiency)
 
-    # Find point of diminishing returns. Allow for leeway of 10% from the maximum efficiency point.
-    reduction = np.mean(history / history[0], axis=1)
-    efficiency = reduction ** (1 / np.clip(np.arange(history.shape[0]), 1e-2, None))
-    index = min(np.argmin(efficiency) + leeway_sweeps, len(efficiency) - 1)
+    # Find point of diminishing returns (PODR). Allow a leeway of 'leeway_factor' from the maximum efficiency point.
+    reduction = np.mean(residual_history / residual_history[0], axis=1)
+    efficiency = reduction ** (1 / np.clip(np.arange(residual_history.shape[0]), 1e-2, None))
+    index = max(np.where(efficiency < leeway_factor * min(efficiency))[0])
+    # factor = residual reduction per sweep over the first 'index' sweeps.
     factor = efficiency[index]
-    # Residual convergence factor.
-    conv = np.mean(np.exp(np.diff(np.log(history), axis=0)), axis=1)
-    return factor, index, history, conv
+
+    # Estimate the asymptotic convergence factor at twice the PODR.
+    # Residual convergence factor history.
+    conv_history = np.mean(np.exp(np.diff(np.log(residual_history), axis=0)), axis=1)
+    conv_factor = conv_history[min(2 * index, len(conv_history) - 1)]
+    return factor, index, residual_history, conv_history, conv_factor
 
 
 def _conv_model(x, x0, y0, c, p):
@@ -98,7 +117,7 @@ def plot_diminishing_returns_point(factor, num_sweeps, conv, ax, title: str = "R
     x = np.arange(1, len(conv) + 1)
     ax.plot(x, conv, "o", color=color, label=r"{} $\mu = {:.2f}, i = {}$".format(title, factor, num_sweeps))
     ax.scatter([num_sweeps], [conv[num_sweeps - 1]], 120, facecolors='none', edgecolors=color)
-    ax.set_ylabel("Residual Reduction")
+    ax.set_ylabel("Residual Reduction Factor")
     ax.set_xlabel("Sweep #")
     ax.grid(True)
 

@@ -36,7 +36,7 @@ class TestCoarseningUniform:
         r_values = np.array([item[0] for item in result])
         mean_energy_error = np.array([item[1] for item in result])
 
-        assert_array_almost_equal(mean_energy_error, [0.139669, 0.019861], decimal=5)
+        assert_array_almost_equal(mean_energy_error, [0.48278, 0.139669], decimal=5)
         assert r_values[0].shape == (4, 16)
         r = r_values[1]
         assert r.shape == (8, 16)
@@ -72,7 +72,7 @@ class TestCoarseningUniform:
         r_values = np.array([item[0] for item in result])
         mean_energy_error = np.array([item[1] for item in result])
 
-        assert_array_almost_equal(mean_energy_error, [0.135483, 0.017114], decimal=5)
+        assert_array_almost_equal(mean_energy_error, [0.513766, 0.135483], decimal=5)
         assert r_values[0].shape == (5, 17)
         r = r_values[1]
         assert r.shape == (10, 17)
@@ -93,7 +93,33 @@ class TestCoarseningUniform:
                 [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.66, -0.33, 0.20, 0.64]
             ], decimal=2)
 
-    def test_create_uniform_coarsening_domain_optimize(self):
+    def test_create_uniform_coarsening_domain_optimize_kh_0_5(self):
+        n = 96
+        kh = 0.5
+        a = hm.linalg.helmholtz_1d_operator(kh, n)
+        level = hm.repetitive.hierarchy.create_finest_level(a)
+        # Generate relaxed test matrix.
+        x = _get_test_matrix(a, n, 10)
+
+        # Calculate mock cycle predicted efficiency.
+        aggregate_size_values = np.array([2, 4, 6])
+        nu_values = np.arange(1, 6, dtype=int)
+        max_conv_factor = 0.3
+
+        r, aggregate_size, nc, cr, mean_energy_error, nu, mock_conv, mock_work, mock_efficiency = \
+            hm.setup.coarsening_uniform.get_optimal_coarsening(
+                level, x, aggregate_size_values, nu_values, max_conv_factor=max_conv_factor)
+        assert r.shape == (48, 96)
+        assert aggregate_size == 4
+        assert nc == 2
+        assert cr == pytest.approx(0.5, 1e-2)
+        assert mean_energy_error == pytest.approx(0.045, 1e-2)
+        assert nu == 3
+        assert mock_conv == pytest.approx(0.156, 1e-2)
+        assert mock_work == pytest.approx(6, 1e-2)
+        assert mock_efficiency == pytest.approx(0.733, 1e-2)
+
+    def test_create_uniform_coarsening_domain_optimize_kh_1(self):
         n = 96
         kh = 1
         a = hm.linalg.helmholtz_1d_operator(kh, n)
@@ -113,7 +139,7 @@ class TestCoarseningUniform:
         assert aggregate_size == 4
         assert nc == 2
         assert cr == pytest.approx(0.5, 1e-2)
-        assert mean_energy_error == pytest.approx(0.045, 1e-2)
+        assert mean_energy_error == pytest.approx(0.156, 1e-2)
         assert nu == 3
         assert mock_conv == pytest.approx(0.156, 1e-2)
         assert mock_work == pytest.approx(6, 1e-2)
