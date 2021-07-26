@@ -110,14 +110,14 @@ class TestCoarseningUniform:
             hm.setup.coarsening_uniform.get_optimal_coarsening(
                 level, x, aggregate_size_values, nu_values, max_conv_factor=max_conv_factor)
         assert r.shape == (48, 96)
-        assert aggregate_size == 4
-        assert nc == 2
+        assert aggregate_size == 2
+        assert nc == 1
         assert cr == pytest.approx(0.5, 1e-2)
-        assert mean_energy_error == pytest.approx(0.045, 1e-2)
-        assert nu == 3
-        assert mock_conv == pytest.approx(0.156, 1e-2)
-        assert mock_work == pytest.approx(6, 1e-2)
-        assert mock_efficiency == pytest.approx(0.733, 1e-2)
+        assert mean_energy_error == pytest.approx(0.256, 1e-2)
+        assert nu == 2
+        assert mock_conv == pytest.approx(0.222, 1e-2)
+        assert mock_work == pytest.approx(4, 1e-2)
+        assert mock_efficiency == pytest.approx(0.687, 1e-2)
 
     def test_create_uniform_coarsening_domain_optimize_kh_1(self):
         n = 96

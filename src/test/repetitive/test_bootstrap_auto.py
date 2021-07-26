@@ -70,7 +70,7 @@ class TestBootstrapAuto:
         two_level_cycle = lambda x: hm.solve.solve_cycle.solve_cycle(multilevel, 1.0, 1, 1).run(x)
         x0 = np.random.random((a.shape[0], ))
         x, conv_factor = hm.solve.run.run_iterative_method(level.operator, two_level_cycle, x0, 20)
-        assert conv_factor == pytest.approx(0.196, 1e-2)
+        assert conv_factor == pytest.approx(0.333, 1e-2)
 
 
     def test_laplace_2_level_bootstrap(self):
@@ -108,12 +108,12 @@ class TestBootstrapAuto:
         coarse_level.print()
         assert_array_equal(ac_0.nonzero()[1], [0, 1, 2, 3, 5, 6, 7])
         assert_array_almost_equal(ac_0.data,
-                                  [-0.946088, 0.569588, -0.105618, 0.014087, 0.010783, -0.10681, 0.563984],
+                                  [-0.949022,  0.567917, -0.107785,  0.015363,  0.006814, -0.100963,  0.567732],
                                   decimal=5)
 
         # Vectors have lower residual after 2-level relaxation cycles than after relaxation only.
         assert (hm.linalg.scaled_norm_of_matrix(a.dot(x)) / hm.linalg.scaled_norm_of_matrix(x)).mean() == \
-               pytest.approx(0.05, 1e-2)
+               pytest.approx(0.021, 1e-2)
 
     def test_helmholtz_coarsening(self):
         n = 16
@@ -162,8 +162,8 @@ class TestBootstrapAuto:
         assert norm(a.dot(x)) / norm(x) == pytest.approx(0.123, 1e-2)
 
         # Residual norm decreases fast during the first 3 bootstrap cycles, then saturates.
-        expected_residual_norms = [0.175, 0.0677, 0.0502, 0.0473, 0.0444, 0.044, 0.0417, 0.0454]
-        expected_conv_factor = [0.36, 0.36, 0.36, 0.36, 0.36, 0.36, 0.36, 0.36]
+        expected_residual_norms = [0.235, 0.0615, 0.0443]
+        expected_conv_factor = [0.275, 0.262, 0.300]
 
         # Relax vector + coarsen in first iteration; then 2-level cycle + improve hierarchy (bootstrap).
         for i, expected_residual_norm in enumerate(expected_residual_norms):

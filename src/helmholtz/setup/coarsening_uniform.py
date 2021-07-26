@@ -111,10 +111,10 @@ def get_optimal_coarsening(level, x, aggregate_size_values, nu_values, max_conv_
         work[mock_conv_factor <= max_conv_factor],
         efficiency[mock_conv_factor <= max_conv_factor]
     )).transpose()
-    print(candidate)
+    #print(candidate)
     best_index = np.argmin(candidate[:, -1])
     i, aggregate_size, nc, cr, mean_energy_error, nu, mock_conv, mock_work, mock_efficiency = candidate[best_index]
-    return r_values[int(i)], int(aggregate_size), int(nc), cr, mean_energy_error, nu, mock_conv, mock_work, \
+    return r_values[int(i)], int(aggregate_size), int(nc), cr, mean_energy_error, int(nu), mock_conv, mock_work, \
         mock_efficiency
 
 

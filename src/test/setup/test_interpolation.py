@@ -29,10 +29,10 @@ class TestInterpolation:
         p, fit_error, val_error, test_error, alpha_opt = \
             hm.setup.interpolation.create_interpolation_least_squares_auto_nbhrs(x, a, r)
 
-        assert np.mean(alpha_opt) == pytest.approx(0.0015625)
-        assert max(fit_error) == pytest.approx(0.0286, 1e-2)
-        assert max(val_error) == pytest.approx(0.0355, 1e-2)
-        assert max(test_error) == pytest.approx(0.0350, 1e-2)
+        assert np.mean(alpha_opt) == pytest.approx(0.00125)
+        assert max(fit_error) == pytest.approx(0.0289, 1e-2)
+        assert max(val_error) == pytest.approx(0.0347, 1e-2)
+        assert max(test_error) == pytest.approx(0.0405, 1e-2)
 
         assert p.shape == (32, 16)
         # To print p:
@@ -99,8 +99,8 @@ class TestInterpolation:
         r, aggregates, nc, energy_error = hm.setup.coarsening.create_coarsening_domain(x, threshold=0.15)
 
         aggregate_size = np.array([len(aggregate) for aggregate in aggregates])
-        assert_array_equal(aggregate_size, [8, 4, 4, 8, 4, 4])
-        assert_array_equal(nc, [4, 2, 2, 4, 2, 2])
+        assert_array_equal(aggregate_size, [6, 6, 4, 6, 6, 4])
+        assert_array_equal(nc,[3, 3, 2, 3, 3, 2])
 
         p, fit_error, val_error, test_error, alpha_opt = \
             hm.setup.interpolation.create_interpolation_least_squares_auto_nbhrs(x, a, r, neighborhood="aggregate")
