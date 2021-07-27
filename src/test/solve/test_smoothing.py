@@ -21,7 +21,7 @@ class TestSmoothing(unittest.TestCase):
         operator = lambda x: a.dot(x)
 
         kaczmarz = hm.solve.relax.KaczmarzRelaxer(a, scipy.sparse.eye(a.shape[0]))
-        factor, num_sweeps, _, _, conv = \
+        factor, num_sweeps, _, _, _, conv = \
             hm.solve.smoothing.shrinkage_factor(operator, lambda x, b: kaczmarz.step(x, b), (n, ))
         assert factor == pytest.approx(0.62, 1e-2)
         assert num_sweeps == 5
@@ -29,7 +29,7 @@ class TestSmoothing(unittest.TestCase):
 
         # GS is a more efficient smoother, thus takes less to slow down.
         gs = hm.solve.relax.GsRelaxer(a)
-        factor, num_sweeps, _, _, conv = \
+        factor, num_sweeps, _, _, _, conv = \
             hm.solve.smoothing.shrinkage_factor(operator, lambda x, b: gs.step(x, b), (n, ))
         assert factor == pytest.approx(0.43, 1e-2)
         assert num_sweeps == 4
@@ -42,7 +42,7 @@ class TestSmoothing(unittest.TestCase):
         operator = lambda x: a.dot(x)
 
         kaczmarz = hm.solve.relax.KaczmarzRelaxer(a, scipy.sparse.eye(a.shape[0]))
-        factor, num_sweeps, _, _, conv = \
+        factor, num_sweeps, _, _, _, conv = \
             hm.solve.smoothing.shrinkage_factor(operator, lambda x, b: kaczmarz.step(x, b), (n, ))
         assert factor == pytest.approx(0.63, 1e-2)
         assert num_sweeps == 5
@@ -50,7 +50,7 @@ class TestSmoothing(unittest.TestCase):
 
         # GS is more efficient than Kaczmarz here too, but diverges.
         gs = hm.solve.relax.GsRelaxer(a)
-        factor, num_sweeps, _, _, conv = \
+        factor, num_sweeps, _, _, _, conv = \
             hm.solve.smoothing.shrinkage_factor(operator, lambda x, b: gs.step(x, b), (n, ))
         assert factor == pytest.approx(0.48, 1e-2)
         assert num_sweeps == 3

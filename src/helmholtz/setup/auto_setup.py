@@ -78,11 +78,12 @@ def setup(a: scipy.sparse.spmatrix,
 
 def bootstap(x, multilevel: hm.hierarchy.multilevel.Multilevel, num_levels: int, relax_conv_factor: float,
              num_sweeps: int = 10,
-             threshold: float = 0.1,
              interpolation_method: str = "ls",
              num_test_examples: int = 5,
              print_frequency: int = None,
-             fixed_aggregate_size: int = None) -> Tuple[np.ndarray, hm.hierarchy.multilevel.Multilevel]:
+             aggregate_size_values: np.ndarray = np.array([2, 4, 6]),
+             nu_values: np.ndarray = np.arange(1, 6, dtype=int),
+             max_conv_factor: float = 0.3) -> Tuple[np.ndarray, hm.hierarchy.multilevel.Multilevel]:
     """
     Improves test functions and a multilevel hierarchy on a fixed-size domain by bootstrapping.
     Args:
@@ -113,7 +114,7 @@ def bootstap(x, multilevel: hm.hierarchy.multilevel.Multilevel, num_levels: int,
     # relaxation cycle, since it will do more harm than good.
     y, conv_factor = hm.solve.run.run_iterative_method(level.operator, relax_cycle,
                                                        np.random.random((level.a.shape[0], 1)),
-                                                       num_sweeps=num_sweeps, print_frequency=print_frequency)
+                                                       num_sweeps=20, print_frequency=print_frequency)
     y = y.flatten()
     coarse_level = multilevel.level[1] if len(multilevel.level) > 1 else None
     _LOGGER.info("Relax cycle conv factor {:.3f} asymptotic RQ {:.3f} RER {:.3f} P error {:.3f}".format(
@@ -140,14 +141,11 @@ def bootstap(x, multilevel: hm.hierarchy.multilevel.Multilevel, num_levels: int,
         x_fit, x_test = x_level[:, :-num_test_examples], x_level[:, -num_test_examples:]
 
         # Create the coarsening operator R.
-        aggregate_size_values = np.array([2, 4, 6])
-        nu_values = np.arange(1, 6, dtype=int)
-        max_conv_factor = 0.3
+        coarsener = hm.setup.coarsening_uniform.UniformCoarsener(level, x, aggregate_size_values, nu_values)
         r, aggregate_size, nc, cr, mean_energy_error, nu, mock_conv, mock_work, mock_efficiency = \
-            hm.setup.coarsening_uniform.get_optimal_coarsening(
-                level, x, aggregate_size_values, nu_values, max_conv_factor=max_conv_factor)
+            coarsener.get_optimal_coarsening(max_conv_factor)
         _LOGGER.info("R {} a {} nc {} cr {:.2f} mean_energy_error {:.4f}; mock cycle nu {} conv {:.2f} "
-                     "efficiency {:.2f}".format(
+                     "eff {:.2f}".format(
             r.shape, aggregate_size, nc, cr, mean_energy_error, nu, mock_conv, mock_efficiency))
 
         # r, aggregates, nc, energy_error = \
@@ -157,8 +155,7 @@ def bootstap(x, multilevel: hm.hierarchy.multilevel.Multilevel, num_levels: int,
         # _LOGGER.info("nc  {}".format(nc))
         # _LOGGER.info("Energy error mean {:.4f} max {:.4f}".format(np.mean(energy_error), np.max(energy_error)))
         # _LOGGER.info("Aggregate {}".format(aggregates))
-        mock_conv_factor = np.array(
-            [hm.setup.auto_setup.mock_cycle_conv_factor(level, r, nu) for nu in np.arange(1, 12, dtype=int)])
+        mock_conv_factor = np.array([hm.setup.auto_setup.mock_cycle_conv_factor(level, r, nu) for nu in nu_values])
         _LOGGER.info("Mock cycle conv factor {}".format(np.array2string(mock_conv_factor, precision=3)))
 
         # Create the interpolation operator P.

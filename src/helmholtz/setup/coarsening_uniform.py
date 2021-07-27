@@ -10,8 +10,8 @@ import helmholtz as hm
 _LOGGER = logging.getLogger(__name__)
 
 
-def create_coarsening_domain_uniform(x, aggregate_size,
-                                     cycle_index: float = 1, cycle_coarse_level_work_bound: float = 0.7,) -> \
+def create_coarsening_domain_uniform(x, aggregate_size, cycle_index: float = 1,
+                                     cycle_coarse_level_work_bound: float = 0.7) -> \
         Generator[Tuple[scipy.sparse.csr_matrix, List[np.ndarray]], None, None]:
     """
     Creates the next coarse level's SVD coarsening operator R on a full domain (non-repetitive).
@@ -69,53 +69,91 @@ def create_coarsening_domain_uniform(x, aggregate_size,
         yield r, mean_energy_error[nc - 1]
 
 
-def get_optimal_coarsening(level, x, aggregate_size_values, nu_values, max_conv_factor):
+class UniformCoarsener:
     """
-    Returns a coarsening matrix (R) on the non-repetitive domain, which maximizes mock cycle efficiency over aggregate
-    size and # principal components (coarse vars per aggregate).
-
-    Args:
-        level:
-        x:
-        aggregate_size_values:
-        nu_values:
-        max_conv_factor:
-
-    Returns:
-
+    Creates the next coarse level's SVD coarsening operator R on a full domain (non-repetitive).
+    Uses a fixed-size aggregate and #PCs throughout the domain.
     """
-    # Generates coarse variables (R) on the non-repetitive domain.
-    result = [(aggregate_size, nc, r, mean_energy_error)
-              for aggregate_size in aggregate_size_values
-              for nc, (r, mean_energy_error) in enumerate(
-            hm.setup.coarsening_uniform.create_coarsening_domain_uniform(x, aggregate_size), 1)]
-    aggregate_size = np.array([item[0] for item in result])
-    nc = np.array([item[1] for item in result])
-    r_values = np.array([item[2] for item in result])
-    mean_energy_error = np.array([item[3] for item in result])
-    # Note: can be derived from cycle index.
-    mock_conv_factor = np.array([[hm.setup.auto_setup.mock_cycle_conv_factor(level, r, nu) for nu in nu_values]
-                                 for r in r_values])
-    coarsening_ratio = np.array([r.shape[0] / r.shape[1] for r in r_values])
-    work = nu_values[None, :] / (1 - coarsening_ratio[:, None])
-    efficiency = mock_conv_factor ** (1 / work)
-    i, j = np.where(mock_conv_factor <= max_conv_factor)
-    candidate = np.vstack((
-        i,
-        aggregate_size[i],
-        nc[i],
-        coarsening_ratio[i],
-        mean_energy_error[i],
-        nu_values[j],
-        mock_conv_factor[mock_conv_factor <= max_conv_factor],
-        work[mock_conv_factor <= max_conv_factor],
-        efficiency[mock_conv_factor <= max_conv_factor]
-    )).transpose()
-    #print(candidate)
-    best_index = np.argmin(candidate[:, -1])
-    i, aggregate_size, nc, cr, mean_energy_error, nu, mock_conv, mock_work, mock_efficiency = candidate[best_index]
-    return r_values[int(i)], int(aggregate_size), int(nc), cr, mean_energy_error, int(nu), mock_conv, mock_work, \
-        mock_efficiency
+    def __init__(self, level, x, aggregate_size_values, nu_values, cycle_index: float = 1,
+                 cycle_coarse_level_work_bound: float = 0.7):
+        """
+
+        Args:
+            level: level object containing the relaxation scheme.
+            x: fine-level test matrix.
+            aggregate_size_values: aggregate sizes to optimize over.
+            nu_values: #sweep per cycle values to optimize over.
+            cycle_index: cycle index of the cycle we are designing.
+            cycle_coarse_level_work_bound: cycle_index * max_coarsening_ratio. Bounds the proportion of coarse level work
+                in the cycle.
+        """
+        # Generates coarse variables (R) on the non-repetitive domain.
+        self._result = [(aggregate_size, nc, r, mean_energy_error)
+                  for aggregate_size in aggregate_size_values
+                  for nc, (r, mean_energy_error) in enumerate(
+                hm.setup.coarsening_uniform.create_coarsening_domain_uniform(
+                    x, aggregate_size, cycle_index=cycle_index,
+                    cycle_coarse_level_work_bound=cycle_coarse_level_work_bound),
+                1)]
+        self._nu_values = nu_values
+        r_values = np.array([item[2] for item in self._result])
+        self._mock_conv_factor = np.array([[hm.setup.auto_setup.mock_cycle_conv_factor(level, r, nu)
+                                            for nu in nu_values] for r in r_values])
+
+    # TODO(oren): max_conv_factor can be derived from cycle index instead of being passed in.
+    def get_coarsening_info(self, max_conv_factor):
+        """
+        Returns a table of coarsening matrix performance statistics vs. aggregate size and # principal components
+        (coarse vars per aggregate).
+
+        Args:
+            max_conv_factor: max convergence factor to allow. NOTE: in principle, should be derived from cycle index.
+
+        Returns:
+            table of index into the _result array, aggregate_size, nc, cr, mean_energy_error, nu, mock_conv, mock_work,
+            mock_efficiency.
+        """
+        aggregate_size = np.array([item[0] for item in self._result])
+        nc = np.array([item[1] for item in self._result])
+        r_values = np.array([item[2] for item in self._result])
+        mean_energy_error = np.array([item[3] for item in self._result])
+        coarsening_ratio = np.array([r.shape[0] / r.shape[1] for r in r_values])
+        work = self._nu_values[None, :] / (1 - coarsening_ratio[:, None])
+        efficiency = self._mock_conv_factor ** (1 / work)
+        candidate = self._mock_conv_factor <= max_conv_factor
+        i, j = np.where(candidate)
+        candidate = np.vstack((
+            i,
+            aggregate_size[i],
+            nc[i],
+            coarsening_ratio[i],
+            mean_energy_error[i],
+            self._nu_values[j],
+            self._mock_conv_factor[candidate],
+            work[candidate],
+            efficiency[candidate]
+        )).transpose()
+        return candidate
+#        return np.array(candidate, [("i", "i4"), ("a", "i4"), ("nc", "i4"), ("cr", "f8"), ("Energy Error", "f8"),
+#                                    ("nu", "f8"), ("conv", "f8"), ("work", "f8"), ("eff", "f8")])
+
+    # TODO(oren): max_conv_factor can be derived from cycle index instead of being passed in.
+    def get_optimal_coarsening(self, max_conv_factor):
+        """
+        Returns a coarsening matrix (R) on the non-repetitive domain, which maximizes mock cycle efficiency over
+        aggregate size and # principal components (coarse vars per aggregate).
+
+        Args:
+            max_conv_factor: max convergence factor to allow. NOTE: in principle, should be derived from cycle index.
+
+        Returns:
+            Optimal R, aggregate_size, nc, cr, mean_energy_error, nu, mock_conv, mock_work, mock_efficiency.
+        """
+        candidate = self.get_coarsening_info(max_conv_factor)
+        best_index = np.argmin(candidate[:, -1])
+        i, aggregate_size, nc, cr, mean_energy_error, nu, mock_conv, mock_work, mock_efficiency = candidate[best_index]
+        return self._result[int(i)][2], int(aggregate_size), int(nc), cr, mean_energy_error, int(nu), mock_conv, \
+            mock_work, mock_efficiency
 
 
 def get_aggregate_starts(domain_size, aggregate_size):

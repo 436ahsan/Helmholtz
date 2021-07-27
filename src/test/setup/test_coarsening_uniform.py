@@ -106,9 +106,10 @@ class TestCoarseningUniform:
         nu_values = np.arange(1, 6, dtype=int)
         max_conv_factor = 0.3
 
+        coarsener = hm.setup.coarsening_uniform.UniformCoarsener(level, x, aggregate_size_values, nu_values)
         r, aggregate_size, nc, cr, mean_energy_error, nu, mock_conv, mock_work, mock_efficiency = \
-            hm.setup.coarsening_uniform.get_optimal_coarsening(
-                level, x, aggregate_size_values, nu_values, max_conv_factor=max_conv_factor)
+            coarsener.get_optimal_coarsening(max_conv_factor)
+
         assert r.shape == (48, 96)
         assert aggregate_size == 2
         assert nc == 1
@@ -132,9 +133,10 @@ class TestCoarseningUniform:
         nu_values = np.arange(1, 6, dtype=int)
         max_conv_factor = 0.3
 
+        coarsener = hm.setup.coarsening_uniform.UniformCoarsener(level, x, aggregate_size_values, nu_values)
         r, aggregate_size, nc, cr, mean_energy_error, nu, mock_conv, mock_work, mock_efficiency = \
-            hm.setup.coarsening_uniform.get_optimal_coarsening(
-                level, x, aggregate_size_values, nu_values, max_conv_factor=max_conv_factor)
+            coarsener.get_optimal_coarsening(max_conv_factor)
+
         assert r.shape == (48, 96)
         assert aggregate_size == 4
         assert nc == 2

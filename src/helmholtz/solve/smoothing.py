@@ -50,6 +50,7 @@ def shrinkage_factor(operator, method, domain_shape: np.ndarray, num_examples: i
     rer_conv_factor = 0
     i = 0
     residual_history = [r_norm]
+    rer_history = [rer]
     # reduction = [np.ones_like(r_norm)]
     # efficiency = list(reduction[0] ** (1 / 1e-2))
     while rer_conv_factor < slow_conv_factor and i < max_sweeps:
@@ -66,6 +67,7 @@ def shrinkage_factor(operator, method, domain_shape: np.ndarray, num_examples: i
                 i, np.mean(r_norm), np.mean(r_norm / np.clip(r_norm_old, 1e-30, None)), np.mean(x_norm),
                 np.mean(rer), rer_conv_factor))
         residual_history.append(r_norm)
+        rer_history.append(rer)
         # red = np.mean(r_norm / history[0])
         # reduction.append(red)
         # efficiency.append(red ** (1 / i))
@@ -84,7 +86,7 @@ def shrinkage_factor(operator, method, domain_shape: np.ndarray, num_examples: i
     # Residual convergence factor history.
     conv_history = np.mean(np.exp(np.diff(np.log(residual_history), axis=0)), axis=1)
     conv_factor = conv_history[min(2 * index, len(conv_history) - 1)]
-    return factor, index, residual_history, conv_history, conv_factor
+    return factor, index, residual_history, conv_history, rer_history, conv_factor
 
 
 def _conv_model(x, x0, y0, c, p):
@@ -130,11 +132,17 @@ def check_relax_cycle_shrinkage(multilevel, max_sweeps: int = 20, num_levels: in
     def relax_cycle(x):
         return hm.solve.relax_cycle.relax_cycle(multilevel, 1.0, nu_pre, nu_post, nu_coarsest,
                                                 num_levels=num_levels).run(x)
+    # This is two-level work.
+    # TODO(orenlivne): generralize to multilevel work.
+    print(len(multilevel.level))
+    r = multilevel.level[1].r
+    work = nu_pre + nu_post + (r.shape[0] / r.shape[1]) * nu_coarsest
 
     fig, ax = plt.subplots(1, 1, figsize=(6, 4))
 
     num_examples = 5
-    b = np.zeros((a.shape[0], num_examples))
+    n = a.shape[0]
+    b = np.zeros((n, num_examples))
 
     operator = lambda x: a.dot(x)
     relax = lambda x: level.relax(x, b)
@@ -143,21 +151,14 @@ def check_relax_cycle_shrinkage(multilevel, max_sweeps: int = 20, num_levels: in
     relax_cycle_b = lambda x, b: relax_cycle(x)
 
     for title, method, method_b, work, color in zip(
-        ("Kaczmarz", "Mini-cycle"), (relax, relax_cycle), (relax_b, relax_cycle_b), (1, 6), ("blue", "red")):
+        ("Kaczmarz", "Mini-cycle"), (relax, relax_cycle), (relax_b, relax_cycle_b), (1, work), ("blue", "red")):
         #print(title)
-        y, conv_factor = hm.solve.run.run_iterative_method(
-            level.operator, method, hm.solve.run.random_test_matrix((level.size, ), num_examples=1),
-            30,  print_frequency=None)
-
-        factor, num_sweeps, r, conv = hm.solve.smoothing.shrinkage_factor(
-            operator, method_b, (a.shape[0], ), print_frequency=1, max_sweeps=max_sweeps, slow_conv_factor=1.1, leeway_sweeps=3)
+        factor, num_sweeps, residual, conv, rer, relax_conv_factor = \
+            hm.solve.smoothing.shrinkage_factor(operator, method_b, (n,), print_frequency=1, max_sweeps=max_sweeps)
+        _LOGGER.info(
+            "Relax conv {:.2f} shrinkage {:.2f} PODR RER {:.2f} after {} sweeps. Work {:.1f} eff {:.2f}".format(
+                relax_conv_factor, factor, np.mean(rer[num_sweeps]), num_sweeps, work,
+                np.mean(residual[num_sweeps] / residual[0]) ** (1 / (num_sweeps * work))))
         hm.solve.smoothing.plot_diminishing_returns_point(factor, num_sweeps, conv, ax, title=title, color=color)
-        print("{:<10s} RER at point of diminishing returns {:.2f} num_sweeps {:>2d} work {:>2d} Residual-per-sweep {:.2f}".format(
-            title, np.mean(r[num_sweeps]), num_sweeps, work, np.mean(r[num_sweeps] / r[0]) ** (1/(num_sweeps * work))))
 
-    ax.legend();
-    # y, conv_factor = hm.solve.run.run_iterative_method(
-    #     level.operator, relax_cycle, hm.solve.run.random_test_matrix((level.size, ), num_examples=1),
-    #     10,  print_frequency=1)
-    # y_all[num_levels] = y
-    # print("Conv Factor {:.5f}".format(conv_factor))
+    ax.legend()
