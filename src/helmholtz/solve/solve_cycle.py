@@ -11,7 +11,7 @@ _LOGGER = logging.getLogger(__name__)
 
 
 def solve_cycle(multilevel: multilevel.Multilevel, cycle_index: float, nu_pre: int, nu_post: int,
-                debug: bool = False, num_levels: int = None, finest: int = 0):
+                debug: bool = False, num_levels: int = None, finest: int = 0, rhs: np.ndarray = None):
     """
     Creates a multilevel solution cycle of A*x=b. Note: x can either be of shape (n, m) with m >= 2 or (n, ), but not
     (n, 1).
@@ -30,7 +30,7 @@ def solve_cycle(multilevel: multilevel.Multilevel, cycle_index: float, nu_pre: i
     """
     if num_levels is None:
         num_levels = len(multilevel)
-    processor = SolutionCycleProcessor(multilevel, nu_pre, nu_post, debug=debug)
+    processor = SolutionCycleProcessor(multilevel, nu_pre, nu_post, debug=debug, rhs=rhs)
     return hm.hierarchy.cycle.Cycle(processor, cycle_index, num_levels, finest=finest)
 
 
@@ -38,7 +38,8 @@ class SolutionCycleProcessor(hm.hierarchy.processor.Processor):
     """
     Relaxation cycle processor. Executes a Cycle(nu_pre, nu_post) on A*x = 0.
     """
-    def __init__(self, multilevel: multilevel.Multilevel, nu_pre: int, nu_post: int, debug: bool = False) -> np.array:
+    def __init__(self, multilevel: multilevel.Multilevel, nu_pre: int, nu_post: int, debug: bool = False,
+                 rhs: np.ndarray = None) -> np.array:
         """
         Args:
             multilevel: multilevel hierarchy to use in the cycle.
@@ -46,6 +47,7 @@ class SolutionCycleProcessor(hm.hierarchy.processor.Processor):
             nu_post: number of relaxation sweeps at a level after visiting coarser levels.
             nu_coarsest: number of relaxation sweeps to run at the coarsest level.
             debug: print logging debugging printouts or not.
+            rhs: optional RHS, for running on A*x=b.
         """
         self._multilevel = multilevel
         self._nu_pre = nu_pre
@@ -54,6 +56,7 @@ class SolutionCycleProcessor(hm.hierarchy.processor.Processor):
         self._x = None
         self._x_initial = None
         self._b = None
+        self._rhs = rhs
 
     def initialize(self, l, num_levels, x):
         if self._debug:
@@ -66,6 +69,8 @@ class SolutionCycleProcessor(hm.hierarchy.processor.Processor):
         # Initialize finest-level quantities.
         self._x[l] = x
         self._b[l] = np.zeros_like(x)
+        if self._rhs is not None:
+            self._b[l] = self._rhs
 
     def process_coarsest(self, l):
         self._print_state(l, "initial")

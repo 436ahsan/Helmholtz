@@ -11,7 +11,8 @@ _LOGGER = logging.getLogger(__name__)
 
 
 def create_coarsening_domain_uniform(x, aggregate_size, cycle_index: float = 1,
-                                     cycle_coarse_level_work_bound: float = 0.7) -> \
+                                     cycle_coarse_level_work_bound: float = 0.7,
+                                     repetitive: bool = False) -> \
         Generator[Tuple[scipy.sparse.csr_matrix, List[np.ndarray]], None, None]:
     """
     Creates the next coarse level's SVD coarsening operator R on a full domain (non-repetitive).
@@ -23,6 +24,8 @@ def create_coarsening_domain_uniform(x, aggregate_size, cycle_index: float = 1,
         cycle_coarse_level_work_bound: cycle_index * max_coarsening_ratio. Bounds the proportion of coarse level work
             in the cycle.
         aggregate_size: uniform aggregate size throughout the domain.
+        repetitive: whether to exploit problem repetitiveness by creating a constant R stencil on all aggregates
+            using windows from a single (or few) test vectors.
 
     Returns: a generator of (coarsening operator R, mean energy error over all aggregates), for all
         nc = 1..max_components (that satisfy the cycle work bound).
@@ -35,11 +38,20 @@ def create_coarsening_domain_uniform(x, aggregate_size, cycle_index: float = 1,
     # Sweep the domain left to right; add an aggregate and its coarsening until we get to the domain end. Use a uniform
     # aggregate size; the last two aggregates will overlap of the domain size is not divisible by the aggregate size.
     # Find PCs of each aggregate.
-    starts = get_aggregate_starts(domain_size, aggregate_size)
-    svd_results = [
-        hm.setup.coarsening.create_coarsening(x[start:start + aggregate_size].transpose(), None, nc=num_components)
-        for start in starts
-    ]
+    starts = hm.linalg.get_uniform_aggregate_starts(domain_size, aggregate_size)
+    if repetitive:
+        # Keep enough windows so that we have enough samples (4 * aggregate_size) an over-determined LS problem for R.
+        x_aggregate_t = np.concatenate(
+            tuple(hm.linalg.get_window(x, offset, aggregate_size)
+                  for offset in range(max((4 * aggregate_size) // x.shape[1], 1))), axis=1).transpose()
+        # Tile the same coarsening over all aggregates.
+        aggregate_coarsening = hm.setup.coarsening.create_coarsening(x_aggregate_t, None, nc=num_components)
+        svd_results = [aggregate_coarsening for _ in starts]
+    else:
+        svd_results = [
+            hm.setup.coarsening.create_coarsening(x[start:start + aggregate_size].transpose(), None, nc=num_components)
+            for start in starts
+        ]
     r_aggregate_candidates = tuple(aggregate_svd_result[0].asarray() for aggregate_svd_result in svd_results)
 
     # Singular values, used for checking energy error in addition to the mock cycle criterion.
@@ -63,9 +75,9 @@ def create_coarsening_domain_uniform(x, aggregate_size, cycle_index: float = 1,
             r_last = scipy.sparse.csr_matrix(r_aggregate[-1])
             offset = starts[-1]
             r_last = scipy.sparse.csr_matrix((r_last.data, r_last.indices + offset, r_last.indptr),
-                                             shape=(r_last.shape[0], r_last.shape[1] + offset)).todense()
+                                             shape=(r_last.shape[0], domain_size)).todense()
             # Merge the two.
-            r = scipy.sparse.vstack((r, r_last))
+            r = scipy.sparse.vstack((r, r_last)).tocsr()
         yield r, mean_energy_error[nc - 1]
 
 
@@ -75,7 +87,7 @@ class UniformCoarsener:
     Uses a fixed-size aggregate and #PCs throughout the domain.
     """
     def __init__(self, level, x, aggregate_size_values, nu_values, cycle_index: float = 1,
-                 cycle_coarse_level_work_bound: float = 0.7):
+                 cycle_coarse_level_work_bound: float = 0.7, repetitive: bool = False):
         """
 
         Args:
@@ -84,8 +96,10 @@ class UniformCoarsener:
             aggregate_size_values: aggregate sizes to optimize over.
             nu_values: #sweep per cycle values to optimize over.
             cycle_index: cycle index of the cycle we are designing.
-            cycle_coarse_level_work_bound: cycle_index * max_coarsening_ratio. Bounds the proportion of coarse level work
-                in the cycle.
+            cycle_coarse_level_work_bound: cycle_index * max_coarsening_ratio. Bounds the proportion of coarse level
+                work in the cycle.
+            repetitive: whether to exploit problem repetitiveness by creating a constant R stencil on all aggregates
+                using windows from a single (or few) test vectors.
         """
         # Generates coarse variables (R) on the non-repetitive domain.
         self._result = [(aggregate_size, nc, r, mean_energy_error)
@@ -93,7 +107,8 @@ class UniformCoarsener:
                   for nc, (r, mean_energy_error) in enumerate(
                 hm.setup.coarsening_uniform.create_coarsening_domain_uniform(
                     x, aggregate_size, cycle_index=cycle_index,
-                    cycle_coarse_level_work_bound=cycle_coarse_level_work_bound),
+                    cycle_coarse_level_work_bound=cycle_coarse_level_work_bound,
+                    repetitive=repetitive),
                 1)]
         self._nu_values = nu_values
         r_values = np.array([item[2] for item in self._result])
@@ -150,21 +165,11 @@ class UniformCoarsener:
             Optimal R, aggregate_size, nc, cr, mean_energy_error, nu, mock_conv, mock_work, mock_efficiency.
         """
         candidate = self.get_coarsening_info(max_conv_factor)
+        if candidate.size == 0:
+            _LOGGER.info("Candidates coarsening")
+            _LOGGER.info(self.get_coarsening_info(1.0))
+            raise Exception("Could not find a coarsening whose mock cycle is below {:.2f}".format(max_conv_factor))
         best_index = np.argmin(candidate[:, -1])
         i, aggregate_size, nc, cr, mean_energy_error, nu, mock_conv, mock_work, mock_efficiency = candidate[best_index]
         return self._result[int(i)][2], int(aggregate_size), int(nc), cr, mean_energy_error, int(nu), mock_conv, \
             mock_work, mock_efficiency
-
-
-def get_aggregate_starts(domain_size, aggregate_size):
-    """
-    Returns the list of aggregate starts, for a domain size and fixed aggregate size over the entire domain. The last
-    two aggregates overlap if the domain size is not divisible by the aggregate size.
-    Args:
-        domain_size: domain size.
-        aggregate_size: aggregate sixe.
-
-    Returns: list of aggregate start indices.
-    """
-    return list(range(0, domain_size, aggregate_size)) if domain_size % aggregate_size == 0 else \
-        list(range(0, domain_size - aggregate_size, aggregate_size)) + [domain_size - aggregate_size]

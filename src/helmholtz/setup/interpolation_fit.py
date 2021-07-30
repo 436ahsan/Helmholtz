@@ -88,7 +88,7 @@ class InterpolationFitter:
             """Returns the fitting and validation errors from k nearest neighbors (the last two columns returned from
             fit_interpolation()."""
             # Exclude self from k nearest neighbors.
-            neighbors = self._nbhr[i, :k]
+            neighbors = self._nbhr[i][:k]
             return fit_interpolation(xc_fit[:, neighbors], x_fit[:, i],
                                      xc_val[:, neighbors], x_val[:, i],
                                      alpha_values, intercept=intercept, return_weights=return_weights)
@@ -213,7 +213,7 @@ def create_interpolation_least_squares(
         val_samples: int = None,
         test_samples: int = None) -> Tuple[scipy.sparse.csr_matrix, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """
-    Creates the next coarse level's R and P operators.
+    Creates the next coarse level interpolation operator P.
     Args:
         x: fine-level test matrix.
         xc: coarse-level test matrix.
@@ -236,19 +236,19 @@ def create_interpolation_least_squares(
     nc = xc.shape[1]
     if fit_samples is None or val_samples is None or test_samples is None:
         fit_samples, val_samples, test_samples = num_examples // 3, num_examples // 3, num_examples // 3
-    fit_range = (0, fit_samples)
-    val_range = (fit_samples, fit_samples + val_samples)
+    fit_range  = (0, fit_samples)
+    val_range  = (fit_samples, fit_samples + val_samples)
     test_range = (fit_samples + val_samples, fit_samples + val_samples + test_samples)
-    xc_fit  = xc[fit_range [0]:fit_range [1]]
-    x_fit   = x [fit_range [0]:fit_range [1]]
-    xc_val  = xc[val_range [0]:val_range [1]]
-    x_val   = x [val_range [0]:val_range [1]]
-    xc_test = xc[test_range[0]:test_range[1]]
-    x_test  = x [test_range[0]:test_range[1]]
+    xc_fit     = xc[fit_range [0]:fit_range [1]]
+    x_fit      = x [fit_range [0]:fit_range [1]]
+    xc_val     = xc[val_range [0]:val_range [1]]
+    x_val      = x [val_range [0]:val_range [1]]
+    xc_test    = xc[test_range[0]:test_range[1]]
+    x_test     = x [test_range[0]:test_range[1]]
 
     # Fit interpolation by least-squares.
-    result = [optimized_fit_interpolation(xc_fit[:, nbhr_i], x_fit[:, i], xc_val[:, nbhr_i], x_val[:, i],
-                                          alpha, return_weights=True)
+    result = [optimized_fit_interpolation(
+        xc_fit[:, nbhr_i], x_fit[:, i], xc_val[:, nbhr_i], x_val[:, i], alpha, return_weights=True)
               for i, nbhr_i in enumerate(nbhr)]
     alpha_opt = np.array([row[0] for row in result])
     info = [row[1] for row in result]

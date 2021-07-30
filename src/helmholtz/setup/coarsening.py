@@ -12,7 +12,7 @@ _LOGGER = logging.getLogger(__name__)
 
 class Coarsener:
     """
-    Encapsulates the restruction operator as both a full array over an aggregate (for easy tiling) and sparse CSR matrix
+    Encapsulates the restriction operator as both a full array over an aggregate (for easy tiling) and sparse CSR matrix
     format. Assumes non-overlapping aggregate (block sparsity) structure."""
 
     def __init__(self, r: np.ndarray):

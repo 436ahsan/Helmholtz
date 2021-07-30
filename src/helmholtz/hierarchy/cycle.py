@@ -52,7 +52,6 @@ class Cycle:
         p = self._processor
         f = self._finest
         gamma = [self._cycle_index] * (L - 1) if np.isscalar(self._cycle_index) else self._cycle_index
-
         # Inject pre-cycle iterate
         l = f
         p.initialize(l, self._num_levels, x)

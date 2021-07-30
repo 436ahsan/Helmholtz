@@ -207,28 +207,11 @@ def create_transfer_operators(x, domain_size: int, threshold: float = 0.1, calib
     r_csr = r.tile(num_aggregates)
     xc = r_csr.dot(x)
 
-    # Create windows of fine-level test functions on disjoint aggregates (e.g., points 0..3, 4..7, etc. for
-    # aggregate_size = 4). No need to use all windows of the domain in the least-squares fit. It's sufficient to use
-    # >> than the interpolation caliber. Using 12 because we need (train, val, test) for LS fit, each of which is
-    # say 4 times the caliber to be safe.
-    num_windows = max(np.minimum(num_aggregates, (12 * caliber) // num_test_functions), 1)
-    x_disjoint_aggregate_t = np.concatenate(
-            tuple(hm.linalg.get_window(x, aggregate_size * offset, aggregate_size)
-                  for offset in range(num_windows)),
-        axis=1).transpose()
+    x_disjoint_aggregate_t, xc_disjoint_aggregate_t = \
+        hm.setup.sampling.get_disjoint_windows(x, xc, aggregate_size, nc, caliber)
 
-    # Create corresponding windows of xc. Note: we are currently concatenating the entire coarse domain 'num_windows'
-    # times. This is not necessary if neighbor computation is done here and not inside create_interpolation(). For
-    # now, we keep create_interpolation() general and do the nbhr computation there.
-    # TODO(orenlivne): reduce storage here using smart periodic indexing or calculate the nbhr set here first
-    # and only pass windows of nbhr values to create_interpolation.
-    num_coarse_vars = nc * num_aggregates
-    xc_disjoint_aggregate_t = np.concatenate(tuple(hm.linalg.get_window(xc, offset, num_coarse_vars)
-                                                 for offset in range(num_windows)), axis=1).transpose()
-
-    p = hm.setup.interpolation.create_interpolation(interpolation_method,
-                                              r.asarray(), x_disjoint_aggregate_t, xc_disjoint_aggregate_t,
-                                              domain_size, nc, caliber)
+    p = hm.setup.interpolation.create_interpolation_repetitive(
+        interpolation_method, r.asarray(), x_disjoint_aggregate_t, xc_disjoint_aggregate_t, domain_size, nc, caliber)
     return r, p, s
 
 

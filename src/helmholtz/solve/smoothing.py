@@ -85,7 +85,7 @@ def shrinkage_factor(operator, method, domain_shape: np.ndarray, num_examples: i
     # Estimate the asymptotic convergence factor at twice the PODR.
     # Residual convergence factor history.
     conv_history = np.mean(np.exp(np.diff(np.log(residual_history), axis=0)), axis=1)
-    conv_factor = conv_history[min(2 * index, len(conv_history) - 1)]
+    conv_factor = conv_history[min(max(10, 2 * index), len(conv_history) - 1)]
     return factor, index, residual_history, conv_history, rer_history, conv_factor
 
 
@@ -133,8 +133,7 @@ def check_relax_cycle_shrinkage(multilevel, max_sweeps: int = 20, num_levels: in
         return hm.solve.relax_cycle.relax_cycle(multilevel, 1.0, nu_pre, nu_post, nu_coarsest,
                                                 num_levels=num_levels).run(x)
     # This is two-level work.
-    # TODO(orenlivne): generralize to multilevel work.
-    print(len(multilevel.level))
+    # TODO(orenlivne): generalize to multilevel work.
     r = multilevel.level[1].r
     work = nu_pre + nu_post + (r.shape[0] / r.shape[1]) * nu_coarsest
 

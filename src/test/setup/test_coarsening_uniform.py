@@ -147,10 +147,38 @@ class TestCoarseningUniform:
         assert mock_work == pytest.approx(6, 1e-2)
         assert mock_efficiency == pytest.approx(0.733, 1e-2)
 
+    def test_create_uniform_coarsening_domain_optimize_kh_0_5_repetitive(self):
+        n = 96
+        kh = 0.5
+        a = hm.linalg.helmholtz_1d_operator(kh, n)
+        level = hm.repetitive.hierarchy.create_finest_level(a)
+        # Generate relaxed test matrix.
+        x = _get_test_matrix(a, n, 10, num_examples=2)
 
-def _get_test_matrix(a, n, num_sweeps):
+        # Calculate mock cycle predicted efficiency.
+        aggregate_size_values = np.array([2, 4, 6])
+        nu_values = np.arange(1, 6, dtype=int)
+        max_conv_factor = 0.3
+
+        coarsener = hm.setup.coarsening_uniform.UniformCoarsener(level, x, aggregate_size_values, nu_values,
+                                                                 repetitive=True)
+        r, aggregate_size, nc, cr, mean_energy_error, nu, mock_conv, mock_work, mock_efficiency = \
+            coarsener.get_optimal_coarsening(max_conv_factor)
+
+        assert r.shape == (48, 96)
+        assert aggregate_size == 2
+        assert nc == 1
+        assert cr == pytest.approx(0.5, 1e-2)
+        assert mean_energy_error == pytest.approx(0.191, 1e-2)
+        assert nu == 2
+        assert mock_conv == pytest.approx(0.222, 1e-2)
+        assert mock_work == pytest.approx(4, 1e-2)
+        assert mock_efficiency == pytest.approx(0.687, 1e-2)
+
+
+def _get_test_matrix(a, n, num_sweeps, num_examples: int = None):
     level = hm.repetitive.hierarchy.create_finest_level(a)
-    x = hm.solve.run.random_test_matrix((n,))
+    x = hm.solve.run.random_test_matrix((n,), num_examples=num_examples)
     b = np.zeros_like(x)
     x, _ = hm.solve.run.run_iterative_method(level.operator, lambda x: level.relax(x, b), x, num_sweeps=num_sweeps)
     return x

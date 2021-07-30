@@ -43,6 +43,20 @@ def get_window(x: np.ndarray, offset: int, aggregate_size: int) -> np.ndarray:
     return x_aggregate
 
 
+def get_uniform_aggregate_starts(domain_size, aggregate_size):
+    """
+    Returns the list of aggregate starts, for a domain size and fixed aggregate size over the entire domain. The last
+    two aggregates overlap if the domain size is not divisible by the aggregate size.
+    Args:
+        domain_size: domain size.
+        aggregate_size: aggregate sixe.
+
+    Returns: list of aggregate start indices.
+    """
+    return list(range(0, domain_size, aggregate_size)) if domain_size % aggregate_size == 0 else \
+        list(range(0, domain_size - aggregate_size, aggregate_size)) + [domain_size - aggregate_size]
+
+
 def scaled_norm(e: np.ndarray) -> float:
     """
     Returns the scaled L2 norm of a test function e:

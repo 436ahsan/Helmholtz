@@ -238,7 +238,7 @@ def create_transfer_operators(x, domain_size: int, aggregate_size: int, threshol
     xc_disjoint_aggregate_t = np.concatenate(tuple(hm.linalg.get_window(xc, offset, num_coarse_vars)
                                                  for offset in range(num_windows)), axis=1).transpose()
 
-    p = hm.setup.interpolation.create_interpolation(interpolation_method,
-                                              r.asarray(), x_disjoint_aggregate_t, xc_disjoint_aggregate_t,
-                                              domain_size, nc, caliber)
+    p = hm.setup.interpolation.create_interpolation_repetitive(interpolation_method,
+                                                               r.asarray(), x_disjoint_aggregate_t, xc_disjoint_aggregate_t,
+                                                               domain_size, nc, caliber)
     return r, p, s

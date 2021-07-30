@@ -87,10 +87,11 @@ def run_iterative_eigen_method(operator, method, x: np.ndarray, lam, num_sweeps:
         conv_factor: asymptotic convergence factor (of the last iteration).
     """
     # Print the error and residual norm of the first test function.
-    x0 = x[:, 0]
+    x0 = x[:, 0] if x.ndim == 2 else x
+    print(lam)
     r_norm = norm(operator(x0, lam))
     lam_error = 1
-    _LOGGER.debug("{:5d} |r| {:.4e} lam {:.5f}".format(0, r_norm, lam))
+    _LOGGER.info("{:5d} |r| {:.4e} lam {:.5f}".format(0, r_norm, lam))
     # Run 'num_sweeps' relaxation sweeps.
     if print_frequency is None:
         print_frequency = num_sweeps // 10
@@ -102,11 +103,11 @@ def run_iterative_eigen_method(operator, method, x: np.ndarray, lam, num_sweeps:
         lam_old = lam
         lam_error_old = lam_error
         x, lam = method(x, lam)
-        x0 = x[:, 0]
+        x0 = x[:, 0] if x.ndim == 2 else x
         r_norm = norm(operator(x0, lam))
         lam_error = np.abs(lam - lam_old)
         if i % print_frequency == 0:
-            _LOGGER.debug("{:5d} |r| {:.4e} ({:.5f}) lam {:.5f} ({:.5f})".format(
+            _LOGGER.info("{:5d} |r| {:.4e} ({:.5f}) lam {:.5f} ({:.5f})".format(
                 i, r_norm, r_norm / max(1e-30, r_norm_old), lam, lam_error / max(1e-30, lam_error_old)))
         r_norm_history[i] = r_norm
         if i >= min_sweeps and r_norm < residual_stop_value:

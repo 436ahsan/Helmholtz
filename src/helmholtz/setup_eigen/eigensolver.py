@@ -3,6 +3,7 @@ import logging
 import numpy as np
 
 import helmholtz as hm
+from helmholtz.linalg import scaled_norm
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -128,13 +129,14 @@ class EigenProcessor(hm.hierarchy.processor.Processor):
         # Returns the cycle result X at level l. Normally called by Cycle with l=finest level.
         return self._x[l], self._lam
 
-    def _print_state(self, level_ind, title):
-        level = self._multilevel.level[level_ind]
+    def _print_state(self, l, title):
+        level = self._multilevel.level[l]
         if self._debug:
             x = self._x[l]
+            b = self._b[l]
             _LOGGER.debug("{:<5d}    {:<15}    {:.4e}    {:.4e}    {:.8f}".format(
-                level_ind, title, scaled_norm(b[:, 0] - level.operator(x[:, 0], lam)),
-                np.abs(sigma - level.normalization(x))[0], self._lam))
+                l, title, scaled_norm(b[:, 0] - level.operator(x[:, 0], self._lam)),
+                np.abs(self._sigma[l] - level.normalization(x))[0], self._lam))
 
     def _update_global_constraints(self, l, x):
         """
