@@ -44,21 +44,21 @@ def setup(a: scipy.sparse.spmatrix,
     """
     # Initialize hierarchy to 1-level and fine-level test functions to random.
     level = hierarchy.create_finest_level(a)
-    multilevel = hm.hierarchy.multilevel.Multilevel(level)
+    multilevel = hm.hierarchy.multilevel.Multilevel.create(level)
     num_levels = 1
     factor, num_sweeps, conv = check_relaxation_speed(num_levels - 1, level, leeway_factor=leeway_factor)
 
     # Create the hierarchy of coarser levels. For now, we use two-level bootstrap only.
     # Eventually, bootstrap may be needed with an increasingly deeper hierarchy (add one level at a time).
     for num_levels in range(2, max_levels + 1):
-        if conv <= max_coarsest_relax_conv_factor or multilevel.level[-1].size <= max_coarsest_level_size:
+        if conv <= max_coarsest_relax_conv_factor or multilevel._level[-1].size <= max_coarsest_level_size:
             break
         _LOGGER.info("=" * 80)
         _LOGGER.info("Coarsening level {}->{}".format(num_levels - 2, num_levels - 1))
         level = build_coarse_level(level, num_sweeps, num_bootstrap_steps=num_bootstrap_steps,
                                    interpolation_method=interpolation_method, repetitive=repetitive,
                                    neighborhood=neighborhood)
-        multilevel.level.append(level)
+        multilevel.add(level)
         factor, num_sweeps, conv = check_relaxation_speed(num_levels - 1, level, leeway_factor=leeway_factor)
     return multilevel
 
@@ -90,7 +90,7 @@ def build_coarse_level(level: hm.hierarchy.multilevel.Level,
         x: test matrix on the largest (final) domain.
         multilevel: multilevel hierarchy on the largest (final) domain.
     """
-    multilevel = hm.hierarchy.multilevel.Multilevel(level)
+    multilevel = hm.hierarchy.multilevel.Multilevel.create(level)
     a = level.a
     x_log = []
     r_log = []
@@ -120,10 +120,10 @@ def build_coarse_level(level: hm.hierarchy.multilevel.Level,
             num_sweeps=num_sweeps, interpolation_method=interpolation_method, neighborhood=neighborhood,
             repetitive=repetitive, num_test_examples=num_test_examples, max_caliber=max_caliber)
         x_log.append(x)
-        r_log.append(multilevel.level[1].r)
+        r_log.append(multilevel._level[1].r)
         _LOGGER.info("RER {:.6f}".format(norm(a.dot(x)) / norm(x)))
         _LOGGER.info("-" * 80)
-    return multilevel.level[1]
+    return multilevel._level[1]
 
 
 def check_relaxation_speed(index, level, leeway_factor: float = 1.2):
@@ -189,7 +189,7 @@ def bootstap(x, multilevel: hm.hierarchy.multilevel.Multilevel, num_levels: int,
     # TODO(orenlivne): update parameters of relaxation cycle to reasonable values if needed.
     def relax_cycle(x):
         return hm.solve.relax_cycle.relax_cycle(multilevel, 1.0, 2, 2, 4).run(x)
-    level = multilevel.level[0]
+    level = multilevel._level[0]
 
     # First, test relaxation cycle convergence on a random vector. If slow, this yields a yet unseen slow to converge
     # error to add to the test function set, and indicate that we should NOT attempt to improve the current TFs with
@@ -198,7 +198,7 @@ def bootstap(x, multilevel: hm.hierarchy.multilevel.Multilevel, num_levels: int,
                                                        np.random.random((level.a.shape[0], 1)),
                                                        num_sweeps=20, print_frequency=print_frequency)
     y = y.flatten()
-    coarse_level = multilevel.level[1] if len(multilevel.level) > 1 else None
+    coarse_level = multilevel._level[1] if len(multilevel._level) > 1 else None
     _LOGGER.info("Relax cycle conv factor {:.3f} asymptotic RQ {:.3f} RER {:.3f} P error {:.3f}".format(
         conv_factor, level.rq(y), norm(level.operator(y)) / norm(y),
         norm(y - coarse_level.p.dot(coarse_level.r.dot(y))) / norm(y) if coarse_level is not None else -1))
@@ -215,7 +215,7 @@ def bootstap(x, multilevel: hm.hierarchy.multilevel.Multilevel, num_levels: int,
     # Recreate all coarse levels. One down-pass, relaxing at each level, hopefully starting from improved x so the
     # process improves all levels.
     # TODO(orenlivne): add nested bootstrap cycles if needed.
-    new_multilevel = hm.hierarchy.multilevel.Multilevel(level)
+    new_multilevel = hm.hierarchy.multilevel.Multilevel.create(level)
     # Keep the x's of coarser levels in x_level; keep 'x' pointing to the finest test matrix.
     x_level = x
     for l in range(1, num_levels):
@@ -248,7 +248,7 @@ def bootstap(x, multilevel: hm.hierarchy.multilevel.Multilevel, num_levels: int,
         # 'level' now becomes the next coarser level and x_level the corresponding test matrix.
         level = hierarchy.create_coarse_level(level.a, level.b, r, p)
         _LOGGER.info("Level {} size {}".format(l, level.size))
-        new_multilevel.level.append(level)
+        new_multilevel.add(level)
         if l < num_levels - 1:
             x_level = level.coarsen(x_level)
             b = np.zeros_like(x_level)

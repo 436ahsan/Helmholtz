@@ -34,7 +34,7 @@ class TestBootstrapEigen:
         level = multilevel.finest_level
         assert level.a.shape == (16, 16)
 
-        coarse_level = multilevel.level[1]
+        coarse_level = multilevel._level[1]
         assert coarse_level.a.shape == (8, 8)
         assert coarse_level._r_csr.shape == (8, 16)
         assert coarse_level._p_csr.shape == (16, 8)
@@ -45,9 +45,9 @@ class TestBootstrapEigen:
         kh = 0.5
         a = hm.linalg.helmholtz_1d_operator(kh, n)
         level = hm.repetitive.hierarchy.create_finest_level(a)
-        multilevel = hm.repetitive.hierarchy.multilevel.Multilevel(level)
+        multilevel = hm.repetitive.hierarchy.multilevel.Multilevel.create(level)
         x = hm.solve.run.random_test_matrix((n,), num_examples=1)
-        multilevel = hm.hierarchy.multilevel.Multilevel(level)
+        multilevel = hm.hierarchy.multilevel.Multilevel.create(level)
         # Run enough Kaczmarz relaxations per lambda update (not just 1 relaxation) so we converge to the minimal one.
         nu = 5
         lam = 0

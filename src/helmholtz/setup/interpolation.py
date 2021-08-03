@@ -58,7 +58,7 @@ class Interpolator:
 
 def create_interpolation_repetitive(
         method: str, r: np.ndarray, x_aggregate_t: np.ndarray, xc_t: np.ndarray, domain_size: int,
-        nc: int, caliber: int) -> Interpolator:
+        nc: int) -> Interpolator:
     """
     Creates an interpolation operator.
     Args:
@@ -78,19 +78,19 @@ def create_interpolation_repetitive(
         return Interpolator(np.tile(np.arange(nc, dtype=int)[:, None], r.shape[1]).transpose(),
                             r.transpose(), nc)
     elif method == "ls":
-        return create_interpolation_least_squares_repetitive(x_aggregate_t, xc_t, domain_size, nc, caliber)
+        return create_interpolation_least_squares_repetitive(x_aggregate_t, xc_t, domain_size, nc)
     else:
         raise Exception("Unsupported interpolation method '{}'".format(method))
 
 
 def create_interpolation_least_squares_repetitive(
         x_aggregate_t: np.ndarray, xc_t: np.ndarray, domain_size: int, nc: int,
-        caliber: int, alpha: np.ndarray = np.array([0, 0.001, 0.01, 0.1, 1.0])) -> Interpolator:
+        alpha: np.ndarray = np.array([0, 0.001, 0.01, 0.1, 1.0])) -> Interpolator:
     """Defines interpolation to an aggregate by LS fitting to coarse neighbors of each fine var. The global
     interpolation P is the tiling of the aggregate P over the domain."""
 
     # Define nearest coarse neighbors of each fine variable.
-    aggregate_size = x_aggregate_t.shape[1]
+    num_examples, aggregate_size = x_aggregate_t.shape
     num_aggregates = domain_size // aggregate_size
     num_coarse_vars = nc * num_aggregates
     # Find nearest neighbors of each fine point in an aggregate.
@@ -98,7 +98,7 @@ def create_interpolation_least_squares_repetitive(
     nbhr = _sort_neighbors_by_similarity(x_aggregate_t, xc_t, nbhr)
 
     return _create_interpolation_least_squares_repetitive(
-        x_aggregate_t, xc_t, nbhr, alpha=alpha,
+        x_aggregate_t, xc_t, nbhr, nc, alpha=alpha,
         fit_samples=num_examples // 3, val_samples=num_examples // 3, test_samples=num_examples // 3)
 
 
@@ -181,7 +181,7 @@ def _tile_interpolation_matrix(p, aggregate_size, nc, domain_size):
 
 
 def _create_interpolation_least_squares_repetitive(
-        x_aggregate_t: np.ndarray, xc_t: np.ndarray, nbhr: np.ndarray,
+        x_aggregate_t: np.ndarray, xc_t: np.ndarray, nbhr: np.ndarray, nc: int,
         alpha: np.ndarray = np.array([0, 0.001, 0.01, 0.1, 1.0]),
         fit_samples: int = 1000,
         val_samples: int = 1000,
@@ -191,6 +191,7 @@ def _create_interpolation_least_squares_repetitive(
     # Fit interpolation over an aggregate.
     fitter = hm.setup.interpolation_fit.InterpolationFitter(
         x_aggregate_t, xc=xc_t, nbhr=nbhr, fit_samples=fit_samples, val_samples=val_samples, test_samples=test_samples)
+    caliber = nbhr.shape[1]
     error, alpha_opt = fitter.optimized_relative_error(caliber, alpha, return_weights=True)
     # Interpolation validation error = error[:, 1]
     data = error[:, 2:]

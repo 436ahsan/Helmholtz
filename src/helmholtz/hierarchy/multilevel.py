@@ -38,7 +38,7 @@ class Level:
         self._relaxer = relaxer
 
     @staticmethod
-    def create_finest_level(a, relaxer):
+    def create_finest_level(a, relaxer) -> "Level":
         return Level(a, scipy.sparse.eye(a.shape[0]), relaxer, None, None, None, None)
 
     @property
@@ -165,16 +165,34 @@ class Level:
 class Multilevel:
     """The multilevel hierarchy. Contains a sequence of levels."""
 
-    def __init__(self, finest_level: Level):
+    def __init__(self):
+        """
+        Creates an empty multi-level hierarchy.
+        """
+        self._level = []
+
+    @staticmethod
+    def create(finest_level: Level) -> "Multilevel":
         """
         Creates an initial multi-level hierarchy with one level.
+
         Args:
             finest_level: finest Level.
-        """
-        self.level = [finest_level]
 
-    def __len__(self):
-        return len(self.level)
+        Returns: multilevel hierarchy with a single level.
+        """
+        multilevel = Multilevel()
+        multilevel.add(finest_level)
+        return multilevel
+
+    def __len__(self) -> int:
+        return len(self._level)
+
+    def __iter__(self):
+        return iter(self._level)
+
+    def __getitem__(self, index: int) -> Level:
+        return self._level[index]
 
     @property
     def finest_level(self) -> Level:
@@ -183,4 +201,26 @@ class Multilevel:
 
         Returns: finest level object.
         """
-        return self.level[0]
+        return self._level[0]
+
+    def add(self, level: Level) -> None:
+        """
+        Adds a level to the multilevel hierarchy.
+        Args:
+            level: level to add.
+        """
+        self._level.append(level)
+
+    def sub_hierarchy(self, finest: int) -> "Multilevel":
+        """
+        Returns the sub-hierarchy starting at level 'finest'.
+        Args:
+            finest: index of new finest level.
+
+        Returns:
+            Sub-hierarchy.
+        """
+        multilevel = Multilevel()
+        for level in range(finest, len(self)):
+            multilevel.add(level)
+        return multilevel

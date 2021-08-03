@@ -73,7 +73,7 @@ class EigenProcessor(hm.hierarchy.processor.Processor):
 
     def process_coarsest(self, l):
         self._print_state(l, "initial")
-        level = self._multilevel.level[l]
+        level = self._multilevel._level[l]
         for _ in range(self._nu_coarsest):
             for _ in range(self._relax_coarsest):
                 self._x[l] = level.relax(self._x[l], self._b[l], self._lam)
@@ -85,13 +85,13 @@ class EigenProcessor(hm.hierarchy.processor.Processor):
 
     def pre_process(self, l):
         # Execute at level L right before switching to the next-coarser level L+1.
-        level = self._multilevel.level[l]
+        level = self._multilevel._level[l]
         self._print_state(l, "initial")
         self._relax(l, self._nu_pre)
 
         # Full Approximation Scheme (FAS).
         lc = l + 1
-        coarse_level = self._multilevel.level[lc]
+        coarse_level = self._multilevel._level[lc]
         x, lam = self._x[l], self._lam
         xc_initial = coarse_level.coarsen(x)
         self._x_initial[lc] = xc_initial
@@ -102,7 +102,7 @@ class EigenProcessor(hm.hierarchy.processor.Processor):
 
     def post_process(self, l):
         lc = l + 1
-        coarse_level = self._multilevel.level[lc]
+        coarse_level = self._multilevel._level[lc]
         self._x[l] += coarse_level.interpolate(self._x[lc] - self._x_initial[lc])
         self._print_state(l, "correction")
 
@@ -110,7 +110,7 @@ class EigenProcessor(hm.hierarchy.processor.Processor):
         self._relax(l, self._nu_post)
 
     def _relax(self, l, num_sweeps):
-        level = self._multilevel.level[l]
+        level = self._multilevel._level[l]
         if num_sweeps > 0:
             for _ in range(num_sweeps):
                 self._x[l] = level.relax(self._x[l], self._b[l], self._lam)
@@ -118,7 +118,7 @@ class EigenProcessor(hm.hierarchy.processor.Processor):
 
     def post_cycle(self, l):
         # Executes at the finest level L at the end of the cycle. A hook.
-        level = self._multilevel.level[l]
+        level = self._multilevel._level[l]
         # # Exclude lam term from action here, so it's just A*x.
         # action = lambda x: level.stiffness_operator(x)
         # self._x[l], lam_ritz = hm.linalg.ritz(self._x[l], action)
@@ -130,7 +130,7 @@ class EigenProcessor(hm.hierarchy.processor.Processor):
         return self._x[l], self._lam
 
     def _print_state(self, l, title):
-        level = self._multilevel.level[l]
+        level = self._multilevel._level[l]
         if self._debug:
             x = self._x[l]
             b = self._b[l]
@@ -147,7 +147,7 @@ class EigenProcessor(hm.hierarchy.processor.Processor):
         Returns:
             Updated x. Global lambda also updated to the mean of RQ of all test functions.
         """
-        level = self._multilevel.level[l]
+        level = self._multilevel._level[l]
         b = self._b[l]
         sigma = self._sigma[l]
         eta = level.normalization(x)

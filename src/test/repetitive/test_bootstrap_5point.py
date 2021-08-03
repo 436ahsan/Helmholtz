@@ -24,9 +24,9 @@ class TestBootstrap5Point:
         kh = 0.5
         a = hm.linalg.helmholtz_1d_5_point_operator(kh, n)
         level = hm.repetitive.hierarchy.create_finest_level(a)
-        multilevel = hm.hierarchy.multilevel.Multilevel(level)
+        multilevel = hm.hierarchy.multilevel.Multilevel.create(level)
         x = hm.solve.run.random_test_matrix((n,), num_examples=1)
-        multilevel = hm.hierarchy.multilevel.Multilevel(level)
+        multilevel = hm.hierarchy.multilevel.Multilevel.create(level)
         # Run enough Kaczmarz relaxations per lambda update (not just 1 relaxation) so we converge to the minimal one.
         nu = 1
         method = lambda x: hm.solve.relax_cycle.relax_cycle(multilevel, 1.0, None, None, nu).run(x)
@@ -51,7 +51,7 @@ class TestBootstrap5Point:
         level = multilevel.finest_level
         assert level.a.shape == (16, 16)
 
-        coarse_level = multilevel.level[1]
+        coarse_level = multilevel[1]
         assert coarse_level.a.shape == (8, 8)
         assert coarse_level._r_csr.shape == (8, 16)
         assert coarse_level._p_csr.shape == (16, 8)
@@ -67,29 +67,34 @@ class TestBootstrap5Point:
         kh = 0
 
         a = hm.linalg.helmholtz_1d_5_point_operator(kh, n)
-        x, multilevel = hm.repetitive.bootstrap_repetitive.generate_test_matrix(a, 0, num_examples=4, num_sweeps=20, num_bootstrap_steps=2)
+        x, multilevel = hm.repetitive.bootstrap_repetitive.generate_test_matrix(
+            a, 0, num_examples=4, num_sweeps=20, num_bootstrap_steps=2)
 
         assert x.shape == (16, 4)
         assert len(multilevel) == 2
 
         # The coarse level should be Galerkin coarsening with piecewise constant interpolation.
-        coarse_level = multilevel.level[1]
+        coarse_level = multilevel[1]
 
         p = coarse_level.p.asarray()
-        assert_array_equal(p[0], [[0], [0]])
-        assert_array_almost_equal(p[1], [[-0.748798], [-0.662799]])
+        assert_array_equal(p[0], [[0, 1], [0, 1], [0, 1], [0, 1]])
+        assert_array_almost_equal(p[1], [[-0.458951, -0.704096],
+             [-0.48365 , -0.25242 ],
+             [-0.512496,  0.200809],
+             [-0.541105,  0.632621]])
 
         r = coarse_level.r.asarray()
-        assert_array_almost_equal(r, [[-0.748798, -0.662799]])
+        assert_array_almost_equal(r, [[-0.458951, -0.48365 , -0.512496, -0.541105],
+              [-0.704096, -0.25242 ,  0.200809,  0.632621]])
 
         ac_0 = coarse_level.a[0]
         coarse_level.print()
-        assert_array_equal(ac_0.nonzero()[1], [0, 1, 7])
-        assert_array_almost_equal(ac_0.data, [-1.176528,  0.578403,  0.578403])
+        assert_array_equal(ac_0.nonzero()[1], [0, 1, 2, 3, 6, 7])
+        assert_array_almost_equal(ac_0.data, [-0.590408,  0.066061,  0.289712,  0.466534,  0.289712, -0.353946])
 
         # Vectors have much lower residual after 2-level relaxation cycles.
         assert (hm.linalg.scaled_norm_of_matrix(a.dot(x)) / hm.linalg.scaled_norm_of_matrix(x)).mean() == \
-               pytest.approx(0.0838, 1e-3)
+               pytest.approx(0.0859, 1e-3)
 
     def test_helmholtz_coarsening(self):
         n = 16
@@ -105,7 +110,7 @@ class TestBootstrap5Point:
         level = multilevel.finest_level
         assert level.a.shape == (16, 16)
 
-        coarse_level = multilevel.level[1]
+        coarse_level = multilevel[1]
         assert coarse_level.a.shape == (8, 8)
         assert coarse_level._r_csr.shape == (8, 16)
         assert coarse_level._p_csr.shape == (16, 8)
@@ -126,7 +131,7 @@ class TestBootstrap5Point:
         # Initialize test functions (to random) and hierarchy at coarsest level.
         a = hm.linalg.helmholtz_1d_5_point_operator(kh, n)
         level = hm.repetitive.hierarchy.create_finest_level(a)
-        multilevel = hm.hierarchy.multilevel.Multilevel(level)
+        multilevel = hm.hierarchy.multilevel.Multilevel.create(level)
         domain_shape = (a.shape[0],)
         x = hm.solve.run.random_test_matrix(domain_shape, num_examples=num_examples)
         assert norm(a.dot(x)) / norm(x) == pytest.approx(3.155, 1e-3)
@@ -153,7 +158,7 @@ class TestBootstrap5Point:
 
         # Vectors have much lower residual after 2-level relaxation cycles.
         assert (hm.linalg.scaled_norm_of_matrix(a.dot(x)) / hm.linalg.scaled_norm_of_matrix(x)).mean() == \
-               pytest.approx(0.1473, 1e-3)
+               pytest.approx(0.1185, 1e-3)
 
 
     def test_2_level_bootstrap_least_squares_interpolation(self):

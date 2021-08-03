@@ -111,10 +111,10 @@ class TestInterpolation:
             hm.setup.interpolation.create_interpolation_least_squares_domain(x, a, r, aggregate_size=aggregate_size,
                                                                              nc=nc, repetitive=True)
 
-        assert np.mean(alpha_opt) == pytest.approx(0)
+        assert np.mean(alpha_opt) == pytest.approx(0.005)
         assert max(fit_error) == pytest.approx(0.147, 1e-2)
-        assert max(val_error) == pytest.approx(0.099, 1e-2)
-        assert max(test_error) == pytest.approx(0.096, 1e-2)
+        assert max(val_error) == pytest.approx(0.107, 1e-2)
+        assert max(test_error) == pytest.approx(0.080, 1e-2)
         assert p.shape == (32, 16)
 
     def test_create_interpolation_least_squares_domain_repetitive_indivisible_size(self):

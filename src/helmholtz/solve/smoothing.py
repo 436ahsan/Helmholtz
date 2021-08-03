@@ -11,7 +11,7 @@ _LOGGER = logging.getLogger(__name__)
 
 
 def shrinkage_factor(operator, method, domain_shape: np.ndarray, num_examples: int = 5,
-                     slow_conv_factor: float = 0.95, print_frequency: int = None, max_sweeps: int = 100,
+                     slow_conv_factor: float = 1.3, print_frequency: int = None, max_sweeps: int = 100,
                      leeway_factor: float = 1.2) -> float:
     """
     Returns the shrinkage factor of an iterative method, the residual-to-error ratio (RER) reduction in the first
@@ -43,17 +43,18 @@ def shrinkage_factor(operator, method, domain_shape: np.ndarray, num_examples: i
     r_norm = norm(operator(x), axis=0)
     rer = r_norm / x_norm
     if print_frequency is not None:
-        _LOGGER.info("Iter     |r|                 |x|         RER")
-        _LOGGER.info("{:<5d} {:.3e}            {:.3e}    {:.3f}".format(
+        _LOGGER.info("Iter     |r|                         |x|         RER")
+        _LOGGER.info("{:<5d} {:.3e}                    {:.3e}    {:.3f}".format(
             0, np.mean(r_norm), np.mean(x_norm), np.mean(rer)))
     b = np.zeros_like(x)
     rer_conv_factor = 0
+    residual_conv_factor = 0
     i = 0
     residual_history = [r_norm]
     rer_history = [rer]
     # reduction = [np.ones_like(r_norm)]
     # efficiency = list(reduction[0] ** (1 / 1e-2))
-    while rer_conv_factor < slow_conv_factor and i < max_sweeps:
+    while residual_conv_factor < slow_conv_factor and i < max_sweeps:
         i += 1
         r_norm_old = r_norm
         rer_old = rer
@@ -62,9 +63,12 @@ def shrinkage_factor(operator, method, domain_shape: np.ndarray, num_examples: i
         x_norm = norm(x, axis=0)
         rer = r_norm / x_norm
         rer_conv_factor = np.mean(rer / np.clip(rer_old, 1e-30, None))
+        residual_conv_factor = np.mean(r_norm / np.clip(r_norm_old, 1e-30, None))
         if print_frequency is not None and i % print_frequency == 0:
-            _LOGGER.info("{:<5d} {:.3e} ({:.3f})    {:.3e}    {:.3f} ({:.3f})".format(
-                i, np.mean(r_norm), np.mean(r_norm / np.clip(r_norm_old, 1e-30, None)), np.mean(x_norm),
+            _LOGGER.info("{:<5d} {:.3e} ({:.3f}) [{:.3f}]    {:.3e}    {:.3f} ({:.3f})".format(
+                i, np.mean(r_norm), residual_conv_factor,
+                np.mean(r_norm / residual_history[0]) ** (1 / i),
+                np.mean(x_norm),
                 np.mean(rer), rer_conv_factor))
         residual_history.append(r_norm)
         rer_history.append(rer)
@@ -78,6 +82,7 @@ def shrinkage_factor(operator, method, domain_shape: np.ndarray, num_examples: i
     # Find point of diminishing returns (PODR). Allow a leeway of 'leeway_factor' from the maximum efficiency point.
     reduction = np.mean(residual_history / residual_history[0], axis=1)
     efficiency = reduction ** (1 / np.clip(np.arange(residual_history.shape[0]), 1e-2, None))
+    _LOGGER.info(efficiency)
     index = max(np.where(efficiency < leeway_factor * min(efficiency))[0])
     # factor = residual reduction per sweep over the first 'index' sweeps.
     factor = efficiency[index]
@@ -125,16 +130,17 @@ def plot_diminishing_returns_point(factor, num_sweeps, conv, ax, title: str = "R
 
 
 def check_relax_cycle_shrinkage(multilevel, max_sweeps: int = 20, num_levels: int = None,
-                                nu_pre: int = 2, nu_post: int = 2, nu_coarsest: int = 4):
+                                nu_pre: int = 2, nu_post: int = 2, nu_coarsest: int = 4,
+                                slow_conv_factor: float = 0.95):
     """Checks the two-level relaxation cycle shrinkage vs. relaxation."""
-    level = multilevel.level[0]
+    level = multilevel[0]
     a = level.a
     def relax_cycle(x):
         return hm.solve.relax_cycle.relax_cycle(multilevel, 1.0, nu_pre, nu_post, nu_coarsest,
                                                 num_levels=num_levels).run(x)
     # This is two-level work.
     # TODO(orenlivne): generalize to multilevel work.
-    r = multilevel.level[1].r
+    r = multilevel[1].r
     work = nu_pre + nu_post + (r.shape[0] / r.shape[1]) * nu_coarsest
 
     fig, ax = plt.subplots(1, 1, figsize=(6, 4))
@@ -153,7 +159,8 @@ def check_relax_cycle_shrinkage(multilevel, max_sweeps: int = 20, num_levels: in
         ("Kaczmarz", "Mini-cycle"), (relax, relax_cycle), (relax_b, relax_cycle_b), (1, work), ("blue", "red")):
         #print(title)
         factor, num_sweeps, residual, conv, rer, relax_conv_factor = \
-            hm.solve.smoothing.shrinkage_factor(operator, method_b, (n,), print_frequency=1, max_sweeps=max_sweeps)
+            hm.solve.smoothing.shrinkage_factor(operator, method_b, (n,), print_frequency=1, max_sweeps=max_sweeps,
+                                                slow_conv_factor=slow_conv_factor)
         _LOGGER.info(
             "Relax conv {:.2f} shrinkage {:.2f} PODR RER {:.2f} after {} sweeps. Work {:.1f} eff {:.2f}".format(
                 relax_conv_factor, factor, np.mean(rer[num_sweeps]), num_sweeps, work,

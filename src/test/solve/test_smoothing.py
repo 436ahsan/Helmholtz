@@ -33,7 +33,7 @@ class TestSmoothing(unittest.TestCase):
             hm.solve.smoothing.shrinkage_factor(operator, lambda x, b: gs.step(x, b), (n, ))
         assert factor == pytest.approx(0.43, 1e-2)
         assert num_sweeps == 4
-        assert conv == pytest.approx(0.81, 1e-2)
+        assert conv == pytest.approx(0.85, 1e-2)
 
     def test_shrinkage_factor_helmholtz(self):
         n = 96
@@ -54,4 +54,4 @@ class TestSmoothing(unittest.TestCase):
             hm.solve.smoothing.shrinkage_factor(operator, lambda x, b: gs.step(x, b), (n, ))
         assert factor == pytest.approx(0.48, 1e-2)
         assert num_sweeps == 3
-        assert conv == pytest.approx(1.21, 1e-2)
+        assert conv == pytest.approx(1.3, 1e-2)

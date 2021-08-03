@@ -25,9 +25,9 @@ class TestBootstrapRepetitive:
         kh = 0.5
         a = hm.linalg.helmholtz_1d_operator(kh, n)
         level = hm.repetitive.hierarchy.create_finest_level(a)
-        multilevel = hm.repetitive.hierarchy.multilevel.Multilevel(level)
+        multilevel = hm.repetitive.hierarchy.multilevel.Multilevel.create(level)
         x = hm.solve.run.random_test_matrix((n,), num_examples=1)
-        multilevel = hm.repetitive.hierarchy.multilevel.Multilevel(level)
+        multilevel = hm.repetitive.hierarchy.multilevel.Multilevel.create(level)
         # Run enough Kaczmarz relaxations per lambda update (not just 1 relaxation) so we converge to the minimal one.
         nu = 1
         method = lambda x: hm.solve.relax_cycle.relax_cycle(multilevel, 1.0, None, None, nu).run(x)
@@ -36,7 +36,7 @@ class TestBootstrapRepetitive:
         assert np.mean([level.rq(x[:, i]) for i in range(x.shape[1])]) == pytest.approx(0.0979, 1e-3)
         assert (hm.linalg.scaled_norm_of_matrix(a.dot(x)) / hm.linalg.scaled_norm_of_matrix(x)).mean() == \
                pytest.approx(0.110, 1e-2)
-        assert conv_factor == pytest.approx(0.9998, 1e-3)
+        assert conv_factor == pytest.approx(0.9957, 1e-3)
 
     def test_laplace_coarsening(self):
         n = 16
@@ -52,7 +52,7 @@ class TestBootstrapRepetitive:
         level = multilevel.finest_level
         assert level.a.shape == (16, 16)
 
-        coarse_level = multilevel.level[1]
+        coarse_level = multilevel[1]
         assert coarse_level.a.shape == (8, 8)
         assert coarse_level._r_csr.shape == (8, 16)
         assert coarse_level._p_csr.shape == (16, 8)
@@ -74,23 +74,23 @@ class TestBootstrapRepetitive:
         assert len(multilevel) == 2
 
         # The coarse level should be Galerkin coarsening with piecewise constant interpolation.
-        coarse_level = multilevel.level[1]
+        coarse_level = multilevel[1]
 
         p = coarse_level.p.asarray()
         assert_array_equal(p[0], [[0], [0]])
-        assert_array_almost_equal(p[1], [[-0.729063], [-0.684447]])
+        assert_array_almost_equal(p[1], [[-0.707228], [-0.706985]])
 
         r = coarse_level.r.asarray()
-        assert_array_almost_equal(r, [[-0.729063, -0.684447]])
+        assert_array_almost_equal(r, [[-0.707228, -0.706985]])
 
         ac_0 = coarse_level.a[0]
         coarse_level.print()
         assert_array_equal(ac_0.nonzero()[1], [0, 1, 7])
-        assert_array_almost_equal(ac_0.data, [-1.001991,  0.499005,  0.499005])
+        assert_array_almost_equal(ac_0.data, [-1. ,  0.5,  0.5])
 
         # Vectors have much lower residual after 2-level relaxation cycles.
         assert (hm.linalg.scaled_norm_of_matrix(a.dot(x)) / hm.linalg.scaled_norm_of_matrix(x)).mean() == \
-               pytest.approx(0.042, 1e-3)
+               pytest.approx(0.045054, 1e-3)
 
     def test_laplace_2_level_more_bootstrap_improves_vectors(self):
         n = 16
@@ -100,12 +100,12 @@ class TestBootstrapRepetitive:
         x, multilevel = hm.repetitive.bootstrap_repetitive.generate_test_matrix(a, 0, num_examples=4, num_sweeps=20, num_bootstrap_steps=3)
 
         assert x.shape == (16, 4)
-        coarse_level = multilevel.level[1]
+        coarse_level = multilevel[1]
         coarse_level.print()
 
         # Vectors have much lower residual after 2-level relaxation cycles.
         assert (hm.linalg.scaled_norm_of_matrix(a.dot(x)) / hm.linalg.scaled_norm_of_matrix(x)).mean() == \
-               pytest.approx(0.000939, 1e-3)
+               pytest.approx(0.0010850, 1e-3)
 
     def test_2_level_one_bootstrap_step_improves_convergence(self):
         n = 48
@@ -125,7 +125,7 @@ class TestBootstrapRepetitive:
         x, lam, conv_factor = hm.solve.run.run_iterative_eigen_method(level.operator, relax_cycle, x, 20, print_frequency=1)
 
 #        assert np.mean([level.rq(x[:, i]) for i in range(x.shape[1])]) == pytest.approx(0.097759, 1e-3)
-        assert conv_factor == pytest.approx(0.46, 1e-2)
+        assert conv_factor == pytest.approx(0.475, 1e-2)
 
     def test_2_level_two_bootstrap_steps_same_speed_as_one(self):
         n = 16
@@ -151,7 +151,7 @@ class TestBootstrapRepetitive:
                                                           print_frequency=1, residual_stop_value=1e-11)
 
 #        assert np.mean([level.rq(x[:, i]) for i in range(x.shape[1])]) == pytest.approx(0.097759, 1e-3)
-        assert conv_factor == pytest.approx(0.15, 1e-2)
+        assert conv_factor == pytest.approx(0.156, 1e-2)
 
     def test_2_level_bootstrap_least_squares_interpolation_laplace(self):
         n = 16

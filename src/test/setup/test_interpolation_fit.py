@@ -85,7 +85,7 @@ class TestInterpolationFit:
             alpha, intercept=True, return_weights=True)
 
         assert alpha_opt == pytest.approx(0.1, 1e-8)
-        assert_array_almost_equal(info, [0.353209,  0.430609, -0.02109 ,  0.061041,  0.161995, -0.013169])
+        assert_array_almost_equal(info, [0.35320889,  0.43060896, -0.02109, 0.06104076, 0.16199508, -0.01316894])
 
         # Prune small weights.
         weight = info[3:]
@@ -93,7 +93,7 @@ class TestInterpolationFit:
         info = hm.setup.interpolation_fit.fit_interpolation(xc_fit[:, nbhr[i, large]], x_fit[:, i],
                                                       xc_val[:, nbhr[i, large]], x_val[:, i],
                                                       alpha_opt, intercept=True, return_weights=True)
-        assert_array_almost_equal(info, [0.353209,  0.430609, -0.02109 ,  0.061041,  0.161995, -0.013169])
+        assert_array_almost_equal(info, [0.353624,  0.437662, -0.035492,  0.058781,  0.158392])
 
     def test_create_interpolation_least_squares(self):
         n = 10

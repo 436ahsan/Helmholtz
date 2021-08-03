@@ -40,7 +40,7 @@ def generate_test_matrix(a: scipy.sparse.spmatrix, num_growth_steps: int, growth
     """
     # Initialize test functions (to random) and hierarchy at coarsest level.
     level = hm.repetitive.hierarchy.create_finest_level(a)
-    multilevel = hm.hierarchy.multilevel.Multilevel(level)
+    multilevel = hm.hierarchy.multilevel.Multilevel.create(level)
     # TODO(orenlivne): generalize to d-dimensions. This is specific to 1D.
     domain_shape = (a.shape[0],)
     x = hm.solve.run.random_test_matrix(domain_shape, num_examples=num_examples)
@@ -95,7 +95,7 @@ def bootstap(x, lam, multilevel: hm.hierarchy.multilevel.Multilevel, max_levels:
     """
     # At the finest level, use the current multilevel hierarchy to run 'num_sweeps' cycles to improve x.
     finest = 0
-    level = multilevel.level[finest]
+    level = multilevel._level[finest]
     b = np.zeros_like(x)
     # TODO(orenlivne): update parameters of relaxation cycle to reasonable values if needed.
     if len(multilevel) == 1:
@@ -111,7 +111,7 @@ def bootstap(x, lam, multilevel: hm.hierarchy.multilevel.Multilevel, max_levels:
     # Recreate all coarse levels. One down-pass, relaxing at each level, hopefully starting from improved x so the
     # process improves all levels.
     # TODO(orenlivne): add nested bootstrap cycles if needed.
-    new_multilevel = hm.hierarchy.multilevel.Multilevel(level)
+    new_multilevel = hm.hierarchy.multilevel.Multilevel.create(level)
     # Keep the x's of coarser levels in x_level; keep 'x' pointing to the finest test matrix.
     x_level = x
     for l in range(1, max_levels):
@@ -122,7 +122,7 @@ def bootstap(x, lam, multilevel: hm.hierarchy.multilevel.Multilevel, max_levels:
                                          interpolation_method=interpolation_method)
         # 'level' now becomes the next coarser level and x_level the corresponding test matrix.
         level = hm.repetitive.hierarchy.create_tiled_coarse_level(level.a, level.b, r, p)
-        new_multilevel.level.append(level)
+        new_multilevel.add(level)
         x_level = level.coarsen(x_level)
         b = np.zeros_like(x_level)
         _LOGGER.info("Relax at level {}".format(l))
@@ -141,13 +141,13 @@ def fmg(multilevel, nu_pre: int = 1, nu_post: int = 1, nu_coarsest: int = 10, nu
     coarsest = len(multilevel) - 1
 
     # Coarsest level initial guess.
-    level = multilevel.level[coarsest]
+    level = multilevel[coarsest]
     x = hm.solve.run.random_test_matrix((level.a.shape[0],), num_examples=num_examples)
     lam = 0
 
     processor = hm.setup_eigen.eigensolver.EigenProcessor(multilevel, nu_pre, nu_post, nu_coarsest)
     for l in range(coarsest, finest, -1):
-        level = multilevel.level[l]
+        level = multilevel[l]
         x0 = x[:, 0]
         r_norm = scaled_norm(level.operator(x0, lam))
         _LOGGER.debug("FMG level {} init |r| {:.8e} lam {:.5f}".format(l, r_norm, lam))
@@ -156,7 +156,7 @@ def fmg(multilevel, nu_pre: int = 1, nu_post: int = 1, nu_coarsest: int = 10, nu
             x, lam = eigen_cycle.run((x, lam))
 
         x = level.interpolate(x)
-        level = multilevel.level[l - 1]
+        level = multilevel[l - 1]
         x0 = x[:, 0]
         r_norm = scaled_norm(level.operator(x0, lam))
         _LOGGER.debug("FMG level {} cycles {} |r| {:.8e} lam {:.5f}".format(l, num_cycles, r_norm, lam))
@@ -238,7 +238,6 @@ def create_transfer_operators(x, domain_size: int, aggregate_size: int, threshol
     xc_disjoint_aggregate_t = np.concatenate(tuple(hm.linalg.get_window(xc, offset, num_coarse_vars)
                                                  for offset in range(num_windows)), axis=1).transpose()
 
-    p = hm.setup.interpolation.create_interpolation_repetitive(interpolation_method,
-                                                               r.asarray(), x_disjoint_aggregate_t, xc_disjoint_aggregate_t,
-                                                               domain_size, nc, caliber)
+    p = hm.setup.interpolation.create_interpolation_repetitive(
+        interpolation_method, r.asarray(), x_disjoint_aggregate_t, xc_disjoint_aggregate_t, domain_size, caliber)
     return r, p, s
