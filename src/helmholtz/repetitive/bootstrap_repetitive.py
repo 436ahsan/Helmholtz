@@ -88,7 +88,7 @@ def bootstap(x, multilevel: hm.hierarchy.multilevel.Multilevel, max_levels: int,
     """
     # At the finest level, use the current multilevel hierarchy to run 'num_sweeps' cycles to improve x.
     finest = 0
-    level = multilevel._level[finest]
+    level = multilevel[finest]
     b = np.zeros_like(x)
     # TODO(orenlivne): update parameters of relaxation cycle to reasonable values if needed.
     if len(multilevel) == 1:

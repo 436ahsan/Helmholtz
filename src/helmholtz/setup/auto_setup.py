@@ -43,15 +43,21 @@ def setup(a: scipy.sparse.spmatrix,
         multilevel: multilevel hierarchy on the largest (final) domain.
     """
     # Initialize hierarchy to 1-level and fine-level test functions to random.
+    min_relax_reduction_factor = 0.5
+    min_relax_sweeps = 2
     level = hierarchy.create_finest_level(a)
     multilevel = hm.hierarchy.multilevel.Multilevel.create(level)
     num_levels = 1
-    factor, num_sweeps, conv = check_relaxation_speed(num_levels - 1, level, leeway_factor=leeway_factor)
+    shrinkage_factor, num_sweeps, conv = check_relaxation_speed(num_levels - 1, level, leeway_factor=leeway_factor)
+    # Use at least nu sweeps such that shrinkage^nu <= 0.5, just to be safe.
+    num_sweeps = max((num_sweeps, min_relax_sweeps,
+                      int(np.ceil(np.log(min_relax_reduction_factor) / np.log(shrinkage_factor)))))
+    _LOGGER.info("Using {} relaxations at level {}".format(num_sweeps, num_levels - 1))
 
     # Create the hierarchy of coarser levels. For now, we use two-level bootstrap only.
     # Eventually, bootstrap may be needed with an increasingly deeper hierarchy (add one level at a time).
     for num_levels in range(2, max_levels + 1):
-        if conv <= max_coarsest_relax_conv_factor or multilevel._level[-1].size <= max_coarsest_level_size:
+        if conv <= max_coarsest_relax_conv_factor or multilevel[-1].size <= max_coarsest_level_size:
             break
         _LOGGER.info("=" * 80)
         _LOGGER.info("Coarsening level {}->{}".format(num_levels - 2, num_levels - 1))
@@ -59,7 +65,11 @@ def setup(a: scipy.sparse.spmatrix,
                                    interpolation_method=interpolation_method, repetitive=repetitive,
                                    neighborhood=neighborhood)
         multilevel.add(level)
-        factor, num_sweeps, conv = check_relaxation_speed(num_levels - 1, level, leeway_factor=leeway_factor)
+        shrinkage_factor, num_sweeps, conv = check_relaxation_speed(num_levels - 1, level, leeway_factor=leeway_factor)
+        # Use at least nu sweeps such that shrinkage^nu <= 0.5, just to be safe.
+        num_sweeps = max((num_sweeps, min_relax_sweeps,
+                          int(np.ceil(np.log(min_relax_reduction_factor) / np.log(shrinkage_factor)))))
+        _LOGGER.info("Using {} relaxations at level {}".format(num_sweeps, num_levels - 1))
     return multilevel
 
 
@@ -120,10 +130,10 @@ def build_coarse_level(level: hm.hierarchy.multilevel.Level,
             num_sweeps=num_sweeps, interpolation_method=interpolation_method, neighborhood=neighborhood,
             repetitive=repetitive, num_test_examples=num_test_examples, max_caliber=max_caliber)
         x_log.append(x)
-        r_log.append(multilevel._level[1].r)
+        r_log.append(multilevel[1].r)
         _LOGGER.info("RER {:.6f}".format(norm(a.dot(x)) / norm(x)))
         _LOGGER.info("-" * 80)
-    return multilevel._level[1]
+    return multilevel[1]
 
 
 def check_relaxation_speed(index, level, leeway_factor: float = 1.2):
@@ -156,7 +166,6 @@ def bootstap(x, multilevel: hm.hierarchy.multilevel.Multilevel, num_levels: int,
              num_test_examples: int = 5,
              print_frequency: int = None,
              aggregate_size_values: np.ndarray = np.array([2, 4, 6]),
-             nu_values: np.ndarray = np.arange(2, 5, dtype=int),
              max_conv_factor: float = 0.4,
              neighborhood: str = "extended",
              max_caliber: int = 5,
@@ -175,7 +184,6 @@ def bootstap(x, multilevel: hm.hierarchy.multilevel.Multilevel, num_levels: int,
         print_frequency: print debugging convergence statements per this number of relaxation cycles/sweeps.
           None means no printouts.
         aggregate_size_values: aggregate sizes to optimize over.
-        nu_values: #sweep per cycle values to optimize over.
         max_conv_factor: max convergence factor to allow. NOTE: in principle, should be derived from cycle index.
         neighborhood: "aggregate"|"extended" coarse neighborhood to interpolate from: only coarse variables in the
             aggregate, or the R*A*R^T sparsity pattern.
@@ -189,7 +197,7 @@ def bootstap(x, multilevel: hm.hierarchy.multilevel.Multilevel, num_levels: int,
     # TODO(orenlivne): update parameters of relaxation cycle to reasonable values if needed.
     def relax_cycle(x):
         return hm.solve.relax_cycle.relax_cycle(multilevel, 1.0, 2, 2, 4).run(x)
-    level = multilevel._level[0]
+    level = multilevel[0]
 
     # First, test relaxation cycle convergence on a random vector. If slow, this yields a yet unseen slow to converge
     # error to add to the test function set, and indicate that we should NOT attempt to improve the current TFs with
@@ -198,7 +206,7 @@ def bootstap(x, multilevel: hm.hierarchy.multilevel.Multilevel, num_levels: int,
                                                        np.random.random((level.a.shape[0], 1)),
                                                        num_sweeps=20, print_frequency=print_frequency)
     y = y.flatten()
-    coarse_level = multilevel._level[1] if len(multilevel._level) > 1 else None
+    coarse_level = multilevel[1] if len(multilevel) > 1 else None
     _LOGGER.info("Relax cycle conv factor {:.3f} asymptotic RQ {:.3f} RER {:.3f} P error {:.3f}".format(
         conv_factor, level.rq(y), norm(level.operator(y)) / norm(y),
         norm(y - coarse_level.p.dot(coarse_level.r.dot(y))) / norm(y) if coarse_level is not None else -1))
@@ -223,16 +231,19 @@ def bootstap(x, multilevel: hm.hierarchy.multilevel.Multilevel, num_levels: int,
         x_fit, x_test = x_level[:, :-num_test_examples], x_level[:, -num_test_examples:]
 
         # Create the coarsening operator R.
+        nu = 2 * num_sweeps
         coarsener = hm.setup.coarsening_uniform.UniformCoarsener(
-            level, x, aggregate_size_values, nu_values, repetitive=repetitive)
-        r, aggregate_size, nc, cr, mean_energy_error, nu, mock_conv, mock_work, mock_efficiency = \
+            level, x, aggregate_size_values, nu, repetitive=repetitive)
+        r, aggregate_size, nc, cr, mean_energy_error, mock_conv, mock_work, mock_efficiency = \
             coarsener.get_optimal_coarsening(max_conv_factor)
         _LOGGER.info("R {} a {} nc {} cr {:.2f} mean_energy_error {:.4f}; mock cycle nu {} conv {:.2f} "
                      "eff {:.2f}".format(
             r.shape, aggregate_size, nc, cr, mean_energy_error, nu, mock_conv, mock_efficiency))
 
+        nu_values = list(range(1, 4)) + [nu]
         mock_conv_factor = np.array([hm.setup.auto_setup.mock_cycle_conv_factor(level, r, nu) for nu in nu_values])
-        _LOGGER.info("Mock cycle conv factor {}".format(np.array2string(mock_conv_factor, precision=3)))
+        _LOGGER.info("Mock cycle conv factor {} for nu {}".format(
+            np.array2string(mock_conv_factor, precision=3), np.array2string(nu_values)))
 
         # Create the interpolation operator P.
         p = create_interpolation(

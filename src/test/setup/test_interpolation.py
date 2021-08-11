@@ -98,23 +98,20 @@ class TestInterpolation:
         x = _get_test_matrix(a, n, 10, num_examples=4)
         # Calculate mock cycle predicted efficiency.
         aggregate_size_values = np.array([2, 4, 6])
-        nu_values = np.arange(1, 6, dtype=int)
         max_conv_factor = 0.3
-        coarsener = hm.setup.coarsening_uniform.UniformCoarsener(level, x, aggregate_size_values, nu_values,
-                                                                 repetitive=True)
-        r, aggregate_size, nc, _, _, _, _, _, _ = \
-            coarsener.get_optimal_coarsening(max_conv_factor)
-        assert aggregate_size == 2
-        assert nc == 1
+        coarsener = hm.setup.coarsening_uniform.UniformCoarsener(level, x, aggregate_size_values, 4, repetitive=True)
+        r, aggregate_size, nc = coarsener.get_optimal_coarsening(max_conv_factor)[:3]
+        assert aggregate_size == 4
+        assert nc == 2
 
         p, fit_error, val_error, test_error, alpha_opt = \
             hm.setup.interpolation.create_interpolation_least_squares_domain(x, a, r, aggregate_size=aggregate_size,
                                                                              nc=nc, repetitive=True)
 
-        assert np.mean(alpha_opt) == pytest.approx(0.005)
-        assert max(fit_error) == pytest.approx(0.147, 1e-2)
-        assert max(val_error) == pytest.approx(0.107, 1e-2)
-        assert max(test_error) == pytest.approx(0.080, 1e-2)
+        assert np.mean(alpha_opt) == pytest.approx(0.0025)
+        assert max(fit_error) == pytest.approx(0.127, 1e-2)
+        assert max(val_error) == pytest.approx(0.078, 1e-2)
+        assert max(test_error) == pytest.approx(0.11, 1e-2)
         assert p.shape == (32, 16)
 
     def test_create_interpolation_least_squares_domain_repetitive_indivisible_size(self):
@@ -126,23 +123,21 @@ class TestInterpolation:
         x = _get_test_matrix(a, n, 10, num_examples=4)
         # Calculate mock cycle predicted efficiency.
         aggregate_size_values = np.array([2, 4, 6])
-        nu_values = np.arange(1, 6, dtype=int)
         max_conv_factor = 0.3
-        coarsener = hm.setup.coarsening_uniform.UniformCoarsener(level, x, aggregate_size_values, nu_values,
-                                                                 repetitive=True)
-        r, aggregate_size, nc, _, _, _, _, _, _ = \
-            coarsener.get_optimal_coarsening(max_conv_factor)
-        assert aggregate_size == 4
-        assert nc == 2
+        coarsener = hm.setup.coarsening_uniform.UniformCoarsener(level, x, aggregate_size_values, 4, repetitive=True)
+        r, aggregate_size, nc = coarsener.get_optimal_coarsening(max_conv_factor)[:3]
+        assert aggregate_size == 6
+        assert nc == 3
 
         p, fit_error, val_error, test_error, alpha_opt = \
             hm.setup.interpolation.create_interpolation_least_squares_domain(x, a, r, aggregate_size=aggregate_size,
                                                                              nc=nc, repetitive=True)
 
-        assert np.mean(alpha_opt) == pytest.approx(0)
-        assert max(fit_error) == pytest.approx(0.149, 1e-2)
-        assert max(val_error) == pytest.approx(0.101, 1e-2)
-        assert max(test_error) == pytest.approx(1.32, 1e-2)
+        assert np.mean(alpha_opt) == pytest.approx(0.0167, 1e-2)
+        assert max(fit_error) == pytest.approx(0.123, 1e-2)
+        assert max(val_error) == pytest.approx(0.138, 1e-2)
+        # Invisible size currently causes large errors due to boundaries (?!).
+        assert max(test_error) == pytest.approx(1.52, 1e-2)
         assert p.shape == (33, 18)
 
         # To print p:
@@ -167,20 +162,17 @@ class TestInterpolation:
         x = _get_test_matrix(a, n, 10, num_examples=8)
         # Calculate mock cycle predicted efficiency.
         aggregate_size_values = np.array([2, 4, 6])
-        nu_values = np.arange(1, 6, dtype=int)
         max_conv_factor = 0.3
-        coarsener = hm.setup.coarsening_uniform.UniformCoarsener(level, x, aggregate_size_values, nu_values,
-                                                                 repetitive=True)
-        r, aggregate_size, nc, _, _, _, _, _, _ = \
-            coarsener.get_optimal_coarsening(max_conv_factor)
-        assert aggregate_size == 4
+        coarsener = hm.setup.coarsening_uniform.UniformCoarsener(level, x, aggregate_size_values, 4, repetitive=True)
+        r, aggregate_size, nc = coarsener.get_optimal_coarsening(max_conv_factor)[:3]
+        assert aggregate_size == 6
         assert nc == 2
 
         p, fit_error, val_error, test_error, alpha_opt = \
             hm.setup.interpolation.create_interpolation_least_squares_domain(x, a, r, aggregate_size=aggregate_size,
                                                                              nc=nc, repetitive=True)
 
-        assert max(fit_error) == pytest.approx(0.092, 1e-2)
+        assert max(fit_error) == pytest.approx(0.347, 1e-2)
         assert max(val_error) == pytest.approx(0.119, 1e-2)
         assert max(test_error) == pytest.approx(0.31, 1e-2)
         assert p.shape == (16, 8)

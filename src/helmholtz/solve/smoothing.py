@@ -82,7 +82,6 @@ def shrinkage_factor(operator, method, domain_shape: np.ndarray, num_examples: i
     # Find point of diminishing returns (PODR). Allow a leeway of 'leeway_factor' from the maximum efficiency point.
     reduction = np.mean(residual_history / residual_history[0], axis=1)
     efficiency = reduction ** (1 / np.clip(np.arange(residual_history.shape[0]), 1e-2, None))
-    _LOGGER.info(efficiency)
     index = max(np.where(efficiency < leeway_factor * min(efficiency))[0])
     # factor = residual reduction per sweep over the first 'index' sweeps.
     factor = efficiency[index]

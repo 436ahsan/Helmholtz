@@ -55,20 +55,20 @@ class RelaxCycleProcessor(hm.hierarchy.processor.Processor):
 
     def process_coarsest(self, l):
         self._print_state(l, "initial")
-        level = self._multilevel._level[l]
+        level = self._multilevel[l]
         for _ in range(self._nu_coarsest):
             self._x[l] = level.relax(self._x[l], self._b[l])
         self._print_state(l, "coarsest ({})".format(self._nu_coarsest))
 
     def pre_process(self, l):
         # Execute at level L right before switching to the next-coarser level L+1.
-        level = self._multilevel._level[l]
+        level = self._multilevel[l]
         self._print_state(l, "initial")
         self._relax(l, self._nu_pre)
 
         # Full Approximation Scheme (FAS).
         lc = l + 1
-        coarse_level = self._multilevel._level[lc]
+        coarse_level = self._multilevel[lc]
         x = self._x[l]
         xc_initial = coarse_level.coarsen(x)
         self._x_initial[lc] = xc_initial
@@ -77,7 +77,7 @@ class RelaxCycleProcessor(hm.hierarchy.processor.Processor):
 
     def post_process(self, l):
         lc = l + 1
-        coarse_level = self._multilevel._level[lc]
+        coarse_level = self._multilevel[lc]
         self._x[l] += coarse_level.interpolate(self._x[lc] - self._x_initial[lc])
         self._print_state(l, "correction")
 
@@ -85,7 +85,7 @@ class RelaxCycleProcessor(hm.hierarchy.processor.Processor):
         self._relax(l, self._nu_post)
 
     def _relax(self, l, num_sweeps):
-        level = self._multilevel._level[l]
+        level = self._multilevel[l]
         if num_sweeps > 0:
             for _ in range(num_sweeps):
                 self._x[l] = level.relax(self._x[l], self._b[l])
@@ -96,7 +96,7 @@ class RelaxCycleProcessor(hm.hierarchy.processor.Processor):
         return self._x[l]
 
     def _print_state(self, level_ind, title):
-        level = self._multilevel._level[level_ind]
+        level = self._multilevel[level_ind]
         if self._debug:
             x = self._x[level_ind]
             r_norm = scaled_norm(b[:, 0] - level.operator(x[:, 0]))

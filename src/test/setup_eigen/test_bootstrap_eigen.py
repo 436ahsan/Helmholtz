@@ -34,7 +34,7 @@ class TestBootstrapEigen:
         level = multilevel.finest_level
         assert level.a.shape == (16, 16)
 
-        coarse_level = multilevel._level[1]
+        coarse_level = multilevel[1]
         assert coarse_level.a.shape == (8, 8)
         assert coarse_level._r_csr.shape == (8, 16)
         assert coarse_level._p_csr.shape == (16, 8)

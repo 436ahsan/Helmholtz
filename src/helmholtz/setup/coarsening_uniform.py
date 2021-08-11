@@ -86,7 +86,7 @@ class UniformCoarsener:
     Creates the next coarse level's SVD coarsening operator R on a full domain (non-repetitive).
     Uses a fixed-size aggregate and #PCs throughout the domain.
     """
-    def __init__(self, level, x, aggregate_size_values, nu_values, cycle_index: float = 1,
+    def __init__(self, level, x, aggregate_size_values, nu: int, cycle_index: float = 1,
                  cycle_coarse_level_work_bound: float = 0.7, repetitive: bool = False):
         """
 
@@ -94,7 +94,7 @@ class UniformCoarsener:
             level: level object containing the relaxation scheme.
             x: fine-level test matrix.
             aggregate_size_values: aggregate sizes to optimize over.
-            nu_values: #sweep per cycle values to optimize over.
+            nu: #relation sweeps per mock cycle.
             cycle_index: cycle index of the cycle we are designing.
             cycle_coarse_level_work_bound: cycle_index * max_coarsening_ratio. Bounds the proportion of coarse level
                 work in the cycle.
@@ -110,10 +110,9 @@ class UniformCoarsener:
                     cycle_coarse_level_work_bound=cycle_coarse_level_work_bound,
                     repetitive=repetitive),
                 1)]
-        self._nu_values = nu_values
+        self._nu = nu
         r_values = np.array([item[2] for item in self._result])
-        self._mock_conv_factor = np.array([[hm.setup.auto_setup.mock_cycle_conv_factor(level, r, nu)
-                                            for nu in nu_values] for r in r_values])
+        self._mock_conv_factor = np.array([hm.setup.auto_setup.mock_cycle_conv_factor(level, r, nu) for r in r_values])
 
     # TODO(oren): max_conv_factor can be derived from cycle index instead of being passed in.
     def get_coarsening_info(self, max_conv_factor):
@@ -133,27 +132,26 @@ class UniformCoarsener:
         r_values = np.array([item[2] for item in self._result])
         mean_energy_error = np.array([item[3] for item in self._result])
         coarsening_ratio = np.array([r.shape[0] / r.shape[1] for r in r_values])
-        work = self._nu_values[None, :] / (1 - coarsening_ratio[:, None])
+        work = self._nu / (1 - coarsening_ratio)
         efficiency = self._mock_conv_factor ** (1 / work)
         candidate = self._mock_conv_factor <= max_conv_factor
-        i, j = np.where(candidate)
+        i = np.where(candidate)[0]
         candidate = np.vstack((
             i,
             aggregate_size[i],
             nc[i],
             coarsening_ratio[i],
             mean_energy_error[i],
-            self._nu_values[j],
             self._mock_conv_factor[candidate],
             work[candidate],
             efficiency[candidate]
         )).transpose()
         return candidate
 #        return np.array(candidate, [("i", "i4"), ("a", "i4"), ("nc", "i4"), ("cr", "f8"), ("Energy Error", "f8"),
-#                                    ("nu", "f8"), ("conv", "f8"), ("work", "f8"), ("eff", "f8")])
+#                                    ("conv", "f8"), ("work", "f8"), ("eff", "f8")])
 
     # TODO(oren): max_conv_factor can be derived from cycle index instead of being passed in.
-    def get_optimal_coarsening(self, max_conv_factor):
+    def get_optimal_coarsening(self, max_conv_factor, aggregate_size: int = None):
         """
         Returns a coarsening matrix (R) on the non-repetitive domain, which maximizes mock cycle efficiency over
         aggregate size and # principal components (coarse vars per aggregate).
@@ -165,11 +163,13 @@ class UniformCoarsener:
             Optimal R, aggregate_size, nc, cr, mean_energy_error, nu, mock_conv, mock_work, mock_efficiency.
         """
         candidate = self.get_coarsening_info(max_conv_factor)
+        if aggregate_size is not None:
+            candidate = candidate[candidate[:, 1] == aggregate_size]
         if candidate.size == 0:
             _LOGGER.info("Candidates coarsening")
             _LOGGER.info(self.get_coarsening_info(1.0))
             raise Exception("Could not find a coarsening whose mock cycle is below {:.2f}".format(max_conv_factor))
         best_index = np.argmin(candidate[:, -1])
-        i, aggregate_size, nc, cr, mean_energy_error, nu, mock_conv, mock_work, mock_efficiency = candidate[best_index]
-        return self._result[int(i)][2], int(aggregate_size), int(nc), cr, mean_energy_error, int(nu), mock_conv, \
+        i, aggregate_size, nc, cr, mean_energy_error, mock_conv, mock_work, mock_efficiency = candidate[best_index]
+        return self._result[int(i)][2], int(aggregate_size), int(nc), cr, mean_energy_error, mock_conv, \
             mock_work, mock_efficiency

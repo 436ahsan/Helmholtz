@@ -11,7 +11,8 @@ _LOGGER = logging.getLogger(__name__)
 
 
 def solve_cycle(multilevel: multilevel.Multilevel, cycle_index: float, nu_pre: int, nu_post: int,
-                debug: bool = False, num_levels: int = None, finest: int = 0, rhs: np.ndarray = None):
+                nu_coarsest: int = 10, debug: bool = False, num_levels: int = None, finest: int = 0,
+                rhs: np.ndarray = None):
     """
     Creates a multilevel solution cycle of A*x=b. Note: x can either be of shape (n, m) with m >= 2 or (n, ), but not
     (n, 1).
@@ -30,7 +31,7 @@ def solve_cycle(multilevel: multilevel.Multilevel, cycle_index: float, nu_pre: i
     """
     if num_levels is None:
         num_levels = len(multilevel)
-    processor = SolutionCycleProcessor(multilevel, nu_pre, nu_post, debug=debug, rhs=rhs)
+    processor = SolutionCycleProcessor(multilevel, nu_pre, nu_post, nu_coarsest=nu_coarsest, debug=debug, rhs=rhs)
     return hm.hierarchy.cycle.Cycle(processor, cycle_index, num_levels, finest=finest)
 
 
@@ -38,8 +39,8 @@ class SolutionCycleProcessor(hm.hierarchy.processor.Processor):
     """
     Relaxation cycle processor. Executes a Cycle(nu_pre, nu_post) on A*x = 0.
     """
-    def __init__(self, multilevel: multilevel.Multilevel, nu_pre: int, nu_post: int, debug: bool = False,
-                 rhs: np.ndarray = None) -> np.array:
+    def __init__(self, multilevel: multilevel.Multilevel, nu_pre: int, nu_post: int, nu_coarsest: int = 10,
+                 debug: bool = False, rhs: np.ndarray = None) -> np.array:
         """
         Args:
             multilevel: multilevel hierarchy to use in the cycle.
@@ -52,6 +53,7 @@ class SolutionCycleProcessor(hm.hierarchy.processor.Processor):
         self._multilevel = multilevel
         self._nu_pre = nu_pre
         self._nu_post = nu_post
+        self._nu_coarsest = nu_coarsest
         self._debug = debug
         self._x = None
         self._x_initial = None
@@ -74,19 +76,22 @@ class SolutionCycleProcessor(hm.hierarchy.processor.Processor):
 
     def process_coarsest(self, l):
         self._print_state(l, "initial")
-        level = self._multilevel._level[l]
-        self._x[l] = spsolve(level.a, self._b[l])
+        level = self._multilevel[l]
+        if self._nu_coarsest < 0:
+            self._x[l] = spsolve(level.a, self._b[l])
+        else:
+            self._relax(l, self._nu_coarsest)
         self._print_state(l, "coarsest")
 
     def pre_process(self, l):
         # Execute at level L right before switching to the next-coarser level L+1.
-        level = self._multilevel._level[l]
+        level = self._multilevel[l]
         self._print_state(l, "initial")
         self._relax(l, self._nu_pre)
 
         # Full Approximation Scheme (FAS).
         lc = l + 1
-        coarse_level = self._multilevel._level[lc]
+        coarse_level = self._multilevel[lc]
         x = self._x[l]
         xc_initial = coarse_level.coarsen(x)
         self._x_initial[lc] = xc_initial
@@ -95,7 +100,7 @@ class SolutionCycleProcessor(hm.hierarchy.processor.Processor):
 
     def post_process(self, l):
         lc = l + 1
-        coarse_level = self._multilevel._level[lc]
+        coarse_level = self._multilevel[lc]
         self._x[l] += coarse_level.interpolate(self._x[lc] - self._x_initial[lc])
         self._print_state(l, "correction")
 
@@ -103,7 +108,7 @@ class SolutionCycleProcessor(hm.hierarchy.processor.Processor):
         self._relax(l, self._nu_post)
 
     def _relax(self, l, num_sweeps):
-        level = self._multilevel._level[l]
+        level = self._multilevel[l]
         if num_sweeps > 0:
             for _ in range(num_sweeps):
                 self._x[l] = level.relax(self._x[l], self._b[l])
@@ -114,7 +119,7 @@ class SolutionCycleProcessor(hm.hierarchy.processor.Processor):
         return self._x[l]
 
     def _print_state(self, level_ind, title):
-        level = self._multilevel._level[level_ind]
+        level = self._multilevel[level_ind]
         b = self._b[level_ind]
         if self._debug:
             x = self._x[level_ind]

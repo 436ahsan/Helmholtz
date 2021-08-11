@@ -103,11 +103,10 @@ class TestCoarseningUniform:
 
         # Calculate mock cycle predicted efficiency.
         aggregate_size_values = np.array([2, 4, 6])
-        nu_values = np.arange(1, 6, dtype=int)
         max_conv_factor = 0.3
 
-        coarsener = hm.setup.coarsening_uniform.UniformCoarsener(level, x, aggregate_size_values, nu_values)
-        r, aggregate_size, nc, cr, mean_energy_error, nu, mock_conv, mock_work, mock_efficiency = \
+        coarsener = hm.setup.coarsening_uniform.UniformCoarsener(level, x, aggregate_size_values, 4)
+        r, aggregate_size, nc, cr, mean_energy_error, mock_conv, mock_work, mock_efficiency = \
             coarsener.get_optimal_coarsening(max_conv_factor)
 
         assert r.shape == (48, 96)
@@ -115,7 +114,6 @@ class TestCoarseningUniform:
         assert nc == 1
         assert cr == pytest.approx(0.5, 1e-2)
         assert mean_energy_error == pytest.approx(0.256, 1e-2)
-        assert nu == 2
         assert mock_conv == pytest.approx(0.222, 1e-2)
         assert mock_work == pytest.approx(4, 1e-2)
         assert mock_efficiency == pytest.approx(0.687, 1e-2)
@@ -130,11 +128,10 @@ class TestCoarseningUniform:
 
         # Calculate mock cycle predicted efficiency.
         aggregate_size_values = np.array([2, 4, 6])
-        nu_values = np.arange(1, 6, dtype=int)
         max_conv_factor = 0.3
 
-        coarsener = hm.setup.coarsening_uniform.UniformCoarsener(level, x, aggregate_size_values, nu_values)
-        r, aggregate_size, nc, cr, mean_energy_error, nu, mock_conv, mock_work, mock_efficiency = \
+        coarsener = hm.setup.coarsening_uniform.UniformCoarsener(level, x, aggregate_size_values, 4)
+        r, aggregate_size, nc, cr, mean_energy_error, mock_conv, mock_work, mock_efficiency = \
             coarsener.get_optimal_coarsening(max_conv_factor)
 
         assert r.shape == (48, 96)
@@ -142,7 +139,6 @@ class TestCoarseningUniform:
         assert nc == 2
         assert cr == pytest.approx(0.5, 1e-2)
         assert mean_energy_error == pytest.approx(0.156, 1e-2)
-        assert nu == 3
         assert mock_conv == pytest.approx(0.156, 1e-2)
         assert mock_work == pytest.approx(6, 1e-2)
         assert mock_efficiency == pytest.approx(0.733, 1e-2)
@@ -157,12 +153,10 @@ class TestCoarseningUniform:
 
         # Calculate mock cycle predicted efficiency.
         aggregate_size_values = np.array([2, 4, 6])
-        nu_values = np.arange(1, 6, dtype=int)
         max_conv_factor = 0.3
 
-        coarsener = hm.setup.coarsening_uniform.UniformCoarsener(level, x, aggregate_size_values, nu_values,
-                                                                 repetitive=True)
-        r, aggregate_size, nc, cr, mean_energy_error, nu, mock_conv, mock_work, mock_efficiency = \
+        coarsener = hm.setup.coarsening_uniform.UniformCoarsener(level, x, aggregate_size_values, 4, repetitive=True)
+        r, aggregate_size, nc, cr, mean_energy_error, mock_conv, mock_work, mock_efficiency = \
             coarsener.get_optimal_coarsening(max_conv_factor)
 
         assert r.shape == (48, 96)
@@ -170,7 +164,6 @@ class TestCoarseningUniform:
         assert nc == 1
         assert cr == pytest.approx(0.5, 1e-2)
         assert mean_energy_error == pytest.approx(0.191, 1e-2)
-        assert nu == 2
         assert mock_conv == pytest.approx(0.222, 1e-2)
         assert mock_work == pytest.approx(4, 1e-2)
         assert mock_efficiency == pytest.approx(0.687, 1e-2)

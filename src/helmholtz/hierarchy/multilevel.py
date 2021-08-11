@@ -221,6 +221,6 @@ class Multilevel:
             Sub-hierarchy.
         """
         multilevel = Multilevel()
-        for level in range(finest, len(self)):
+        for level in self._level[finest:len(self)]:
             multilevel.add(level)
         return multilevel
