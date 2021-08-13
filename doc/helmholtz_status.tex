@@ -1,0 +1,120 @@
+\documentclass{article}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{authblk}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\usepackage{booktabs}
+
+\newcommand{\bbeta}{\boldsymbol\beta}
+\newcommand{\bt}{\boldsymbol\tau}
+\newcommand{\bta}{\boldsymbol\ta}
+\newcommand{\bOmega}{\boldsymbol\Omega}
+\newcommand{\bY}{\mathbf{Y}}
+\newcommand{\cC}{\mathcal{C}}
+\newcommand{\cG}{\mathcal{G}}
+\newcommand{\st}{v_{\ta}}
+\newcommand{\ta}{\theta}
+\newcommand{\lla}{\longleftarrow}
+\newcommand{\G}{\mathcal{G}}
+\newcommand{\I}{\mathbb{I}}
+\newcommand{\Normal}{\mathcal{N}}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\bX}{\mathbf{X}}
+
+\title{1D Helmholtz Equation Coarsening: Next Steps}
+\author{}
+
+%\author[1]{Achi Brandt}
+%\author[2]{Oren Livne}
+%\affil[1]{The Weizmann Institute of Science,Department of Applied Mathematics \& Computer Science, 76100 Rehovot, Israel. Email: achibr@gmail.com}
+%\affil[2]{Educational Testing Service, 660 Rosedale Road, Attn: MS-12, T-197, Princeton, NJ 08540. Email: olivne@ets.org}
+%\author[3]{James Brannick} % Add affiliation
+%\author[4]{Karsten Khal}} % Add affiliation
+% In the ordering that makes sense.
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\section{Context}
+As we've observed in experiments, defining species of variables at level 1 (level 0 being the finest level, where all variables are of a single species) could be important to defining further coarsening levels.
+
+In fact, it is essential to {\it align} the coarse variables of different blocks so that they correspong to each other (after which we can define species as the first coarse variables of all blocks, the second coarse variables from all blocks, etc.). This crreates higher correlations between variables, which might improve relaxation smoothing and the next-coarsening accuracy.
+
+Listed here are notes from recent discussions, how we see the setup algorithm, and the next steps of development that need to be performed.
+
+\subsection{Repetitiveness}
+For simplicity, work on a fixed-size domain with $h=1$ and $n$ points, constant $k$, and within the {\it repetitive} framework first, i.e., use windows (sampling) from the same (or few) Test Vectors (TVs) to build $R$ and $P$ on an aggregate and tile them over all aggregates in the domain.
+
+$P$ will have to be different at the end of the domain if the aggregate size $a$ does not divide $n$. $R$ can be made almost uniform by overlapping the last two aggregates.
+
+\section{Level $0 \rightarrow 1$: No Species}
+
+\subsection{Smoothing}
+\begin{itemize}
+    \item Use Kaczmarz as a smoother.
+    \item Calculate the relaxation shrinkage factor. Determine the number of sweeps $\nu$ of the Point of Diminishing Returns (PODR). If the residual reduction after $i$ sweeps is $\mu_i$ (averaged over $5$ random-start experiments), let $f_i := \mu_i^{1/i}$. $f_i$ is likely to be an increasing sequence; pick the smallest $\nu$ such that $f_{\nu} < 1.2 f_1$.
+      
+    \item If the RER at the PODR is much smaller than the initial RER (of a random vector), no need to coarsen. This is in fact true at any coarsening level: determining whether further coarsening is justified, and if not, terminating the setup process.
+\end{itemize}
+
+\subsection{Coarsening}
+Use the SVD to calculate principal components. Optimize $a$ and $n_c$ (the number of components = number of coarse variables per aggregate) to minimize the 
+
+\subsection{Boostrap}
+Alignment shows better results when the vectors are smooth enough, thus bootstrap may be needed to smooth the level 0 TVs beyond relaxation.
+
+The goal of $P$ here is to provide more efficient smoothing in a two-level relaxation cycle. Check shrinkage of cycle, compare torelaxation.
+
+We have good control over $P$'s quality by observing the TV's residuals (to make sure they decrease after the cycles), and the cycle's shrinkage factor.
+
+\begin{itemize}
+  \item Use the largest interpolatory set that does not increase the density of the coarse grid operator ({\bf question: what increase is tolerable? After all we know the first stage of coarsening typically increases density a bit, but further coarsenings should not}).
+  
+\end{itemize}
+
+\section{Alignment}
+The description assumes two species ($n_c=2$ in the level $0 \rightarrow 1$ coarsening). If there are more, the problem can to be recast as a quadratically constrained quadratic program and solved using QCQP solvers, but the ideas and results should be the same.
+
+\subsection{Step 1: Find Neighbor Rotations $\phi_i := \theta_{i,i+1}$}
+For each pair of neighboring aggregater $(i,j=i+1)$, with test matrices $X$ and $Y$ of size $2 \times s$, respectively, where $s$ is the number of test vectors, we can define an optimal neighbor rotation angle $\theta_{i,j}$ that minimizes
+
+$$ \theta_{i,j} = argmin_{\theta} f(\theta)$$
+$$ f(\theta) := \frac12 \left\{ \|\cos(\theta) X_0 + \sin(\theta) X_1 - Y_0 \|_2^2 + \|-\sin(\theta) X_0 + \cos(\theta) X_1 - Y_1\|_2^2 \right\}. $$
+
+Here $Z_j$ is the $j$th row of $Z$, $Z=X,Y, j=0,1$.
+
+The minimization function $f$ seems to have a unique minimum in $[0, 2 \pi)$.
+
+We see a large reduction in $f$ value only when TVs are smooth enough. Note that $\sum_i \phi_i mod (2 \pi)$ is close to $0$, but not very close, so the next step (global rotations) can only be solved approximately, not exactly.
+
+
+\subsection{Step 2: Find Aggregate Rotations $\theta_{i}$ (Global Solve)}
+Solve
+$$ \min_{\theta} \frac12 \sum_{i=0}^{N-1} \left(\theta_{i} - \theta_{i+1} - \phi_{i} \right)^2\, $$
+which is equivalent to the Poisson linear system
+$$ -\theta_{i-1} + 2 \theta_i - \theta_{i+1} = \phi_{i} - \phi_{i-1}, \qquad i = 0,\dots, N-1\,, $$
+
+where $N$ = number of aggregates. $i$ is the (cyclic/periodic) aggregate index.
+
+If $\sum_i \phi_i \approx 0$, this can be solved almost exactly (i.e., the minimum is $0$) with $\theta_{i+1} = \theta_{i} - \phi_i$. Only the last equation (for $i=n-1$) is not satisfied in this case. Generally, one can solve the minimization problem in 1D using integration / stepping: $\theta_0=0$, $\theta_{i+1} = \theta_i + \phi_i$, then correcting $\theta_i \leftarrow \theta_i + c i$ where $c$ is determined to satisfy the Poisson equation at the last point $i = N-1.$
+
+\subsection{Perform the Alignment}
+This amounts to defining a sparse block-diagonal matrix of $2 \times 2$ aggregate rotations, and updating $R \leftarrow U R$, $P \leftarrow P U^T$, $A^c \leftarrow U A^c U^T$.
+
+\section{Level $1 \rightarrow 2$: Species}
+Before we even design an interpolation stencil that takes advantage of species separation, we check relaxation. See below. This is one way to see the species separation leads to stronger correlations among neighboring variables and perhaps promotes better smoothing, not just the ability to interpolate from fewer points here.
+
+\section{Next Steps / Tasks}
+\begin{itemize}
+    \item Complete coarsen level $0 \rightarrow 1$.
+    \item Align the coarse variables.
+    \item Check the stencil of $A^1$: do the equations for each species (e.g., $u_i$) mostly involve the same species in other aggregates (e.g., $u_{i-1},u{i+1}$) with only small cross-weights to $v$-variables?
+    \item Compare the smoothing (shrinkage) and convergence of Gauss-Seidel and Kaczmarz at level 1. Maybe we can get away with GS and in fact get better smoothing there as a result of alignment.
+\end{itemize}
+
+\bibliographystyle{plain}
+\bibliography{mg.bib}
+
+\end{document}

@@ -104,12 +104,12 @@ class TestInterpolation:
         assert aggregate_size == 4
         assert nc == 2
 
-        p, fit_error, val_error, test_error, alpha_opt = \
+        p, fit_error, val_error, test_error, alpha_opt, caliber = \
             hm.setup.interpolation.create_interpolation_least_squares_domain(x, a, r, aggregate_size=aggregate_size,
                                                                              nc=nc, repetitive=True)
 
-        assert np.mean(alpha_opt) == pytest.approx(0.0025)
-        assert max(fit_error) == pytest.approx(0.127, 1e-2)
+        assert np.mean(alpha_opt) == pytest.approx(0.0075)
+        assert max(fit_error) == pytest.approx(0.063, 1e-2)
         assert max(val_error) == pytest.approx(0.078, 1e-2)
         assert max(test_error) == pytest.approx(0.11, 1e-2)
         assert p.shape == (32, 16)

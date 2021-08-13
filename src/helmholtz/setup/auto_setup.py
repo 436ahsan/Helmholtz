@@ -168,7 +168,7 @@ def bootstap(x, multilevel: hm.hierarchy.multilevel.Multilevel, num_levels: int,
              aggregate_size_values: np.ndarray = np.array([2, 4, 6]),
              max_conv_factor: float = 0.4,
              neighborhood: str = "extended",
-             max_caliber: int = 5,
+             caliber: int = 1,
              repetitive: bool = False) -> Tuple[np.ndarray, hm.hierarchy.multilevel.Multilevel]:
     """
     Improves test functions and a multilevel hierarchy on a fixed-size domain by bootstrapping.
@@ -247,7 +247,7 @@ def bootstap(x, multilevel: hm.hierarchy.multilevel.Multilevel, num_levels: int,
 
         # Create the interpolation operator P.
         p = create_interpolation(
-            x_level, level.a, r, interpolation_method, aggregate_size=aggregate_size, nc=nc, max_caliber=max_caliber,
+            x_level, level.a, r, interpolation_method, aggregate_size=aggregate_size, nc=nc, caliber=caliber,
             neighborhood=neighborhood, repetitive=repetitive)
         for title, x_set in ((("all", x),) if repetitive else (("fit", x_fit), ("test", x_test))):
             error = norm(x_set - p.dot(r.dot(x_set)), axis=0) / norm(x_set, axis=0)

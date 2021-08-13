@@ -2,7 +2,9 @@
 coarse neighborhoods based on domain periodicity)."""
 import numpy as np
 import scipy.sparse
+import sklearn.metrics.pairwise
 from typing import Tuple
+from scipy.linalg import norm
 
 import helmholtz as hm
 
@@ -94,7 +96,7 @@ def create_interpolation_least_squares_repetitive(
     num_aggregates = domain_size // aggregate_size
     num_coarse_vars = nc * num_aggregates
     # Find nearest neighbors of each fine point in an aggregate.
-    nbhr = np.mod(_geometric_neighbors(aggregate_size, nc), num_coarse_vars)
+    nbhr = np.mod(geometric_neighbors(aggregate_size, nc), num_coarse_vars)
     nbhr = _sort_neighbors_by_similarity(x_aggregate_t, xc_t, nbhr)
 
     return _create_interpolation_least_squares_repetitive(
@@ -106,20 +108,22 @@ def create_interpolation_least_squares_domain(
         x: np.ndarray, a: scipy.sparse.csr_matrix, r: scipy.sparse.csr_matrix,
         aggregate_size: int = None, nc: int = None, neighborhood: str = "extended", num_test_examples: int = 5,
         repetitive: bool = False,
-        max_caliber: int = 5) -> Tuple[scipy.sparse.csr_matrix, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        caliber: int = 1) -> Tuple[scipy.sparse.csr_matrix, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """
     Creates the interpolation operator P by least squares fitting from r*x to x. Interpolatory sets are automatically
     determined by a's graph.
     Args:
         x: fine-level test matrix. shape = (num_fine_vars, num_examples).
         a: fine-level operator (only its adjacency graph is used here).
+        aggregate_size: size of aggregate (assumed uniform over domain).
+        nc: number of coarse variables per aggregate.
         r: coarsening operator.
         neighborhood: "aggregate"|"extended" coarse neighborhood to interpolate from: only coarse variables in the
             aggregate, or the R*A*R^T sparsity pattern.
         num_test_examples: number of test functions dedicated to testing (do not participate in SVD, LS fit).
         repetitive: whether to exploit problem repetitiveness by creating a constant R stencil on all aggregates
             using windows from a single (or few) test vectors.
-        max_caliber: estimated maximum interpolation caliber. Used to sample enough windows.
+        caliber: interpolation caliber. Also used to sample enough windows.
 
     Returns:
         interpolation matrix P,
@@ -128,6 +132,58 @@ def create_interpolation_least_squares_domain(
         relative test error at all fine points,
         optimal alpha for all fine points.
     """
+    # Find nearest neighbors of each fine point in an aggregate.
+    if repetitive:
+        num_aggregates = int(np.ceil(a.shape[0] / aggregate_size))
+        num_coarse_vars = nc * num_aggregates
+        nbhr = np.mod(geometric_neighbors(aggregate_size, nc), num_coarse_vars)
+    else:
+        nbhr = get_neighbor_set(x, a, r, neighborhood)
+
+    # Ridge regularization parameter (list of values).
+    alpha = np.array([0, 0.01, 0.1, 0.1, 1])
+
+    # Prepare fine and coarse test matrices.
+    xc = r.dot(x)
+    if repetitive:
+        x_disjoint_aggregate_t, xc_disjoint_aggregate_t = \
+            hm.setup.sampling.get_disjoint_windows(x, xc, aggregate_size, nc, caliber)
+        nbhr = nbhr[:aggregate_size]
+    else:
+        x_disjoint_aggregate_t, xc_disjoint_aggregate_t = x.transpose(), xc.transpose()
+
+    num_examples = x_disjoint_aggregate_t.shape[0]
+    num_fit_examples = num_examples - num_test_examples
+    fit_samples = int(0.8 * num_fit_examples)
+    val_samples = int(0.2 * num_fit_examples)
+
+    # Fit interpolation for all calibers.
+    info = {}
+    for caliber in range(1, len(nbhr) + 1):
+        # Create an interpolation over the samples: a single aggregate (if repetitive) or entire domain (otherwise).
+        p, fit_error, val_error, test_error, alpha_opt = \
+            hm.setup.interpolation_fit.create_interpolation_least_squares(
+                x_disjoint_aggregate_t, xc_disjoint_aggregate_t, nbhr[:, :caliber],
+                alpha=alpha, fit_samples=fit_samples, val_samples=val_samples, test_samples=num_test_examples)
+        if repetitive:
+            p = _tile_interpolation_matrix(p, aggregate_size, nc, x.shape[0])
+
+        x_val = x[:, -val_samples:]
+        error_a = np.mean(norm(a.dot(x_val - p.dot(r.dot(x_val))), axis=0) / norm(x_val, axis=0))
+        info[caliber] = {"error_a": error_a, "p": p, "fit_error": fit_error,
+                         "val_error": val_error, "test_error": test_error, "alpha_opt": alpha_opt}
+
+    # Determine the optimal caliber.
+    opt_caliber = min((info_caliber["error_a"], caliber) for caliber, info_caliber in info.items())[1]
+    info_opt = info[opt_caliber]
+    p, fit_error, val_error, test_error, alpha_opt = \
+        info_opt["error_a"], info_opt["fit_error"], info_opt["val_error"], \
+        info_opt["test_error"], info_opt["alpha_opt"]
+
+    return p, fit_error, val_error, test_error, alpha_opt, opt_caliber
+
+
+def get_neighbor_set(x, a, r, neighborhood):
     # Define interpolation neighbors. We use as much neighbors of each fine point in an aggregate such that the coarse
     # stencil is not increased beyond its size if we only interpolated the from aggregate's coarse variables. This is
     # the union of all coarse variables in all aggregates of the points in i's fine-level (a) stencil.
@@ -137,31 +193,7 @@ def create_interpolation_least_squares_domain(
         nbhr = [np.unique(r[:, a[i].nonzero()[1]].nonzero()[0]) for i in range(x.shape[0])]
     else:
         raise Exception("Unsupported neighborhood type {}".format(neighborhood))
-    # Ridge regularization parameter (list of values).
-    alpha = np.array([0, 0.01, 0.1, 0.1, 1])
-
-    # Prepare fine and coarse test matrices.
-    xc = r.dot(x)
-    if repetitive:
-        x_disjoint_aggregate_t, xc_disjoint_aggregate_t = \
-            hm.setup.sampling.get_disjoint_windows(x, xc, aggregate_size, nc, max_caliber)
-        nbhr = nbhr[:aggregate_size]
-    else:
-        x_disjoint_aggregate_t, xc_disjoint_aggregate_t = x.transpose(), xc.transpose()
-
-    # Create an interpolation over the samples: a single aggregate (if repetitive) or entire domain (otherwise).
-    num_examples = x_disjoint_aggregate_t.shape[0]
-    num_fit_examples = num_examples - num_test_examples
-    fit_samples = int(0.8 * num_fit_examples)
-    val_samples = int(0.2 * num_fit_examples)
-    p, fit_error, val_error, test_error, alpha_opt = \
-        hm.setup.interpolation_fit.create_interpolation_least_squares(
-            x_disjoint_aggregate_t, xc_disjoint_aggregate_t, nbhr,
-            alpha=alpha, fit_samples=fit_samples, val_samples=val_samples, test_samples=num_test_examples)
-    if repetitive:
-        p = _tile_interpolation_matrix(p, aggregate_size, nc, x.shape[0])
-
-    return p, fit_error, val_error, test_error, alpha_opt
+    return nbhr
 
 
 def _tile_interpolation_matrix(p, aggregate_size, nc, domain_size):
@@ -198,11 +230,13 @@ def _create_interpolation_least_squares_repetitive(
     return hm.setup.interpolation.Interpolator(nbhr[:, :caliber], data, nc)
 
 
-def _geometric_neighbors(w: int, nc: int):
+def geometric_neighbors(aggregate_size: int, nc: int):
     """
-    Returns the relative indices of the interpolatory set of each fine variable in a window.
+    Returns the relative indices of the interpolation set of each fine variable in a window. Center neighbors are
+    listed first, then neighboring aggregates.
+
     Args:
-        w: size of window (aggregate).
+        aggregate_size: size of window (aggregate).
         nc: number of coarse variables per aggregate. In 1D at the finest level, we know there are two principal
             components, so nc=2 makes sense there.
 
@@ -211,18 +245,18 @@ def _geometric_neighbors(w: int, nc: int):
     """
     # Here we assume w points per aggregate and the same number mc of coarse vars per aggregate, but in general
     # aggregate sizes may vary.
-    fine_var = np.arange(w, dtype=int)
+    fine_var = np.arange(aggregate_size, dtype=int)
 
     # Index of neighboring coarse variable. Left neighboring aggregate for points on the left half of the window;
     # right for right.
     coarse_nbhr = np.zeros_like(fine_var)
-    left = fine_var < w // 2
-    right = fine_var >= w // 2
+    left = fine_var < aggregate_size // 2
+    right = fine_var >= aggregate_size // 2
     coarse_nbhr[left] = -1
     coarse_nbhr[right] = 1
 
     # All nbhrs = central aggregate coarse vars + neighboring aggregate coarse vars.
-    coarse_vars_center = np.tile(np.arange(nc, dtype=int), (w, 1))
+    coarse_vars_center = np.tile(np.arange(nc, dtype=int), (aggregate_size, 1))
     return np.concatenate((coarse_vars_center, coarse_vars_center + nc * coarse_nbhr[:, None]), axis=1)
 
 
