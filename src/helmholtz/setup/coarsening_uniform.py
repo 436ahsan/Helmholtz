@@ -133,8 +133,8 @@ class UniformCoarsener:
     def __init__(self, level, x, nu: int,
                  max_aggregate_size: int = 8,
                  cycle_index: float = 1,
-                 max_energy_loss: float = 0.2,
                  cycle_coarse_level_work_bound: float = 0.7,
+                 max_energy_loss: float = 0.2,
                  expected_eventual_coarsening_ratio: float = 0.5,
                  efficiency_leeway_factor: float = 1.05,
                  repetitive: bool = False):
@@ -147,6 +147,9 @@ class UniformCoarsener:
             cycle_index: cycle index of the cycle we are designing.
             cycle_coarse_level_work_bound: cycle_index * max_coarsening_ratio. Bounds the proportion of coarse level
                 work in the cycle.
+            max_energy_loss: determines the minimum aggregate size considered, such that
+                sigma_min < max_energy_loss * sigma_max (or sqrt of ratio of the corresponding sum of squares over all
+                aggregates, in the non-repetitive case).
             expected_eventual_coarsening_ratio: coarsening ratio of subsequent coarsening to assume in estimating the
                 cycle work.
             efficiency_leeway_factor: consider all cases with efficiency measure < efficiency_leeway_factor *
