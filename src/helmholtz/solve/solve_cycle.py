@@ -18,16 +18,15 @@ def solve_cycle(multilevel: multilevel.Multilevel, cycle_index: float, nu_pre: i
     (n, 1).
 
     Args:
-        multilevel:
-        cycle_index:
-        nu_pre:
-        nu_post:
-        debug:
-        num_levels:
-        finest:
+        multilevel: a multilevel hierarchy.
+        cycle_index: cycle index (#times to visit coarse level per fine level visit).
+        nu_pre: #pre-relaxation sweeps.
+        nu_post: #post-relaxation sweeps.
+        debug: debugging printout flag.
+        num_levels: max # to use levels in the cycle.
+        finest: finest level index (usually 0, but useful for debugging sub-cycles).
 
-    Returns:
-
+    Returns: multilevel solution cycle object.
     """
     if num_levels is None:
         num_levels = len(multilevel)

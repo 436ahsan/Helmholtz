@@ -9,6 +9,8 @@ from helmholtz.linalg import norm
 
 _LOGGER = logging.getLogger(__name__)
 
+_SMALL = 1e-12
+
 
 def run_iterative_method(operator, method, x: np.ndarray, num_sweeps: int = 30, print_frequency: int = None,
                          residual_stop_value: float = 1e-10, conv_factor_type: str = "residual") -> np.ndarray:
@@ -64,7 +66,7 @@ def run_iterative_method(operator, method, x: np.ndarray, num_sweeps: int = 30, 
     last_steps = min(5, len(r_norm_history) - 2)
     history = r_norm_history if conv_factor_type == "residual" else rer_history
     return x, (None if num_sweeps < 5 else
-           (history[-1] / history[-last_steps - 1]) ** (1 / last_steps))
+           (history[-1] / max(_SMALL, history[-last_steps - 1])) ** (1 / last_steps))
 
 
 def run_iterative_eigen_method(operator, method, x: np.ndarray, lam, num_sweeps: int = 30, print_frequency: int = None,

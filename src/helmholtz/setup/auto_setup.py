@@ -270,12 +270,12 @@ def bootstap(x, multilevel: hm.hierarchy.multilevel.Multilevel, num_levels: int,
     return x, new_multilevel
 
 
-def mock_cycle_conv_factor(level, r, num_relax_sweeps):
+def mock_cycle_conv_factor(level, r, num_relax_sweeps, print_frequency: int = None):
     return hm.solve.run.run_iterative_method(
         level.operator,
         hm.solve.mock_cycle.MockCycle(lambda x, b: level.relax(x, b), r, num_relax_sweeps),
         hm.solve.run.random_test_matrix((level.size,), num_examples=1),
-        num_sweeps=10)[1]
+        num_sweeps=10, print_frequency=print_frequency)[1]
 
 
 def create_interpolation(x: np.ndarray, a: scipy.sparse.csr_matrix,
