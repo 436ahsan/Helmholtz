@@ -1,12 +1,15 @@
 """Interpolation construction routines. Fits interpolation to 1D Helmholtz test functions in particular (with specific
 coarse neighborhoods based on domain periodicity)."""
+import logging
 import numpy as np
 import scipy.sparse
-import sklearn.metrics.pairwise
 from typing import Tuple
 from scipy.linalg import norm
 
 import helmholtz as hm
+
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class Interpolator:
@@ -108,7 +111,8 @@ def create_interpolation_least_squares_domain(
         x: np.ndarray, a: scipy.sparse.csr_matrix, r: scipy.sparse.csr_matrix,
         aggregate_size: int = None, nc: int = None, neighborhood: str = "extended", num_test_examples: int = 5,
         repetitive: bool = False,
-        caliber: int = 1) -> Tuple[scipy.sparse.csr_matrix, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        max_caliber: int = 6,
+        target_interpolation_energy_error: float = 0.1) -> Tuple[scipy.sparse.csr_matrix, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """
     Creates the interpolation operator P by least squares fitting from r*x to x. Interpolatory sets are automatically
     determined by a's graph.
@@ -123,14 +127,13 @@ def create_interpolation_least_squares_domain(
         num_test_examples: number of test functions dedicated to testing (do not participate in SVD, LS fit).
         repetitive: whether to exploit problem repetitiveness by creating a constant R stencil on all aggregates
             using windows from a single (or few) test vectors.
-        caliber: interpolation caliber. Also used to sample enough windows.
+        max_caliber: maximum interpolation caliber to ty.
+        target_interpolation_energy_error:
 
     Returns:
-        interpolation matrix P,
-        relative fit error at all fine points,
-        relative validation error at all fine points,
-        relative test error at all fine points,
-        optimal alpha for all fine points.
+        interpolation matrix P.
+        relative interpolation A-norm error on the test set.
+        optimal caliber.
     """
     # Find nearest neighbors of each fine point in an aggregate.
     if repetitive:
@@ -147,40 +150,36 @@ def create_interpolation_least_squares_domain(
     xc = r.dot(x)
     if repetitive:
         x_disjoint_aggregate_t, xc_disjoint_aggregate_t = \
-            hm.setup.sampling.get_disjoint_windows(x, xc, aggregate_size, nc, caliber)
+            hm.setup.sampling.get_disjoint_windows(x, xc, aggregate_size, nc, max_caliber)
         nbhr = nbhr[:aggregate_size]
     else:
         x_disjoint_aggregate_t, xc_disjoint_aggregate_t = x.transpose(), xc.transpose()
 
     num_examples = x_disjoint_aggregate_t.shape[0]
-    num_fit_examples = num_examples - num_test_examples
-    fit_samples = int(0.8 * num_fit_examples)
-    val_samples = int(0.2 * num_fit_examples)
-
-    # Fit interpolation for all calibers.
-    info = {}
-    for caliber in range(1, len(nbhr) + 1):
+    num_ls_examples = num_examples - num_test_examples
+    val_samples = int(0.2 * num_ls_examples)
+    fit_samples = num_examples - val_samples - num_test_examples
+    folds = tuple(f.transpose() for f in
+                  hm.linalg.create_folds(x.transpose(), (fit_samples, val_samples, num_test_examples)))
+    # Fit interpolation for increasing caliber until the test error A-norm is below the accuracy threshold.
+    for caliber in range(1, max_caliber + 1):
         # Create an interpolation over the samples: a single aggregate (if repetitive) or entire domain (otherwise).
-        p, fit_error, val_error, test_error, alpha_opt = \
-            hm.setup.interpolation_fit.create_interpolation_least_squares(
-                x_disjoint_aggregate_t, xc_disjoint_aggregate_t, nbhr[:, :caliber],
-                alpha=alpha, fit_samples=fit_samples, val_samples=val_samples, test_samples=num_test_examples)
+        p = hm.setup.interpolation_fit.create_interpolation_least_squares(
+            x_disjoint_aggregate_t, xc_disjoint_aggregate_t, np.array([n[:caliber] for n in nbhr]),
+            alpha=alpha, fit_samples=fit_samples, val_samples=val_samples, test_samples=num_test_examples)
         if repetitive:
             p = _tile_interpolation_matrix(p, aggregate_size, nc, x.shape[0])
 
-        x_val = x[:, -val_samples:]
-        error_a = np.mean(norm(a.dot(x_val - p.dot(r.dot(x_val))), axis=0) / norm(x_val, axis=0))
-        info[caliber] = {"error_a": error_a, "p": p, "fit_error": fit_error,
-                         "val_error": val_error, "test_error": test_error, "alpha_opt": alpha_opt}
+        error_l2 = np.array([np.mean(norm(f - p.dot(r.dot(f)), axis=0) / norm(f, axis=0)) for f in folds])
+        error_a = np.array([np.mean(norm(a.dot(f - p.dot(r.dot(f))), axis=0) / norm(f, axis=0)) for f in folds])
+        _LOGGER.debug("caliber {} error_l2 {} error_a {}".format(
+            caliber,
+            np.array2string(error_l2, separator=", ", precision=2),
+            np.array2string(error_a, separator=", ", precision=2)))
+        if error_a[-1] < target_interpolation_energy_error:
+            return p
 
-    # Determine the optimal caliber.
-    opt_caliber = min((info_caliber["error_a"], caliber) for caliber, info_caliber in info.items())[1]
-    info_opt = info[opt_caliber]
-    p, fit_error, val_error, test_error, alpha_opt = \
-        info_opt["error_a"], info_opt["fit_error"], info_opt["val_error"], \
-        info_opt["test_error"], info_opt["alpha_opt"]
-
-    return p, fit_error, val_error, test_error, alpha_opt, opt_caliber
+    raise Exception("Could not find a good caliber for threshold {}".format(target_interpolation_energy_error))
 
 
 def get_neighbor_set(x, a, r, neighborhood):
@@ -271,3 +270,28 @@ def _similarity(x, xc):
     assumes intercept = False in fitting interpolation.
     """
     return hm.linalg.pairwise_cos_similarity(x, xc, squared=True)
+
+
+def update_interpolation(p: scipy.sparse.csr_matrix, e, ec, nbhr: np.ndarray, threshold: float = 0.1) -> \
+    scipy.sparse.csr_matrix:
+    """
+    Updates an interpolation for a new vector using Kaczmarz (minimum move from current interpolation while
+    satisfying |e-P*ec| <= t.
+
+    Args:
+        p: old interpolation matrix.
+        e: new test vector.
+        ec: coarse representation of e.
+        nbhr: (i, j) index pairs indicating the sparsity pattern of the interpolation update.
+        threshold: coarsening accuracy threshold in e.
+
+    Returns:
+        updated interpolation. Sparsity pattern = p's pattern union nbhr.
+    """
+    r = e - p.dot(ec)
+    s = np.sign(r)
+    # Lagrange multiplier.
+    row, col = zip(*sorted(set(zip(i, j)) + set(nbhr[:, 0], nbhr[:, 1])))
+    E = ec[row, col]
+    lam = (r - s * (t ** 0.5)) / np.sum(E ** 2, axis=1)
+    return p + lam * E

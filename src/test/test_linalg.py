@@ -2,7 +2,7 @@ import numpy as np
 import scipy.linalg
 import scipy.sparse
 from numpy.linalg import norm
-from numpy.ma.testutils import assert_array_almost_equal
+from numpy.ma.testutils import assert_array_equal, assert_array_almost_equal
 
 import helmholtz as hm
 
@@ -12,6 +12,28 @@ class TestLinalg:
     def setup_method(self):
         """Fixed random seed for deterministic results."""
         np.random.seed(0)
+
+    def test_scaled_norm_of_matrix_2d(self):
+        num_functions = 4
+        x = 2 * np.random.random((10, num_functions)) - 1
+
+        actual = hm.linalg.scaled_norm_of_matrix(x)
+
+        y = x.reshape(10, num_functions)
+        factor = 1 / x.shape[0] ** 0.5
+        expected = factor * np.array([norm(y[:, i]) for i in range(y.shape[1])])
+        assert_array_almost_equal(actual, expected, 10)
+
+    def test_scaled_norm_of_matrix_3d(self):
+        num_functions = 4
+        x = 2 * np.random.random((10, 2, num_functions)) - 1
+
+        actual = hm.linalg.scaled_norm_of_matrix(x)
+
+        y = x.reshape(20, num_functions)
+        factor = 1 / np.prod(x.shape[:-1]) ** 0.5
+        expected = factor * np.array([norm(y[:, i]) for i in range(y.shape[1])])
+        assert_array_almost_equal(actual, expected, 10)
 
     def test_sparse_circulant(self):
         vals = np.array([1, 2, 3, 5, 4])
@@ -153,6 +175,15 @@ class TestLinalg:
             for i in range(x.shape[1])])
 
         assert_array_almost_equal(actual, expected, 10)
+
+    def test_create_folds(self):
+        x = 2 * np.random.random((10, 4)) - 1
+
+        folds = hm.linalg.create_folds(x, (2, 3, 5))
+
+        assert_array_equal(folds[0], x[0:2])
+        assert_array_equal(folds[1], x[2:5])
+        assert_array_equal(folds[2], x[5:10])
 
 
 def _rq(x, action):

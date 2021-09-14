@@ -165,10 +165,10 @@ def bootstap(x, multilevel: hm.hierarchy.multilevel.Multilevel, num_levels: int,
              interpolation_method: str = "ls",
              num_test_examples: int = 5,
              print_frequency: int = None,
-             aggregate_size_values: np.ndarray = np.array([2, 4, 6]),
+             max_aggregate_size: int = 8,
              max_conv_factor: float = 0.4,
              neighborhood: str = "extended",
-             caliber: int = 1,
+             max_caliber: int = 1,
              repetitive: bool = False) -> Tuple[np.ndarray, hm.hierarchy.multilevel.Multilevel]:
     """
     Improves test functions and a multilevel hierarchy on a fixed-size domain by bootstrapping.
@@ -183,7 +183,7 @@ def bootstap(x, multilevel: hm.hierarchy.multilevel.Multilevel, num_levels: int,
         num_test_examples: number of test functions dedicated to testing (do not participate in SVD, LS fit).
         print_frequency: print debugging convergence statements per this number of relaxation cycles/sweeps.
           None means no printouts.
-        aggregate_size_values: aggregate sizes to optimize over.
+        max_aggregate_size: maximum allowed aggregate size.
         max_conv_factor: max convergence factor to allow. NOTE: in principle, should be derived from cycle index.
         neighborhood: "aggregate"|"extended" coarse neighborhood to interpolate from: only coarse variables in the
             aggregate, or the R*A*R^T sparsity pattern.
@@ -233,21 +233,21 @@ def bootstap(x, multilevel: hm.hierarchy.multilevel.Multilevel, num_levels: int,
         # Create the coarsening operator R.
         nu = 2 * num_sweeps
         coarsener = hm.setup.coarsening_uniform.UniformCoarsener(
-            level, x, aggregate_size_values, nu, repetitive=repetitive)
+            level, x, nu, repetitive=repetitive, max_aggregate_size=max_aggregate_size)
         r, aggregate_size, nc, cr, mean_energy_error, mock_conv, mock_work, mock_efficiency = \
             coarsener.get_optimal_coarsening(max_conv_factor)
         _LOGGER.info("R {} a {} nc {} cr {:.2f} mean_energy_error {:.4f}; mock cycle nu {} conv {:.2f} "
                      "eff {:.2f}".format(
             r.shape, aggregate_size, nc, cr, mean_energy_error, nu, mock_conv, mock_efficiency))
 
-        nu_values = list(range(1, 4)) + [nu]
+        nu_values = np.array(list(range(1, 4)) + [nu])
         mock_conv_factor = np.array([hm.setup.auto_setup.mock_cycle_conv_factor(level, r, nu) for nu in nu_values])
         _LOGGER.info("Mock cycle conv factor {} for nu {}".format(
             np.array2string(mock_conv_factor, precision=3), np.array2string(nu_values)))
 
         # Create the interpolation operator P.
         p = create_interpolation(
-            x_level, level.a, r, interpolation_method, aggregate_size=aggregate_size, nc=nc, caliber=caliber,
+            x_level, level.a, r, interpolation_method, aggregate_size=aggregate_size, nc=nc, max_caliber=max_caliber,
             neighborhood=neighborhood, repetitive=repetitive)
         for title, x_set in ((("all", x),) if repetitive else (("fit", x_fit), ("test", x_test))):
             error = norm(x_set - p.dot(r.dot(x_set)), axis=0) / norm(x_set, axis=0)
@@ -285,16 +285,16 @@ def create_interpolation(x: np.ndarray, a: scipy.sparse.csr_matrix,
     if method == "svd":
         p = r.transpose()
     elif method == "ls":
-        p, fit_error, val_error, test_error, alpha_opt = \
-            hm.setup.interpolation.create_interpolation_least_squares_domain(
-                x, a, r, aggregate_size=aggregate_size, nc=nc, neighborhood=neighborhood, repetitive=repetitive,
-                max_caliber=max_caliber)
+        # TODO(oren): replace caliber by true max_caliber in this call (right now 'max_caliber' is interpreted here
+        # as the fixed interpolation caliber returned; make the call loop over all calibers and return the desirable
+        # one).
+        p, error_a = hm.setup.interpolation.create_interpolation_least_squares_domain(
+            x, a, r, aggregate_size=aggregate_size, nc=nc, neighborhood=neighborhood, repetitive=repetitive,
+            caliber=max_caliber)
         # _LOGGER.info("fit error {}".format(fit_error))
         # _LOGGER.info("val error {}".format(val_error))
         # _LOGGER.info("test error {}".format(test_error))
-        _LOGGER.info("P max error: fit {:.3f} val {:.3f} test {:.3f}; alpha mean {:.3f}".format(
-            max(fit_error), max(val_error), max(test_error), alpha_opt.mean()
-        ))
+        _LOGGER.info("P mean A-norm test error {:.3f}".format(error_a))
     else:
         raise Exception("Unsupported interpolation method '{}'".format(method))
     return p

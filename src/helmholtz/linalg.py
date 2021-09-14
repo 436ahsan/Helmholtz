@@ -84,8 +84,8 @@ def scaled_norm_of_matrix(e: np.ndarray) -> float:
     Returns:
         The scaled L2 norm of e.
     """
-    num_dims = e.ndim - 1
-    return norm(e, axis=tuple(range(num_dims))) / np.prod(e.shape[:num_dims]) ** 0.5
+    e = e.reshape(-1, e.shape[-1])
+    return norm(e, axis=0) / e.shape[0] ** 0.5
 
 
 def sparse_circulant(vals: np.array, offsets: np.array, n: int) -> scipy.sparse.dia_matrix:
@@ -307,3 +307,19 @@ def csr_vappend(a: scipy.sparse.csr_matrix, b: scipy.sparse.csr_matrix) -> scipy
     a.indptr = np.hstack((a.indptr,(b.indptr + a.nnz)[1:]))
     a._shape = (a.shape[0]+b.shape[0],b.shape[1])
     return a
+
+
+def create_folds(x: np.ndarray, num_samples: Tuple[int]) -> Tuple[np.ndarray]:
+    """
+    Creates row-wise folds.
+    Args:
+        x: matrix to partition.
+        num_samples: a tuple of the number of rows in each fold. Must sum up to x.shape[0].
+
+    Returns:
+        list of folds.
+    """
+    assert sum(num_samples) == x.shape[0], "Folds should sum up to row shape. num_samples {} x.shape {}".format(
+        num_samples, x.shape)
+    endpoints = np.concatenate(([0], np.cumsum(num_samples)))
+    return [x[begin:end] for begin, end in zip(endpoints[:-1], endpoints[1:])]

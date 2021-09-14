@@ -6,6 +6,8 @@ import sklearn.metrics.pairwise
 from numpy.linalg import norm
 from typing import List, Tuple
 
+import helmholtz as hm
+
 _SMALL_NUMBER = 1e-15
 
 
@@ -76,13 +78,12 @@ class InterpolationFitter:
         Returns: relative interpolation error: array, shape=(2 + return_weights * (k + intercept), num_activations,
             len(alpha_values))
         """
-        fit_range = (0, self._fit_samples)
-        test_range = (self._fit_samples + self._val_samples, self._fit_samples + self._val_samples + self._test_samples) \
-            if test else (self._fit_samples, self._fit_samples + self._val_samples)
-        xc_fit = self._xc[fit_range[0]:fit_range[1]]
-        x_fit = self._x[fit_range[0]:fit_range[1]]
-        xc_val = self._xc[test_range[0]:test_range[1]]
-        x_val = self._x[test_range[0]:test_range[1]]
+        folds = (self._fit_samples, self._val_samples, self._test_samples)
+        x_fit, x_val, x_test = hm.linalg.create_folds(x, folds)
+        xc_fit, xc_val, xc_test = hm.linalg.create_folds(x, folds)
+        if test:
+            x_val = x_test
+            xc_val = xc_test
 
         def _interpolation_error(i):
             """Returns the fitting and validation errors from k nearest neighbors (the last two columns returned from
@@ -236,21 +237,15 @@ def create_interpolation_least_squares(
     nc = xc.shape[1]
     if fit_samples is None or val_samples is None or test_samples is None:
         fit_samples, val_samples, test_samples = num_examples // 3, num_examples // 3, num_examples // 3
-    fit_range  = (0, fit_samples)
-    val_range  = (fit_samples, fit_samples + val_samples)
-    test_range = (fit_samples + val_samples, fit_samples + val_samples + test_samples)
-    xc_fit     = xc[fit_range [0]:fit_range [1]]
-    x_fit      = x [fit_range [0]:fit_range [1]]
-    xc_val     = xc[val_range [0]:val_range [1]]
-    x_val      = x [val_range [0]:val_range [1]]
-    xc_test    = xc[test_range[0]:test_range[1]]
-    x_test     = x [test_range[0]:test_range[1]]
+    folds = (fit_samples, val_samples, test_samples)
+    x_fit, x_val, x_test = hm.linalg.create_folds(x, folds)
+    xc_fit, xc_val, xc_test = hm.linalg.create_folds(x, folds)
 
     # Fit interpolation by least-squares.
     result = [optimized_fit_interpolation(
         xc_fit[:, nbhr_i], x_fit[:, i], xc_val[:, nbhr_i], x_val[:, i], alpha, return_weights=True)
               for i, nbhr_i in enumerate(nbhr)]
-    alpha_opt = np.array([row[0] for row in result])
+    #alpha_opt = np.array([row[0] for row in result])
     info = [row[1] for row in result]
     # In each info element:
     # Interpolation fit error = error[:, 0]
@@ -258,6 +253,7 @@ def create_interpolation_least_squares(
     # Interpolation coefficients = error[:, 2:]
     fit_error = np.array([info_i[0] for info_i in info])
     val_error = np.array([info_i[1] for info_i in info])
+    print(fit_error, val_error)
 
     # Build the sparse interpolation matrix.
     row = np.concatenate(tuple([i] * len(nbhr_i) for i, nbhr_i in enumerate(nbhr)))
@@ -265,7 +261,7 @@ def create_interpolation_least_squares(
     data = np.concatenate(tuple(info_i[2:] for info_i in info))
     p = scipy.sparse.coo_matrix((data, (row, col)), shape=(n, nc)).tocsr()
 
-    return p, fit_error, val_error, relative_interpolation_error(p, x_test, xc_test), alpha_opt
+    return p
 
 
 def _filtered_mean(x):
@@ -281,28 +277,3 @@ def relative_interpolation_error(p: scipy.sparse.csr_matrix, x: np.ndarray, xc: 
         return (x - px) / x
     else:
         return norm(x - px, axis=0) / norm(x, axis=0)
-
-
-def update_interpolation(p: scipy.sparse.csr_matrix, e, ec, nbhr: np.ndarray, threshold: float = 0.1) -> \
-    scipy.sparse.csr_matrix:
-    """
-    Updates an interpolation for a new vector using Kaczmarz (minimum move from current interpolation while
-    satisfying |e-P*ec| <= t.
-
-    Args:
-        p: old interpolation matrix.
-        e: new test vector.
-        ec: coarse representation of e.
-        nbhr: (i, j) index pairs indicating the sparsity pattern of the interpolation update.
-        threshold: coarsening accuracy threshold in e.
-
-    Returns:
-        updated interpolation. Sparsity pattern = p's pattern union nbhr.
-    """
-    r = e - p.dot(ec)
-    s = np.sign(r)
-    # Lagrange multiplier.
-    row, col = zip(*sorted(set(zip(i, j)) + set(nbhr[:, 0], nbhr[:, 1])))
-    E = ec[row, col]
-    lam = (r - s * (t ** 0.5)) / np.sum(E ** 2, axis=1)
-    return p + lam * E
