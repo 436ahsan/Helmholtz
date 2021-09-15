@@ -48,16 +48,19 @@ def setup(a: scipy.sparse.spmatrix,
     level = hierarchy.create_finest_level(a)
     multilevel = hm.hierarchy.multilevel.Multilevel.create(level)
     num_levels = 1
-    shrinkage_factor, num_sweeps, conv = check_relaxation_speed(num_levels - 1, level, leeway_factor=leeway_factor)
+    shrinkage_factor, num_sweeps, residual, _, _, relax_conv_factor = \
+        check_relaxation_speed(num_levels - 1, level, leeway_factor=leeway_factor)
     # Use at least nu sweeps such that shrinkage^nu <= 0.5, just to be safe.
     num_sweeps = max((num_sweeps, min_relax_sweeps,
                       int(np.ceil(np.log(min_relax_reduction_factor) / np.log(shrinkage_factor)))))
-    _LOGGER.info("Using {} relaxations at level {}".format(num_sweeps, num_levels - 1))
+    _LOGGER.info("Using {} relaxations at level {} shrinkage {:.2f}".format(
+        num_sweeps, num_levels - 1, shrinkage_factor))
+    #_LOGGER.debug("residual {}".format(np.array2string(residual, separator=", ", precision=2)))
 
     # Create the hierarchy of coarser levels. For now, we use two-level bootstrap only.
     # Eventually, bootstrap may be needed with an increasingly deeper hierarchy (add one level at a time).
     for num_levels in range(2, max_levels + 1):
-        if conv <= max_coarsest_relax_conv_factor or multilevel[-1].size <= max_coarsest_level_size:
+        if relax_conv_factor <= max_coarsest_relax_conv_factor or multilevel[-1].size <= max_coarsest_level_size:
             break
         _LOGGER.info("=" * 80)
         _LOGGER.info("Coarsening level {}->{}".format(num_levels - 2, num_levels - 1))
@@ -65,11 +68,13 @@ def setup(a: scipy.sparse.spmatrix,
                                    interpolation_method=interpolation_method, repetitive=repetitive,
                                    neighborhood=neighborhood)
         multilevel.add(level)
-        shrinkage_factor, num_sweeps, conv = check_relaxation_speed(num_levels - 1, level, leeway_factor=leeway_factor)
+        shrinkage_factor, num_sweeps, residual, _, _, relax_conv_factor = \
+            check_relaxation_speed(num_levels - 1, level, leeway_factor=leeway_factor)
         # Use at least nu sweeps such that shrinkage^nu <= 0.5, just to be safe.
         num_sweeps = max((num_sweeps, min_relax_sweeps,
                           int(np.ceil(np.log(min_relax_reduction_factor) / np.log(shrinkage_factor)))))
         _LOGGER.info("Using {} relaxations at level {}".format(num_sweeps, num_levels - 1))
+        #_LOGGER.debug("residual {}".format(np.array2string(residual, separator=", ", precision=2)))
     return multilevel
 
 
@@ -157,7 +162,7 @@ def check_relaxation_speed(index, level, leeway_factor: float = 1.2):
                  "Work {:.1f} eff {:.2f}".format(
         index, level.size, relax_conv_factor, factor, np.mean(rer[num_sweeps]), num_sweeps, work,
         np.mean(residual[num_sweeps] / residual[0]) ** (1 / (num_sweeps * work))))
-    return factor, num_sweeps, relax_conv_factor
+    return factor, num_sweeps, residual, conv, rer, relax_conv_factor
 
 
 def bootstap(x, multilevel: hm.hierarchy.multilevel.Multilevel, num_levels: int, relax_conv_factor: float,
@@ -231,16 +236,17 @@ def bootstap(x, multilevel: hm.hierarchy.multilevel.Multilevel, num_levels: int,
         x_fit, x_test = x_level[:, :-num_test_examples], x_level[:, -num_test_examples:]
 
         # Create the coarsening operator R.
-        nu = 2 * num_sweeps
         coarsener = hm.setup.coarsening_uniform.UniformCoarsener(
-            level, x, nu, repetitive=repetitive, max_aggregate_size=max_aggregate_size)
+            level, x, num_sweeps, repetitive=repetitive, max_aggregate_size=max_aggregate_size)
+        info = coarsener.get_coarsening_info(1, fmt="dataframe")
+        _LOGGER.debug(info)
         r, aggregate_size, nc, cr, mean_energy_error, mock_conv, mock_work, mock_efficiency = \
             coarsener.get_optimal_coarsening(max_conv_factor)
-        _LOGGER.info("R {} a {} nc {} cr {:.2f} mean_energy_error {:.4f}; mock cycle nu {} conv {:.2f} "
+        _LOGGER.info("R {} a {} nc {} cr {:.2f} mean_energy_error {:.4f}; mock cycle num_sweeps {} conv {:.2f} "
                      "eff {:.2f}".format(
-            r.shape, aggregate_size, nc, cr, mean_energy_error, nu, mock_conv, mock_efficiency))
+            r.shape, aggregate_size, nc, cr, mean_energy_error, num_sweeps, mock_conv, mock_efficiency))
 
-        nu_values = np.array(list(range(1, 4)) + [nu])
+        nu_values = np.union1d(np.array(list(range(1, 4))), [num_sweeps])
         mock_conv_factor = np.array([hm.setup.auto_setup.mock_cycle_conv_factor(level, r, nu) for nu in nu_values])
         _LOGGER.info("Mock cycle conv factor {} for nu {}".format(
             np.array2string(mock_conv_factor, precision=3), np.array2string(nu_values)))

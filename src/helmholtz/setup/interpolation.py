@@ -19,7 +19,8 @@ def create_interpolation_least_squares_domain(
         aggregate_size: int = None, nc: int = None, neighborhood: str = "extended", num_test_examples: int = 5,
         repetitive: bool = False,
         max_caliber: int = 6,
-        target_interpolation_energy_error: float = 0.1) -> \
+        target_error: float = 0.2,
+        kind: str = "l2") -> \
         Tuple[scipy.sparse.csr_matrix, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """
     Creates the interpolation operator P by least squares fitting from r*x to x. Interpolatory sets are automatically
@@ -36,7 +37,8 @@ def create_interpolation_least_squares_domain(
         repetitive: whether to exploit problem repetitiveness by creating a constant R stencil on all aggregates
             using windows from a single (or few) test vectors.
         max_caliber: maximum interpolation caliber to ty.
-        target_interpolation_energy_error:
+        target_error: target relative interpolation error in norm 'kind'.
+        kind: interpolation norm kind ("l2"|"a" = energy norm).
 
     Returns:
         interpolation matrix P.
@@ -86,18 +88,18 @@ def create_interpolation_least_squares_domain(
             alpha=alpha, fit_samples=fit_samples, val_samples=val_samples, test_samples=num_test_examples)
         if repetitive:
             p = _tile_interpolation_matrix(p, aggregate_size, nc, x.shape[0])
-
-        error_l2 = np.array([relative_interpolation_error(p, r, a, f, "l2") for f in folds])
-        error_a = np.array([relative_interpolation_error(p, r, a, f, "a") for f in folds])
+        error = dict((kind, np.array([relative_interpolation_error(p, r, a, f, kind) for f in folds]))
+                      for kind in ("l2", "a"))
         _LOGGER.debug("caliber {} error l2 {} a {}".format(
             caliber,
-            np.array2string(error_l2, separator=", ", precision=2),
-            np.array2string(error_a, separator=", ", precision=2)))
-        if error_a[-1] < target_interpolation_energy_error:
+            np.array2string(error["l2"], separator=", ", precision=2),
+            np.array2string(error["a"], separator=", ", precision=2)))
+        # Check test set error.
+        if error[kind][-1] < target_error:
             return p
 
     _LOGGER.warning("Could not find a good caliber for threshold {}, using max caliber {}".format(
-        target_interpolation_energy_error, caliber))
+        target_error, caliber))
     return p
 
 

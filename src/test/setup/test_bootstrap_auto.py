@@ -19,7 +19,7 @@ class TestBootstrapAuto:
         """Fixed random seed for deterministic results."""
         np.set_printoptions(precision=6, linewidth=1000)
         for handler in logging.root.handlers[:]: logging.root.removeHandler(handler)
-        logging.basicConfig(stream=sys.stdout, level=logging.WARN, format="%(message)s")
+        logging.basicConfig(stream=sys.stdout, level=logging.DEBUG, format="%(message)s")
         np.random.seed(0)
         np.set_printoptions(linewidth=200, precision=2)
 
@@ -41,12 +41,12 @@ class TestBootstrapAuto:
                pytest.approx(0.114, 1e-2)
         assert conv_factor == pytest.approx(0.99979, 1e-2)
 
-    def test_laplace_coarsening(self):
+    def test_laplace_coarsening_repetitive(self):
         n = 16
         kh = 0
         a = hm.linalg.helmholtz_1d_5_point_operator(kh, n).tocsr()
 
-        multilevel = hm.setup.auto_setup.setup(a, max_levels=2)
+        multilevel = hm.setup.auto_setup.setup(a, max_levels=2, repetitive=True)
 
         assert len(multilevel) == 2
 
@@ -62,7 +62,8 @@ class TestBootstrapAuto:
         # Test two-level cycle convergence for A*x=0.
         two_level_cycle = lambda x: hm.solve.solve_cycle.solve_cycle(multilevel, 1.0, 1, 1).run(x)
         x0 = np.random.random((a.shape[0], ))
-        x, conv_factor = hm.solve.run.run_iterative_method(level.operator, two_level_cycle, x0, 20)
+        x, conv_factor = hm.solve.run.run_iterative_method(level.operator, two_level_cycle, x0, 20,
+                                                           print_frequency=1)
         assert conv_factor == pytest.approx(0.194, 1e-2)
 
     def test_laplace_2_level_bootstrap(self):
