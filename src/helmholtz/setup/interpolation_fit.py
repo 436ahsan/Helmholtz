@@ -239,7 +239,7 @@ def create_interpolation_least_squares(
         fit_samples, val_samples, test_samples = num_examples // 3, num_examples // 3, num_examples // 3
     folds = (fit_samples, val_samples, test_samples)
     x_fit, x_val, x_test = hm.linalg.create_folds(x, folds)
-    xc_fit, xc_val, xc_test = hm.linalg.create_folds(x, folds)
+    xc_fit, xc_val, xc_test = hm.linalg.create_folds(xc, folds)
 
     # Fit interpolation by least-squares.
     result = [optimized_fit_interpolation(
@@ -253,7 +253,6 @@ def create_interpolation_least_squares(
     # Interpolation coefficients = error[:, 2:]
     fit_error = np.array([info_i[0] for info_i in info])
     val_error = np.array([info_i[1] for info_i in info])
-    print(fit_error, val_error)
 
     # Build the sparse interpolation matrix.
     row = np.concatenate(tuple([i] * len(nbhr_i) for i, nbhr_i in enumerate(nbhr)))
