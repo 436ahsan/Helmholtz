@@ -1,13 +1,12 @@
 """Utilities: multilevel hierarchy for repetitive problems."""
-import numpy as np
 import scipy.sparse
 import helmholtz as hm
 import helmholtz.hierarchy.multilevel as multilevel
-import helmholtz.repetitive.hierarchy as hierarchy
 
 
-def create_tiled_coarse_level(a: scipy.sparse.spmatrix, b: scipy.sparse.spmatrix, r: np.ndarray, p: np.ndarray) -> \
-        multilevel.Level:
+def create_tiled_coarse_level(a: scipy.sparse.spmatrix, b: scipy.sparse.spmatrix, r, p) -> multilevel.Level:
+    # r: hm.repetitive.coarsening_repetitive.Coarsener,
+    # p: hm.repetitive.interpolation_repetitive.Interpolator) -> \
     """
     Creates a tiled coarse level.
     Args:

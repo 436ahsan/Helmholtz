@@ -23,7 +23,7 @@ class TestBootstrap5Point:
         n = 16
         kh = 0.5
         a = hm.linalg.helmholtz_1d_5_point_operator(kh, n)
-        level = hm.repetitive.hierarchy.create_finest_level(a)
+        level = old_code.repetitive.hierarchy_repetitive.create_finest_level(a)
         multilevel = hm.hierarchy.multilevel.Multilevel.create(level)
         x = hm.solve.run.random_test_matrix((n,), num_examples=1)
         multilevel = hm.hierarchy.multilevel.Multilevel.create(level)
@@ -42,7 +42,7 @@ class TestBootstrap5Point:
         kh = 0
 
         a = hm.linalg.helmholtz_1d_5_point_operator(kh, n)
-        x, multilevel = hm.repetitive.bootstrap_repetitive.generate_test_matrix(a, 0, num_examples=4, num_sweeps=20)
+        x, multilevel = old_code.repetitive.bootstrap_repetitive.generate_test_matrix(a, 0, num_examples=4, num_sweeps=20)
 
         assert x.shape == (16, 4)
 
@@ -67,7 +67,7 @@ class TestBootstrap5Point:
         kh = 0
 
         a = hm.linalg.helmholtz_1d_5_point_operator(kh, n)
-        x, multilevel = hm.repetitive.bootstrap_repetitive.generate_test_matrix(
+        x, multilevel = old_code.repetitive.bootstrap_repetitive.generate_test_matrix(
             a, 0, num_examples=4, num_sweeps=20, num_bootstrap_steps=2)
 
         assert x.shape == (16, 4)
@@ -101,7 +101,7 @@ class TestBootstrap5Point:
         kh = 0.5
 
         a = hm.linalg.helmholtz_1d_5_point_operator(kh, n)
-        x, multilevel = hm.repetitive.bootstrap_repetitive.generate_test_matrix(a, 0, num_examples=4, num_sweeps=20)
+        x, multilevel = old_code.repetitive.bootstrap_repetitive.generate_test_matrix(a, 0, num_examples=4, num_sweeps=20)
 
         assert x.shape == (16, 4)
 
@@ -130,7 +130,7 @@ class TestBootstrap5Point:
 
         # Initialize test functions (to random) and hierarchy at coarsest level.
         a = hm.linalg.helmholtz_1d_5_point_operator(kh, n)
-        level = hm.repetitive.hierarchy.create_finest_level(a)
+        level = old_code.repetitive.hierarchy_repetitive.create_finest_level(a)
         multilevel = hm.hierarchy.multilevel.Multilevel.create(level)
         domain_shape = (a.shape[0],)
         x = hm.solve.run.random_test_matrix(domain_shape, num_examples=num_examples)
@@ -141,7 +141,7 @@ class TestBootstrap5Point:
 
         # Relax vector + coarsen in first iteration; then 2-level cycle + improve hierarchy (bootstrap).
         for i, expected_residual_norm in enumerate(expected_residual_norms):
-            x, multilevel = hm.repetitive.bootstrap_repetitive.bootstap(x, multilevel, max_levels, num_sweeps=10)
+            x, multilevel = old_code.repetitive.bootstrap_repetitive.bootstap(x, multilevel, max_levels, num_sweeps=10)
             assert norm(a.dot(x)) / norm(x) == pytest.approx(expected_residual_norm, 1e-3)
 
     def test_helmholtz_2_level_more_bootstrap_doesnt_change_residual(self):
@@ -151,7 +151,7 @@ class TestBootstrap5Point:
         kh = 0.5
 
         a = hm.linalg.helmholtz_1d_5_point_operator(kh, n)
-        x, multilevel = hm.repetitive.bootstrap_repetitive.generate_test_matrix(a, 0, num_examples=4, num_sweeps=20, num_bootstrap_steps=3)
+        x, multilevel = old_code.repetitive.bootstrap_repetitive.generate_test_matrix(a, 0, num_examples=4, num_sweeps=20, num_bootstrap_steps=3)
 
         assert x.shape == (16, 4)
         assert len(multilevel) == 2
@@ -168,8 +168,8 @@ class TestBootstrap5Point:
         kh = 0.5
 
         a = hm.linalg.helmholtz_1d_5_point_operator(kh, n)
-        x, multilevel = hm.repetitive.bootstrap_repetitive.generate_test_matrix(a, 0, num_examples=10, num_sweeps=20, num_bootstrap_steps=1,
-                                                          interpolation_method="ls")
+        x, multilevel = old_code.repetitive.bootstrap_repetitive.generate_test_matrix(a, 0, num_examples=10, num_sweeps=20, num_bootstrap_steps=1,
+                                                                                      interpolation_method="ls")
 
         assert x.shape == (16, 10)
         assert len(multilevel) == 2

@@ -76,7 +76,7 @@ def setup(a: scipy.sparse.spmatrix,
 def build_coarse_level(level: hm.hierarchy.multilevel.Level,
                        num_sweeps: int,
                        num_bootstrap_steps: int = 1,
-                       max_caliber: int = 8,
+                       max_caliber: int = 6,
                        num_test_examples: int = 5,
                        interpolation_method: str = "ls",
                        neighborhood: str = "extended",
@@ -280,7 +280,7 @@ def mock_cycle_conv_factor(level, r, num_relax_sweeps, print_frequency: int = No
 
 def create_interpolation(x: np.ndarray, a: scipy.sparse.csr_matrix,
                          r: scipy.sparse.csr_matrix, method: str, aggregate_size: int = None, nc: int = None,
-                         neighborhood: str = "extended", max_caliber: int = 5,
+                         neighborhood: str = "extended", max_caliber: int = 6,
                          repetitive: bool = False) -> scipy.sparse.csr_matrix:
     if method == "svd":
         p = r.transpose()
@@ -288,13 +288,9 @@ def create_interpolation(x: np.ndarray, a: scipy.sparse.csr_matrix,
         # TODO(oren): replace caliber by true max_caliber in this call (right now 'max_caliber' is interpreted here
         # as the fixed interpolation caliber returned; make the call loop over all calibers and return the desirable
         # one).
-        p, error_a = hm.setup.interpolation.create_interpolation_least_squares_domain(
+        p = hm.setup.interpolation.create_interpolation_least_squares_domain(
             x, a, r, aggregate_size=aggregate_size, nc=nc, neighborhood=neighborhood, repetitive=repetitive,
-            caliber=max_caliber)
-        # _LOGGER.info("fit error {}".format(fit_error))
-        # _LOGGER.info("val error {}".format(val_error))
-        # _LOGGER.info("test error {}".format(test_error))
-        _LOGGER.info("P mean A-norm test error {:.3f}".format(error_a))
+            max_caliber=max_caliber)
     else:
         raise Exception("Unsupported interpolation method '{}'".format(method))
     return p

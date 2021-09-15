@@ -1,4 +1,4 @@
-"""coarsening (R) construction routines. Based on SVD on an aggregate."""
+"""Repetitive coarsening (R) construction routines."""
 import logging
 import numpy as np
 import scipy.sparse
@@ -25,7 +25,7 @@ class Coarsener:
         # Convert matrix to array if needed.
         self._r = np.array(r)
 
-    def asarray(self) -> scipy.sparse.csr_matrix:
+    def asarray(self) -> np.ndarray:
         """ Returns the dense coarsening matrix on an aggregate."""
         return self._r
 
@@ -128,7 +128,7 @@ def _create_aggregate_coarsening(x, threshold, max_coarsening_ratio, max_aggrega
             aggregate_size += 1
         end = min(start + aggregate_size, domain_size)
         x_aggregate_t = x[start:end].transpose()
-        r, s = hm.setup.coarsening.create_coarsening(x_aggregate_t, threshold)
+        r, s = create_coarsening(x_aggregate_t, threshold)
         r = r.asarray()
         # n = actual aggregate size after trimming to domain end. nc = #coarse variables.
         nc, n = r.shape

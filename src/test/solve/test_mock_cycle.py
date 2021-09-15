@@ -4,6 +4,7 @@ import scipy.sparse
 import unittest
 
 import helmholtz as hm
+import helmholtz.repetitive.coarsening_repetitive as cr
 
 
 class TestMockCycle(unittest.TestCase):
@@ -112,7 +113,7 @@ def _create_svd_coarsening(level, threshold: float = 0.1):
     # Generate coarse variables (R) based on a window of x.
     aggregate_size = 4
     x_aggregate_t = x[:aggregate_size].transpose()
-    r, _ = hm.setup.coarsening.create_coarsening(x_aggregate_t, threshold)
+    r, _ = cr.create_coarsening(x_aggregate_t, threshold)
 
     # Convert to sparse matrix + tile over domain.
     r_csr = r.tile(n // aggregate_size)
@@ -121,7 +122,7 @@ def _create_svd_coarsening(level, threshold: float = 0.1):
 
 def _create_pointwise_coarsening(level):
     aggregate_size = 2
-    r = hm.setup.coarsening.Coarsener(np.array([[1, 0]]))
+    r = cr.Coarsener(np.array([[1, 0]]))
     # Convert to sparse matrix + tile over domain.
     domain_size = level.a.shape[0]
     r_csr = r.tile(domain_size // aggregate_size)

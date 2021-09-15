@@ -1,5 +1,3 @@
-import scipy.sparse
-
 import helmholtz as hm
 
 
@@ -11,7 +9,7 @@ class TestWindowSvd:
         window_shape = (n,)
         a = hm.linalg.helmholtz_1d_operator(kh, n)
 
-        s, vh = hm.repetitive.window_svd.get_window_svd(a, window_shape, num_sweeps=1000)
+        s, vh = old_code.repetitive.window_svd.get_window_svd(a, window_shape, num_sweeps=1000)
 
         # For sufficiently smooth test vectors, the SVD should reveal two large singular values (corresponding to the
         # sine and cosine null-space components / left- and right-travelling waves) and the rest are small.

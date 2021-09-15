@@ -11,7 +11,7 @@ import helmholtz as hm
 _SMALL_NUMBER = 1e-15
 
 
-class InterpolationFitter:
+class InterpolationLsFitter:
     """
     Fits interpolation from X[:, n[0]],...,X[:, n[k-1]], i's k nearest neighbors, to X[:, i] using
     Ridge regression. Determines the optimal Ridge parameter by cross-validation.
@@ -245,14 +245,14 @@ def create_interpolation_least_squares(
     result = [optimized_fit_interpolation(
         xc_fit[:, nbhr_i], x_fit[:, i], xc_val[:, nbhr_i], x_val[:, i], alpha, return_weights=True)
               for i, nbhr_i in enumerate(nbhr)]
-    #alpha_opt = np.array([row[0] for row in result])
     info = [row[1] for row in result]
-    # In each info element:
+    # In each 'info' element:
     # Interpolation fit error = error[:, 0]
     # Interpolation validation error = error[:, 1]
     # Interpolation coefficients = error[:, 2:]
-    fit_error = np.array([info_i[0] for info_i in info])
-    val_error = np.array([info_i[1] for info_i in info])
+    # fit_error = np.array([info_i[0] for info_i in info])
+    # val_error = np.array([info_i[1] for info_i in info])
+    # alpha_opt = np.array([row[0] for row in result])
 
     # Build the sparse interpolation matrix.
     row = np.concatenate(tuple([i] * len(nbhr_i) for i, nbhr_i in enumerate(nbhr)))
@@ -266,13 +266,3 @@ def create_interpolation_least_squares(
 def _filtered_mean(x):
     """Returns the mean of x except large outliers."""
     return x[x <= 3 * np.median(x)].mean()
-
-
-def relative_interpolation_error(p: scipy.sparse.csr_matrix, x: np.ndarray, xc: np.ndarray):
-    """Returns the relative interpolation error (error norm is L2 norm over all test vectors, for each fine
-    point)."""
-    px = p.dot(xc.transpose()).transpose()
-    if x.ndim == 1:
-        return (x - px) / x
-    else:
-        return norm(x - px, axis=0) / norm(x, axis=0)

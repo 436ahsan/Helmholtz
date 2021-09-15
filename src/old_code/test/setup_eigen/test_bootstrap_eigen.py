@@ -25,7 +25,7 @@ class TestBootstrapEigen:
         kh = 0.5
 
         a = hm.linalg.helmholtz_1d_operator(kh, n)
-        x, lam, multilevel = hm.setup_eigen.bootstrap_eigen.generate_test_matrix(a, 0, num_examples=4, num_sweeps=10)
+        x, lam, multilevel = old_code.setup_eigen.bootstrap_eigen.generate_test_matrix(a, 0, num_examples=4, num_sweeps=10)
 
         assert x.shape == (16, 4)
 
@@ -51,7 +51,7 @@ class TestBootstrapEigen:
         # Run enough Kaczmarz relaxations per lambda update (not just 1 relaxation) so we converge to the minimal one.
         nu = 5
         lam = 0
-        method = lambda x, lam: hm.setup_eigen.eigensolver.eigen_cycle(multilevel, 1.0, None, None, nu).run((x, lam))
+        method = lambda x, lam: old_code.setup_eigen.eigensolver.eigen_cycle(multilevel, 1.0, None, None, nu).run((x, lam))
         x, lam, conv_factor = hm.solve.run.run_iterative_eigen_method(level.operator, method, x, lam, 100)
 
         assert np.mean([level.rq(x[:, i]) for i in range(x.shape[1])]) == pytest.approx(0.09770, 1e-3)
@@ -64,14 +64,14 @@ class TestBootstrapEigen:
         n = 16
         kh = 0.5
         a = hm.linalg.helmholtz_1d_operator(kh, n)
-        x, lam, multilevel = hm.setup_eigen.bootstrap_eigen.generate_test_matrix(a, 0, num_examples=4)
+        x, lam, multilevel = old_code.setup_eigen.bootstrap_eigen.generate_test_matrix(a, 0, num_examples=4)
         assert len(multilevel) == 2
 
         level = multilevel.finest_level
         # Convergence speed test.
-        eigen_cycle = lambda x, lam: hm.setup_eigen.eigensolver.eigen_cycle(multilevel, 1.0, 1, 1, 100).run((x, lam))
+        eigen_cycle = lambda x, lam: old_code.setup_eigen.eigensolver.eigen_cycle(multilevel, 1.0, 1, 1, 100).run((x, lam))
         # FMG start so (x, lambda) has a reasonable initial guess.
-        x = hm.setup_eigen.bootstrap_eigen.fmg(multilevel, num_cycles_finest=0)
+        x = old_code.setup_eigen.bootstrap_eigen.fmg(multilevel, num_cycles_finest=0)
         x, lam, conv_factor = hm.solve.run.run_iterative_eigen_method(level.operator, eigen_cycle, x, lam, 20, print_frequency=1)
 
         assert lam == pytest.approx(0.0977590650225, 1e-3)
@@ -82,16 +82,16 @@ class TestBootstrapEigen:
         n = 16
         kh = 0.5
         a = hm.linalg.helmholtz_1d_operator(kh, n)
-        x, lam, multilevel = hm.setup_eigen.bootstrap_eigen.generate_test_matrix(a, 0, num_examples=4, num_bootstrap_steps=2)
+        x, lam, multilevel = old_code.setup_eigen.bootstrap_eigen.generate_test_matrix(a, 0, num_examples=4, num_bootstrap_steps=2)
         assert len(multilevel) == 2
 
         level = multilevel.finest_level
 
         # Convergence speed test.
-        eigen_cycle = lambda x, lam: hm.setup_eigen.eigensolver.eigen_cycle(multilevel, 1.0, 4, 3, 100).run((x, lam))
+        eigen_cycle = lambda x, lam: old_code.setup_eigen.eigensolver.eigen_cycle(multilevel, 1.0, 4, 3, 100).run((x, lam))
         # FMG start so (x, lambda) has a reasonable initial guess.
         logger.info("2-level convergence test")
-        x = hm.setup_eigen.bootstrap_eigen.fmg(multilevel, num_cycles_finest=0)
+        x = old_code.setup_eigen.bootstrap_eigen.fmg(multilevel, num_cycles_finest=0)
 
         # Add some random noise but still stay near a reasonable initial guess.
         # x += 0.1 * np.random.random(x.shape)
@@ -109,15 +109,15 @@ class TestBootstrapEigen:
         n = 16
         kh = 0
         a = hm.linalg.helmholtz_1d_operator(kh, n)
-        x, lam, multilevel = hm.setup_eigen.bootstrap_eigen.generate_test_matrix(a, 0, num_examples=4, interpolation_method="ls",
-                                                                     num_sweeps=1000)
+        x, lam, multilevel = old_code.setup_eigen.bootstrap_eigen.generate_test_matrix(a, 0, num_examples=4, interpolation_method="ls",
+                                                                                       num_sweeps=1000)
         assert len(multilevel) == 2
 
         level = multilevel.finest_level
         # Convergence speed test.
-        eigen_cycle = lambda x, lam: hm.setup_eigen.eigensolver.eigen_cycle(multilevel, 1.0, 1, 1, 100).run((x, lam))
+        eigen_cycle = lambda x, lam: old_code.setup_eigen.eigensolver.eigen_cycle(multilevel, 1.0, 1, 1, 100).run((x, lam))
         # FMG start so (x, lambda) has a reasonable initial guess.
-        x = hm.setup_eigen.bootstrap_eigen.fmg(multilevel, num_cycles_finest=0)
+        x = old_code.setup_eigen.bootstrap_eigen.fmg(multilevel, num_cycles_finest=0)
         x, lam, conv_factor = hm.solve.run.run_iterative_eigen_method(level.operator, eigen_cycle, x, lam, 20, print_frequency=1)
 
         assert lam == pytest.approx(0.0977590650225, 1e-3)
@@ -129,14 +129,14 @@ class TestBootstrapEigen:
         n = 16
         kh = 0.5
         a = hm.linalg.helmholtz_1d_operator(kh, n)
-        x, lam, multilevel = hm.setup_eigen.bootstrap_eigen.generate_test_matrix(a, 0, num_examples=4, interpolation_method="ls")
+        x, lam, multilevel = old_code.setup_eigen.bootstrap_eigen.generate_test_matrix(a, 0, num_examples=4, interpolation_method="ls")
         assert len(multilevel) == 2
 
         level = multilevel.finest_level
         # Convergence speed test.
-        eigen_cycle = lambda x, lam: hm.setup_eigen.eigensolver.eigen_cycle(multilevel, 1.0, 1, 1, 100).run((x, lam))
+        eigen_cycle = lambda x, lam: old_code.setup_eigen.eigensolver.eigen_cycle(multilevel, 1.0, 1, 1, 100).run((x, lam))
         # FMG start so (x, lambda) has a reasonable initial guess.
-        x = hm.setup_eigen.bootstrap_eigen.fmg(multilevel, num_cycles_finest=0)
+        x = old_code.setup_eigen.bootstrap_eigen.fmg(multilevel, num_cycles_finest=0)
         x, lam, conv_factor = hm.solve.run.run_iterative_eigen_method(level.operator, eigen_cycle, x, lam, 20, print_frequency=1)
 
         assert lam == pytest.approx(0.0977590650225, 1e-3)
@@ -148,7 +148,7 @@ class TestBootstrapEigen:
         n = 16
         kh = 0.5
         a = hm.linalg.helmholtz_1d_operator(kh, n)
-        x, lam, multilevel = hm.setup_eigen.bootstrap_eigen.generate_test_matrix(
+        x, lam, multilevel = old_code.setup_eigen.bootstrap_eigen.generate_test_matrix(
             a, 0, num_sweeps=20, num_examples=4, initial_max_levels=3)
         assert len(multilevel) == 3
 
@@ -156,10 +156,10 @@ class TestBootstrapEigen:
 
         # Convergence speed test.
         # FMG start so (x, lambda) has a reasonable initial guess.
-        x_init = hm.setup_eigen.bootstrap_eigen.fmg(multilevel, num_cycles_finest=0, num_cycles=1)
+        x_init = old_code.setup_eigen.bootstrap_eigen.fmg(multilevel, num_cycles_finest=0, num_cycles=1)
         #        multilevel.lam = exact_eigenpair(level.a)
 
-        eigen_cycle = lambda x, lam: hm.setup_eigen.eigensolver.eigen_cycle(multilevel, 1.0, 1, 1, 100, num_levels=3).run((x, lam))
+        eigen_cycle = lambda x, lam: old_code.setup_eigen.eigensolver.eigen_cycle(multilevel, 1.0, 1, 1, 100, num_levels=3).run((x, lam))
         x, lam, conv_factor = hm.solve.run.run_iterative_eigen_method(level.operator, eigen_cycle, x_init, lam, 15)
         assert lam == pytest.approx(0.0977590650225, 1e-3)
         assert np.mean([level.rq(x[:, i]) for i in range(x.shape[1])]) == pytest.approx(0.097759, 1e-3)

@@ -37,7 +37,7 @@ class FixedAggSizeUniformCoarsener:
         self._domain_size = x.shape[0]
         self._aggregate_size = aggregate_size
         self._cycle_index = cycle_index
-        self._cycle_coarse_level_work_bound = cycle_coarse_level_work_bound
+        self._max_coarsening_ratio = cycle_coarse_level_work_bound
         self._repetitive = repetitive
         self._starts = hm.linalg.get_uniform_aggregate_starts(self._domain_size, aggregate_size)
         self._r_aggregate_candidates, self._s_aggregate = self._candidate_coarsening()
@@ -55,13 +55,13 @@ class FixedAggSizeUniformCoarsener:
     @property
     def mean_energy_error(self):
         return np.mean(
-            (1 - np.cumsum(self._s_aggregate ** 2, axis=1) / np.sum(self._s_aggregate ** 2, axis=1)[:, None]) ** 0.5,
-            axis=0)
+            np.clip((1 - np.cumsum(self._s_aggregate ** 2, axis=1) / np.sum(self._s_aggregate ** 2, axis=1)[:, None]),
+                    0, None) ** 0.5, axis=0)
 
     @property
     def _num_components(self):
         """Returns the maximum number of components to keep in each aggregate SVD."""
-        return int(self._aggregate_size * self._cycle_coarse_level_work_bound / self._cycle_index)
+        return int(self._aggregate_size * self._max_coarsening_ratio / self._cycle_index)
 
     def __getitem__(self, nc) -> Tuple[scipy.sparse.csr_matrix, List[np.ndarray]]:
         """
@@ -111,15 +111,12 @@ class FixedAggSizeUniformCoarsener:
                 tuple(hm.linalg.get_window(x, offset, self._aggregate_size)
                       for offset in range(max((4 * self._aggregate_size) // x.shape[1], 1))), axis=1).transpose()
             # Tile the same coarsening over all aggregates.
-            aggregate_coarsening = hm.setup.coarsening.create_coarsening(x_aggregate_t, None, nc=self._num_components)
+            aggregate_coarsening = _create_coarsening(x_aggregate_t, self._num_components)
             svd_results = [aggregate_coarsening for _ in self._starts]
         else:
-            svd_results = [
-                hm.setup.coarsening.create_coarsening(x[start:start + self._aggregate_size].transpose(),
-                                                      None, nc=self._num_components)
-                for start in self._starts
-            ]
-        r_aggregate_candidates = tuple(aggregate_svd_result[0].asarray() for aggregate_svd_result in svd_results)
+            svd_results = [_create_coarsening(x[start:start + self._aggregate_size].transpose(), self._num_components)
+                           for start in self._starts]
+        r_aggregate_candidates = tuple(aggregate_svd_result[0] for aggregate_svd_result in svd_results)
         # Singular values, used for checking energy error in addition to the mock cycle criterion.
         s_aggregate = np.concatenate(tuple(aggregate_svd_result[1][None, :] for aggregate_svd_result in svd_results))
         return r_aggregate_candidates, s_aggregate
@@ -256,3 +253,18 @@ class UniformCoarsener:
         i, aggregate_size, nc, cr, mean_energy_error, mock_conv, mock_work, mock_efficiency = candidate[best_index]
         return self._result[int(i)][2], int(aggregate_size), int(nc), cr, mean_energy_error, mock_conv, \
             mock_work, mock_efficiency
+
+
+def _create_coarsening(x_aggregate_t: np.ndarray, nc: int) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Generates R (coarse variables) on an aggregate from SVD principal components.
+
+    Args:
+        x_aggregate_t: fine-level test matrix on an aggregate, transposed.
+        nc: number of principal components.
+
+    Returns:
+        coarsening matrix nc x {aggregate_size} (dense), list of ALL singular values on aggregate.
+    """
+    u, s, vh = svd(x_aggregate_t)
+    return vh[:nc], s

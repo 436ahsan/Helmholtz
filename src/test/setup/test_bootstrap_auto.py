@@ -65,7 +65,6 @@ class TestBootstrapAuto:
         x, conv_factor = hm.solve.run.run_iterative_method(level.operator, two_level_cycle, x0, 20)
         assert conv_factor == pytest.approx(0.194, 1e-2)
 
-
     def test_laplace_2_level_bootstrap(self):
         """We improve vectors by relaxation -> coarsening creation -> 2-level relaxation cycles.
         P = SVD interpolation = R^T."""

@@ -7,8 +7,11 @@ import numpy as np
 import scipy.sparse
 
 import helmholtz as hm
-import helmholtz.repetitive.hierarchy as hierarchy
+import helmholtz.repetitive.hierarchy_repetitive as hierarchy
 from helmholtz.linalg import scaled_norm
+from helmholtz.hierarchy.multilevel import Multilevel
+from .interpolation_repetitive import Interpolator
+from .coarsening_repetitive import Coarsener
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -17,7 +20,7 @@ def generate_test_matrix(a: scipy.sparse.spmatrix, num_growth_steps: int, growth
                          num_bootstrap_steps: int = 1, num_sweeps: int = 10,
                          num_examples: int = None, print_frequency: int = None, initial_max_levels: int = 2,
                          interpolation_method: str = "svd",
-                         threshold: float = 0.1) -> Tuple[np.ndarray, np.ndarray, hm.hierarchy.multilevel.Multilevel]:
+                         threshold: float = 0.1) -> Tuple[np.ndarray, np.ndarray, Multilevel]:
     """
     Creates low-residual test functions and multilevel hierarchy on a large domain from the operator on a small window
     (the coarsest domain). This is similar to a full multigrid algorithm.
@@ -41,7 +44,7 @@ def generate_test_matrix(a: scipy.sparse.spmatrix, num_growth_steps: int, growth
     """
     # Initialize test functions (to random) and hierarchy at coarsest level.
     level = hierarchy.create_finest_level(a)
-    multilevel = hm.hierarchy.multilevel.Multilevel.create(level)
+    multilevel = Multilevel.create(level)
     # TODO(orenlivne): generalize to d-dimensions. This is specific to 1D.
     domain_shape = (a.shape[0],)
     x = hm.solve.run.random_test_matrix(domain_shape, num_examples=num_examples)
@@ -69,10 +72,10 @@ def generate_test_matrix(a: scipy.sparse.spmatrix, num_growth_steps: int, growth
     return x, multilevel
 
 
-def bootstap(x, multilevel: hm.hierarchy.multilevel.Multilevel, max_levels: int,
+def bootstap(x, multilevel: Multilevel, max_levels: int,
              num_sweeps: int = 10, threshold: float = 0.1, caliber: int = 2, interpolation_method: str = "svd",
              print_frequency: int = None) -> \
-        Tuple[np.ndarray, hm.hierarchy.multilevel.Multilevel]:
+        Tuple[np.ndarray, Multilevel]:
     """
     Improves test functions and a multilevel hierarchy on a fixed-size domain by bootstrapping.
     Args:
@@ -103,7 +106,7 @@ def bootstap(x, multilevel: hm.hierarchy.multilevel.Multilevel, max_levels: int,
     # Recreate all coarse levels. One down-pass, relaxing at each level, hopefully starting from improved x so the
     # process improves all levels.
     # TODO(orenlivne): add nested bootstrap cycles if needed.
-    new_multilevel = hm.hierarchy.multilevel.Multilevel.create(level)
+    new_multilevel = Multilevel.create(level)
     # Keep the x's of coarser levels in x_level; keep 'x' pointing to the finest test matrix.
     x_level = x
     for l in range(1, max_levels):
@@ -169,7 +172,7 @@ def fmg(multilevel, nu_pre: int = 1, nu_post: int = 1, nu_coarsest: int = 10, nu
 
 def create_transfer_operators(x, domain_size: int, threshold: float = 0.1, caliber: int = 2,
                               interpolation_method: str = "svd", max_coarsening_ratio: float = 0.5) -> \
-        Tuple[hm.setup.coarsening.Coarsener, hm.setup.interpolation.Interpolator]:
+        Tuple[Coarsener,Interpolator]:
     """
     Creates the next coarse level's R and P operators.
     Args:
@@ -192,7 +195,7 @@ def create_transfer_operators(x, domain_size: int, threshold: float = 0.1, calib
         num_windows = max((4 * aggregate_size) // num_test_functions, 1)
         x_aggregate_t = np.concatenate(
             tuple(hm.linalg.get_window(x, offset, aggregate_size) for offset in range(num_windows)), axis=1).transpose()
-        r, s = hm.setup.coarsening.create_coarsening(x_aggregate_t, threshold)
+        r, s = hm.repetitive.coarsening_repetitive.create_coarsening(x_aggregate_t, threshold)
         nc = r.asarray().shape[0]
         coarsening_ratio = nc / aggregate_size
         _LOGGER.debug("SVD {:2d} x {:2d} nc {} cr {:.2f} error {:.3f} Singular vals {}"
@@ -217,7 +220,7 @@ def create_transfer_operators(x, domain_size: int, threshold: float = 0.1, calib
 
 def create_repetitive_coarsening(x, num_windows, aggregate_size, threshold):
     """Returns a coarsening of a repetitive Helmholtz problem a from windows of the test matrix x."""
-    return hm.setup.coarsening.create_coarsening(
+    return hm.repetitive.coarsening_repetitive.create_coarsening(
         np.concatenate(tuple(hm.linalg.get_window(x, offset, aggregate_size)
                                      for offset in range(num_windows)), axis=1).transpose(),
         threshold)

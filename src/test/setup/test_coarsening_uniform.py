@@ -110,7 +110,7 @@ class TestCoarseningUniform:
         max_conv_factor = 0.3
 
         a = hm.linalg.helmholtz_1d_operator(kh, n)
-        level = hm.repetitive.hierarchy.create_finest_level(a)
+        level = hm.setup.hierarchy.create_finest_level(a)
         # Generate relaxed test matrix.
         x = _get_test_matrix(a, n, 10)
 
@@ -134,7 +134,7 @@ class TestCoarseningUniform:
         kh = 1
         max_conv_factor = 0.3
         a = hm.linalg.helmholtz_1d_operator(kh, n)
-        level = hm.repetitive.hierarchy.create_finest_level(a)
+        level = hm.setup.hierarchy.create_finest_level(a)
         # Generate relaxed test matrix.
         x = _get_test_matrix(a, n, 10)
 
@@ -157,7 +157,7 @@ class TestCoarseningUniform:
         kh = 0.5
         max_conv_factor = 0.3
         a = hm.linalg.helmholtz_1d_operator(kh, n)
-        level = hm.repetitive.hierarchy.create_finest_level(a)
+        level = hm.setup.hierarchy.create_finest_level(a)
         # Generate relaxed test matrix.
         x = _get_test_matrix(a, n, 10, num_examples=2)
 
@@ -177,7 +177,7 @@ class TestCoarseningUniform:
 
 
 def _get_test_matrix(a, n, num_sweeps, num_examples: int = None):
-    level = hm.repetitive.hierarchy.create_finest_level(a)
+    level = hm.setup.hierarchy.create_finest_level(a)
     x = hm.solve.run.random_test_matrix((n,), num_examples=num_examples)
     b = np.zeros_like(x)
     x, _ = hm.solve.run.run_iterative_method(level.operator, lambda x: level.relax(x, b), x, num_sweeps=num_sweeps)
