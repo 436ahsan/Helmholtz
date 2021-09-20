@@ -20,6 +20,7 @@ def setup(a: scipy.sparse.spmatrix,
           repetitive: bool = False,
           max_coarsest_relax_conv_factor: float = 0.8,
           max_coarsest_level_size: int = 10,
+          target_error: float = 0.2,
           leeway_factor: float = 1.2) -> hm.hierarchy.multilevel.Multilevel:
     """
     Creates low-residual test functions and multilevel hierarchy for solving A*x=b.
@@ -66,7 +67,7 @@ def setup(a: scipy.sparse.spmatrix,
         _LOGGER.info("Coarsening level {}->{}".format(num_levels - 2, num_levels - 1))
         level = build_coarse_level(level, num_sweeps, num_bootstrap_steps=num_bootstrap_steps,
                                    interpolation_method=interpolation_method, repetitive=repetitive,
-                                   neighborhood=neighborhood)
+                                   neighborhood=neighborhood, target_error=target_error)
         multilevel.add(level)
         shrinkage_factor, num_sweeps, residual, _, _, relax_conv_factor = \
             check_relaxation_speed(num_levels - 1, level, leeway_factor=leeway_factor)
@@ -82,6 +83,7 @@ def build_coarse_level(level: hm.hierarchy.multilevel.Level,
                        num_sweeps: int,
                        num_bootstrap_steps: int = 1,
                        max_caliber: int = 6,
+                       target_error: float = 0.2,
                        num_test_examples: int = 5,
                        interpolation_method: str = "ls",
                        neighborhood: str = "extended",
@@ -133,7 +135,8 @@ def build_coarse_level(level: hm.hierarchy.multilevel.Level,
         x, multilevel = hm.setup.auto_setup.bootstap(
             x, multilevel, num_levels, 2.0,
             num_sweeps=num_sweeps, interpolation_method=interpolation_method, neighborhood=neighborhood,
-            repetitive=repetitive, num_test_examples=num_test_examples, max_caliber=max_caliber)
+            repetitive=repetitive, num_test_examples=num_test_examples, max_caliber=max_caliber,
+            target_error=target_error)
         x_log.append(x)
         r_log.append(multilevel[1].r)
         _LOGGER.info("RER {:.6f}".format(norm(a.dot(x)) / norm(x)))
@@ -173,7 +176,8 @@ def bootstap(x, multilevel: hm.hierarchy.multilevel.Multilevel, num_levels: int,
              max_aggregate_size: int = 8,
              max_conv_factor: float = 0.4,
              neighborhood: str = "extended",
-             max_caliber: int = 1,
+             max_caliber: int = 6,
+             target_error: float = 0.2,
              repetitive: bool = False) -> Tuple[np.ndarray, hm.hierarchy.multilevel.Multilevel]:
     """
     Improves test functions and a multilevel hierarchy on a fixed-size domain by bootstrapping.
@@ -239,7 +243,7 @@ def bootstap(x, multilevel: hm.hierarchy.multilevel.Multilevel, num_levels: int,
         coarsener = hm.setup.coarsening_uniform.UniformCoarsener(
             level, x, num_sweeps, repetitive=repetitive, max_aggregate_size=max_aggregate_size)
         info = coarsener.get_coarsening_info(1, fmt="dataframe")
-        _LOGGER.debug(info)
+        #_LOGGER.debug(info)
         r, aggregate_size, nc, cr, mean_energy_error, mock_conv, mock_work, mock_efficiency = \
             coarsener.get_optimal_coarsening(max_conv_factor)
         _LOGGER.info("R {} a {} nc {} cr {:.2f} mean_energy_error {:.4f}; mock cycle num_sweeps {} conv {:.2f} "
@@ -254,7 +258,7 @@ def bootstap(x, multilevel: hm.hierarchy.multilevel.Multilevel, num_levels: int,
         # Create the interpolation operator P.
         p = create_interpolation(
             x_level, level.a, r, interpolation_method, aggregate_size=aggregate_size, nc=nc, max_caliber=max_caliber,
-            neighborhood=neighborhood, repetitive=repetitive)
+            neighborhood=neighborhood, repetitive=repetitive, target_error=target_error)
         for title, x_set in ((("all", x),) if repetitive else (("fit", x_fit), ("test", x_test))):
             error = norm(x_set - p.dot(r.dot(x_set)), axis=0) / norm(x_set, axis=0)
             error_a = norm(level.a.dot(x_set - p.dot(r.dot(x_set))), axis=0) / norm(x_set, axis=0)
@@ -287,6 +291,7 @@ def mock_cycle_conv_factor(level, r, num_relax_sweeps, print_frequency: int = No
 def create_interpolation(x: np.ndarray, a: scipy.sparse.csr_matrix,
                          r: scipy.sparse.csr_matrix, method: str, aggregate_size: int = None, nc: int = None,
                          neighborhood: str = "extended", max_caliber: int = 6,
+                         target_error: float = 0.2,
                          repetitive: bool = False) -> scipy.sparse.csr_matrix:
     if method == "svd":
         p = r.transpose()
@@ -296,7 +301,7 @@ def create_interpolation(x: np.ndarray, a: scipy.sparse.csr_matrix,
         # one).
         p = hm.setup.interpolation.create_interpolation_least_squares_domain(
             x, a, r, aggregate_size=aggregate_size, nc=nc, neighborhood=neighborhood, repetitive=repetitive,
-            max_caliber=max_caliber)
+            max_caliber=max_caliber, target_error=target_error)
     else:
         raise Exception("Unsupported interpolation method '{}'".format(method))
     return p

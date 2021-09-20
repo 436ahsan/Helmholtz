@@ -156,12 +156,13 @@ class TestCoarseningUniform:
         n = 96
         kh = 0.5
         max_conv_factor = 0.3
+        # Create fine-level matrix.
         a = hm.linalg.helmholtz_1d_operator(kh, n)
         level = hm.setup.hierarchy.create_finest_level(a)
         # Generate relaxed test matrix.
         x = _get_test_matrix(a, n, 10, num_examples=2)
 
-        # Calculate mock cycle predicted efficiency.
+        # Construct coarsening.
         coarsener = hm.setup.coarsening_uniform.UniformCoarsener(level, x, 4, repetitive=True)
         r, aggregate_size, nc, cr, mean_energy_error, mock_conv, mock_work, mock_efficiency = \
             coarsener.get_optimal_coarsening(max_conv_factor)

@@ -61,7 +61,6 @@ def create_interpolation_least_squares_domain(
     if repetitive:
         x_disjoint_aggregate_t, xc_disjoint_aggregate_t = \
             hm.setup.sampling.get_disjoint_windows(x, xc, aggregate_size, nc, max_caliber)
-        nbhr = nbhr[:aggregate_size]
     else:
         x_disjoint_aggregate_t, xc_disjoint_aggregate_t = x.transpose(), xc.transpose()
 
@@ -87,10 +86,11 @@ def create_interpolation_least_squares_domain(
             x_disjoint_aggregate_t, xc_disjoint_aggregate_t, [n[:caliber] for n in nbhr],
             alpha=alpha, fit_samples=fit_samples, val_samples=val_samples, test_samples=num_test_examples)
         if repetitive:
+            # TODO(oren): this will not work for the last aggregate if aggregate_size does not divide the domain size.
             p = _tile_interpolation_matrix(p, aggregate_size, nc, x.shape[0])
         error = dict((kind, np.array([relative_interpolation_error(p, r, a, f, kind) for f in folds]))
                       for kind in ("l2", "a"))
-        _LOGGER.debug("caliber {} error l2 {} a {}".format(
+        _LOGGER.info("caliber {} error l2 {} a {}".format(
             caliber,
             np.array2string(error["l2"], separator=", ", precision=2),
             np.array2string(error["a"], separator=", ", precision=2)))
@@ -126,7 +126,7 @@ def relative_interpolation_error(p: scipy.sparse.csr_matrix,
     if kind == "l2":
         error = norm(x - p.dot(r.dot(x)), axis=0) / norm(x, axis=0)
     elif kind == "a":
-        error = norm(a.dot(x - p.dot(r.dot(x))), axis=0) / norm(x, axis=0)
+        error = norm(a.dot(x - p.dot(r.dot(x))), axis=0) / norm(a.dot(x), axis=0)
     else:
         raise Exception("Unsupported error norm {}".format(kind))
     aggregator = _AGGREGATOR[aggregation]

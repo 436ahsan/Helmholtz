@@ -104,7 +104,6 @@ class FixedAggSizeUniformCoarsener:
         Uses a uniform aggregate size; the last two aggregates will overlap of the domain size is not divisible by the
         aggregate size. Returns PCs of each aggregate and singular values of each aggregate."""
         x = self._x
-        starts = hm.linalg.get_uniform_aggregate_starts(self._domain_size, self._aggregate_size)
         if self._repetitive:
             # Keep enough windows so that we have enough samples (4 * aggregate_size) an over-determined LS problem
             # for R.
@@ -112,10 +111,10 @@ class FixedAggSizeUniformCoarsener:
                 tuple(hm.linalg.get_window(x, offset, self._aggregate_size)
                       for offset in range(max((4 * self._aggregate_size) // x.shape[1], 1))), axis=1).transpose()
             # Tile the same coarsening over all aggregates.
-            aggregate_coarsening = _create_coarsening(x_aggregate_t, self._num_components)
+            aggregate_coarsening = create_coarsening(x_aggregate_t, self._num_components)
             svd_results = [aggregate_coarsening for _ in self._starts]
         else:
-            svd_results = [_create_coarsening(x[start:start + self._aggregate_size].transpose(), self._num_components)
+            svd_results = [create_coarsening(x[start:start + self._aggregate_size].transpose(), self._num_components)
                            for start in self._starts]
         r_aggregate_candidates = tuple(aggregate_svd_result[0] for aggregate_svd_result in svd_results)
         # Singular values, used for checking energy error in addition to the mock cycle criterion.
@@ -134,6 +133,7 @@ class UniformCoarsener:
                  cycle_coarse_level_work_bound: float = 0.7,
                  max_energy_loss: float = 0.2,
                  expected_eventual_coarsening_ratio: float = 0.5,
+                 min_trusted_mock_conv_factor: float = 0.05,
                  efficiency_leeway_factor: float = 1.05,
                  repetitive: bool = False):
         """
@@ -150,6 +150,9 @@ class UniformCoarsener:
                 aggregates, in the non-repetitive case).
             expected_eventual_coarsening_ratio: coarsening ratio of subsequent coarsening to assume in estimating the
                 cycle work.
+            min_trusted_mock_conv_factor: the minimum mock cycle convergence factor value that's "trusted". Any value
+                smaller than this value will be set to 'min_trusted_mock_conv_factor' since it's "too good" in reality
+                due to interpolation errors.
             efficiency_leeway_factor: consider all cases with efficiency measure < efficiency_leeway_factor *
                 min(measure) as candidates. Pick the one with the smallest aggregate size.
             repetitive: whether to exploit problem repetitiveness by creating a constant R stencil on all aggregates
@@ -159,8 +162,14 @@ class UniformCoarsener:
         self._cycle_index = cycle_index
         self._expected_eventual_coarsening_ratio = expected_eventual_coarsening_ratio
         self._efficiency_leeway_factor = efficiency_leeway_factor
+        self._min_trusted_mock_conv_factor = min_trusted_mock_conv_factor
 
+        domain_size = x.shape[0]
         aggregate_size_values = np.arange(2, max_aggregate_size + 1, dtype=int)
+        if repetitive:
+            # In a repetitive framework, ensure that the aggregate size divides the domain size.
+            aggregate_size_values = np.array([a for a in aggregate_size_values if domain_size % a == 0])
+        _LOGGER.debug("aggregate_size_values {}".format(np.array2string(aggregate_size_values, separator=", ")))
         agg_coarsener = [FixedAggSizeUniformCoarsener(
             x, aggregate_size, cycle_index=cycle_index,
             cycle_coarse_level_work_bound=cycle_coarse_level_work_bound,
@@ -206,7 +215,7 @@ class UniformCoarsener:
         # # self._expected_eventual_coarsening_ratio.
         cr_subsequent = np.clip(cr, self._expected_eventual_coarsening_ratio, None)
         work = self._nu * (self._cycle_index * (cr - cr_subsequent) + 1 / (1 - self._cycle_index * cr_subsequent))
-        efficiency = self._mock_conv_factor ** (1 / work)
+        efficiency = np.clip(self._mock_conv_factor, self._min_trusted_mock_conv_factor, None) ** (1 / work)
         candidate = self._mock_conv_factor <= max_conv_factor
         i = np.where(candidate)[0]
         candidate = np.vstack((
@@ -260,7 +269,7 @@ class UniformCoarsener:
             mock_work, mock_efficiency
 
 
-def _create_coarsening(x_aggregate_t: np.ndarray, nc: int) -> Tuple[np.ndarray, np.ndarray]:
+def create_coarsening(x_aggregate_t: np.ndarray, nc: int) -> Tuple[np.ndarray, np.ndarray]:
     """
     Generates R (coarse variables) on an aggregate from SVD principal components.
 

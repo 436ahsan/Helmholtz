@@ -62,8 +62,7 @@ class TestBootstrapAuto:
         # Test two-level cycle convergence for A*x=0.
         two_level_cycle = lambda x: hm.solve.solve_cycle.solve_cycle(multilevel, 1.0, 1, 1).run(x)
         x0 = np.random.random((a.shape[0], ))
-        x, conv_factor = hm.solve.run.run_iterative_method(level.operator, two_level_cycle, x0, 20,
-                                                           print_frequency=1)
+        x, conv_factor = hm.solve.run.run_iterative_method(level.operator, two_level_cycle, x0, 20, print_frequency=1)
         assert conv_factor == pytest.approx(0.194, 1e-2)
 
     def test_laplace_2_level_bootstrap(self):
