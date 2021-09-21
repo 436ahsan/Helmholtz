@@ -18,6 +18,7 @@ def create_interpolation_least_squares_domain(
         x: np.ndarray, a: scipy.sparse.csr_matrix, r: scipy.sparse.csr_matrix,
         aggregate_size: int = None, nc: int = None, neighborhood: str = "extended", num_test_examples: int = 5,
         repetitive: bool = False,
+        caliber: int = None,
         max_caliber: int = 6,
         target_error: float = 0.2,
         kind: str = "l2") -> \
@@ -36,6 +37,7 @@ def create_interpolation_least_squares_domain(
         num_test_examples: number of test functions dedicated to testing (do not participate in SVD, LS fit).
         repetitive: whether to exploit problem repetitiveness by creating a constant R stencil on all aggregates
             using windows from a single (or few) test vectors.
+        caliber: if None, automatically selects caliber. If non-None, uses this caliber value.
         max_caliber: maximum interpolation caliber to ty.
         target_error: target relative interpolation error in norm 'kind'.
         kind: interpolation norm kind ("l2"|"a" = energy norm).
@@ -80,7 +82,8 @@ def create_interpolation_least_squares_domain(
 
     # Increase caliber (fitting interpolation with LS) until the test error A-norm is below the accuracy threshold.
     max_caliber = min(max_caliber, max(len(n) for n in nbhr))
-    for caliber in range(1, max_caliber + 1):
+    calibers = np.array([caliber]) if caliber is not None else np.arange(1, max_caliber + 1, dtype=int)
+    for caliber in calibers:
         # Create an interpolation over the samples: a single aggregate (if repetitive) or entire domain (otherwise).
         p = hm.setup.interpolation_ls_fit.create_interpolation_least_squares(
             x_disjoint_aggregate_t, xc_disjoint_aggregate_t, [n[:caliber] for n in nbhr],
@@ -98,8 +101,9 @@ def create_interpolation_least_squares_domain(
         if error[kind][-1] < target_error:
             return p
 
-    _LOGGER.warning("Could not find a good caliber for threshold {}, using max caliber {}".format(
-        target_error, caliber))
+    if caliber is not None:
+        _LOGGER.warning("Could not find a good caliber for threshold {}, using max caliber {}".format(
+            target_error, caliber))
     return p
 
 
