@@ -88,13 +88,14 @@ def scaled_norm_of_matrix(e: np.ndarray) -> float:
     return norm(e, axis=0) / e.shape[0] ** 0.5
 
 
-def sparse_circulant(vals: np.array, offsets: np.array, n: int) -> scipy.sparse.dia_matrix:
+def sparse_circulant(vals: np.array, offsets: np.array, n: int, dtype=np.double) -> scipy.sparse.dia_matrix:
     """
     Creates a sparse square circulant matrix from a stencil.
     Args:
         vals: stencil values.
         offsets: corresponding diagonal offsets. 0 corresponds to the middle of the stencil.
         n: matrix dimension.
+        dtype: matrix type.
 
     Returns:
         n x n sparse matrix with vals[i] on diagonal offsets[i] (wrapping around other diagonals -- n + offsets[i] or
@@ -106,7 +107,7 @@ def sparse_circulant(vals: np.array, offsets: np.array, n: int) -> scipy.sparse.
     dupvals = np.concatenate((vals, v))
     dupoffsets[dupoffsets > n] -= 2 * n
 
-    return scipy.sparse.diags(dupvals, dupoffsets, shape=(n, n))
+    return scipy.sparse.diags(dupvals, dupoffsets, shape=(n, n), dtype=dtype)
 
 
 def tile_csr_matrix(a: scipy.sparse.csr_matrix, n: int) -> scipy.sparse.csr_matrix:
@@ -147,7 +148,8 @@ def tile_array(r: np.ndarray, n: int) -> scipy.sparse.csr_matrix:
     return scipy.sparse.block_diag(tuple(r for _ in range(n))).tocsr()
 
 
-def helmholtz_1d_discrete_operator(kh: float, discretization: str, n: int) -> scipy.sparse.dia_matrix:
+def helmholtz_1d_discrete_operator(kh: float, discretization: str, n: int, bc: str = "periodic") -> \
+        scipy.sparse.dia_matrix:
     """
     Returns the normalized FD-discretized 1D Helmholtz operator with periodic boundary conditions. The discretization
     stencil is [1, -2 + (kh)^2, -1].
@@ -156,19 +158,53 @@ def helmholtz_1d_discrete_operator(kh: float, discretization: str, n: int) -> sc
         kh: k*h, where k is a the wave number and h is the meshsize.
         discretization: "3-point"|"5-point", discretization scheme.
         n: size of grid.
+        bc: type of boundary condition. "periodic"|"bloch".
 
     Returns:
         Helmholtz operator (as a sparse matrix).
     """
+    if bc == "periodic":
+        dtype = np.double
+    elif bc == "bloch":
+        dtype = np.cdouble
+    else:
+        raise Exception("Unsupported boundary condition {}".format(bc))
+
     if discretization == "3-point":
-        return helmholtz_1d_operator(kh, n)
+        a = helmholtz_1d_operator(kh, n, dtype=dtype)
     elif discretization == "5-point":
-        return helmholtz_1d_5_point_operator(kh, n)
+        a = helmholtz_1d_5_point_operator(kh, n, dtype=dtype)
     else:
         raise Exception("Unsupported discretization {}".format(discretization))
 
+    if bc == "periodic":
+        # Already periodic.
+        pass
+    elif bc == "bloch":
+        # Assuming h = 1 here.
+        apply_bloch_boundary_conditions(a, kh * n)
+    else:
+        raise Exception("Unsupported boundary condition {}".format(bc))
+    return a
 
-def helmholtz_1d_operator(kh: float, n: int) -> scipy.sparse.dia_matrix:
+
+def apply_bloch_boundary_conditions(a: scipy.sparse.dia_matrix, alpha: float) -> None:
+    """
+    Applies the Bloch boundary conditions u(x+n) = u(x)*exp(i*alpha) to a discretization matrix, in place.
+
+    Args:
+        a: a sparse circulant operator. Changed in place.
+        alpha: Bloch boundary condition exponent.
+    """
+    n = a.shape[0]
+    for s in (-1, 1):
+        boundary = (a.offsets < -(n // 2)) if s > 0 else (a.offsets > (n // 2))
+        a.data[boundary] = \
+            np.multiply(a.data[boundary], np.exp(-1j * alpha * (a.offsets[boundary] + s * n))[None, :].transpose(),
+                           casting="unsafe")
+
+
+def helmholtz_1d_operator(kh: float, n: int, dtype=np.double) -> scipy.sparse.dia_matrix:
     """
     Returns the normalized FD-discretized 1D Helmholtz operator with periodic boundary conditions. The discretization
     stencil is [1, -2 + (kh)^2, -1].
@@ -180,10 +216,10 @@ def helmholtz_1d_operator(kh: float, n: int) -> scipy.sparse.dia_matrix:
     Returns:
         Helmholtz operator (as a sparse matrix).
     """
-    return sparse_circulant(np.array([1, -2 + kh ** 2, 1]), np.array([-1, 0, 1]), n)
+    return sparse_circulant(np.array([1, -2 + kh ** 2, 1]), np.array([-1, 0, 1]), n, dtype=dtype)
 
 
-def helmholtz_1d_5_point_operator(kh: float, n: int) -> scipy.sparse.dia_matrix:
+def helmholtz_1d_5_point_operator(kh: float, n: int, dtype=np.double) -> scipy.sparse.dia_matrix:
     """
     Returns the normalized FD-discretized 1D Helmholtz operator with periodic boundary conditions. This is an O(h^4)
     discretization with stencil is [1, -2 + (kh)^2, -1] / 12.
@@ -195,7 +231,9 @@ def helmholtz_1d_5_point_operator(kh: float, n: int) -> scipy.sparse.dia_matrix:
     Returns:
         Helmholtz operator (as a sparse matrix).
     """
-    return sparse_circulant(np.array([-1, 16, -30 + 12 * kh ** 2, 16, -1]) / 12, np.array([-2, -1, 0, 1, 2]), n)
+    return sparse_circulant(np.array([-1, 16, -30 + 12 * kh ** 2, 16, -1], dtype=float) / 12,
+                            np.array([-2, -1, 0, 1, 2]), n,
+                            dtype=dtype)
 
 
 def gram_schmidt(a: np.ndarray) -> np.ndarray:

@@ -1,6 +1,7 @@
 import helmholtz as hm
 import numpy as np
-from numpy.linalg import eig
+from scipy.sparse.linalg import eigs
+from scipy.optimize import fsolve
 
 
 def ideal_tv(a, num_examples):
@@ -18,3 +19,23 @@ def ideal_tv(a, num_examples):
     v = v[:, ind]
     return np.array(v[:, :num_examples]), lam
 
+
+def find_singular_kh(discretization, n):
+    """
+    Finds a k near 0.5 for which the smallest eigenvalue of the discrete Helmholtz operator is singular. That is,
+    the smallest eigenvector's wavelength evenly divides the domain size. Here h = 1, so k = kh.
+
+    Uses a sparse eigensolver.
+
+    Args:
+        discretization: discretization type ("3-point"|"5-point").
+        n: domain size.
+
+    Returns: kh, minimum eigenvalue.
+    """
+    def func(kh):
+        return np.min(np.abs(eigs(hm.linalg.helmholtz_1d_discrete_operator(kh, discretization, n), 1, which="SM")[0]))
+
+    wavelength = 2 * np.pi * n
+    root = fsolve(func, wavelength / (2 * np.round(wavelength)))
+    return root[0], func(root)
