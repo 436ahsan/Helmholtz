@@ -216,7 +216,7 @@ def helmholtz_1d_operator(kh: float, n: int, dtype=np.double) -> scipy.sparse.di
     Returns:
         Helmholtz operator (as a sparse matrix).
     """
-    return sparse_circulant(np.array([1, -2 + kh ** 2, 1]), np.array([-1, 0, 1]), n, dtype=dtype)
+    return sparse_circulant(np.array([1, -2 + kh ** 2, 1], dtype=float), np.array([-1, 0, 1]), n, dtype=dtype)
 
 
 def helmholtz_1d_5_point_operator(kh: float, n: int, dtype=np.double) -> scipy.sparse.dia_matrix:
@@ -227,6 +227,7 @@ def helmholtz_1d_5_point_operator(kh: float, n: int, dtype=np.double) -> scipy.s
     Args:
         kh: k*h, where k is a the wave number and h is the meshsize.
         n: size of grid.
+        dtype: return type (double/complex).
 
     Returns:
         Helmholtz operator (as a sparse matrix).

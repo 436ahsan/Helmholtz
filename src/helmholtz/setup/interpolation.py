@@ -22,7 +22,7 @@ def create_interpolation_least_squares_domain(
         max_caliber: int = 6,
         target_error: float = 0.2,
         kind: str = "l2") -> \
-        Tuple[scipy.sparse.csr_matrix, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        scipy.sparse.csr_matrix:
     """
     Creates the interpolation operator P by least squares fitting from r*x to x. Interpolatory sets are automatically
     determined by a's graph.

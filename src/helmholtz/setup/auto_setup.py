@@ -290,7 +290,8 @@ def mock_cycle_conv_factor(level, r, num_relax_sweeps, print_frequency: int = No
 
 def create_interpolation(x: np.ndarray, a: scipy.sparse.csr_matrix,
                          r: scipy.sparse.csr_matrix, method: str, aggregate_size: int = None, nc: int = None,
-                         neighborhood: str = "extended", max_caliber: int = 6,
+                         neighborhood: str = "extended", caliber: int = None,
+                         max_caliber: int = 6,
                          target_error: float = 0.2,
                          repetitive: bool = False) -> scipy.sparse.csr_matrix:
     if method == "svd":
@@ -301,7 +302,7 @@ def create_interpolation(x: np.ndarray, a: scipy.sparse.csr_matrix,
         # one).
         p = hm.setup.interpolation.create_interpolation_least_squares_domain(
             x, a, r, aggregate_size=aggregate_size, nc=nc, neighborhood=neighborhood, repetitive=repetitive,
-            max_caliber=max_caliber, target_error=target_error)
+            caliber=caliber, max_caliber=max_caliber, target_error=target_error)
     else:
         raise Exception("Unsupported interpolation method '{}'".format(method))
     return p
