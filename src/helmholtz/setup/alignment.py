@@ -1,8 +1,12 @@
+import logging
 import helmholtz as hm
 import matplotlib.pyplot as plt
 import numpy as np
 from numpy.linalg import norm
 from scipy import optimize
+
+
+_LOGGER = logging.getLogger(__name__)
 
 
 def optimal_rotation_angle(xc):
@@ -24,7 +28,7 @@ def optimal_rotation_angle(xc):
     f0 = f(0)
     fmin = f(tmin)
 
-    print("{:<+3f} {:2e} {:2e} ({:6.2f})".format(tmin / (2 * np.pi), f0, fmin, f0 / fmin))
+    print("{:<+3f} {:2e} {:2e} ({:6.2f})".format(tmin / np.pi, f0, fmin, f0 / fmin))
     return f, tmin
 
 
@@ -35,6 +39,8 @@ def calculate_local_rotation_angles(n, aggregate_size, nc, xc):
     p = 2
 
     phi = []
+    _LOGGER.info("{:<3s} {:<9s} {:<12s} {:<12s} {:<8s} {:<13s} {:<13s}".format(
+        "Agg", "t/pi", "f0", "fmin", "factor", "Dist Before", "Dist After"))
     for j, i in enumerate(range(0, num_coarse, nc)):
         f = lambda t: get_local_rotation_min_function(
             xc[i:i + nc], xc[np.arange(i + nc, i + 2*nc) % num_coarse], t, scale=False, p=p)
@@ -44,10 +50,51 @@ def calculate_local_rotation_angles(n, aggregate_size, nc, xc):
         f0 = f(0)
         fmin = f(tmin)
         norm_before = norm(xc[i:i + nc] - xc[np.arange(i + nc, i + 2*nc) % num_coarse], axis=1) #** 2
-        print("{:<2d} {:<+3f} {:2e} {:2e} ({:6.2f}) {}".format(i, tmin, f0, fmin, f0 / fmin, norm_before))
+        u = rotation(tmin)
+        norm_after = norm(u.dot(xc[i:i + nc]) - xc[np.arange(i + nc, i + 2*nc) % num_coarse], axis=1) #** 2
+        _LOGGER.info("{:<3d} {:<+3f} {:2e} {:2e} ({:6.2f}) {} {}".format(
+            i, tmin / np.pi, f0, fmin, f0 / fmin, norm_before, norm_after))
         phi.append(tmin)
     phi = np.array(phi)
     return phi
+
+
+def calculate_local_repetitive_rotation_angle(num_aggregates, nc, xc):
+    # Number of aggregates.
+    num_coarse = nc * num_aggregates
+    p = 2
+
+    phi = []
+    _LOGGER.info("{:<3s} {:<9s} {:<12s} {:<12s} {:<8s} {:<13s} {:<13s}".format(
+        "Agg", "t/pi", "f0", "fmin", "factor", "Dist Before", "Dist After"))
+
+    f = lambda t: sum(get_local_rotation_min_function(
+            xc[i:i + nc], xc[np.arange(i + nc, i + 2*nc) % num_coarse], t, scale=False, p=p)
+            for i in range(0, num_coarse, nc))
+    result = optimize.minimize_scalar(f, bounds=(-np.pi, np.pi), method='brent')
+    tmin = result.x % (2 * np.pi)
+
+    for j, i in enumerate(range(0, num_coarse, nc)):
+        f = lambda t: get_local_rotation_min_function(
+            xc[i:i + nc], xc[np.arange(i + nc, i + 2 * nc) % num_coarse], t, scale=False, p=p)
+        result = optimize.minimize_scalar(f, bounds=(-np.pi, np.pi), method='brent')
+        tmin_i = result.x % (2 * np.pi)
+        #tmin_i = optimize.shgo(f, [(-np.pi, np.pi)], sampling_method='sobol').x[0]
+        f0 = f(0)
+        fmin = f(tmin)
+        norm_before = norm(xc[i:i + nc] - xc[np.arange(i + nc, i + 2*nc) % num_coarse], axis=1) #** 2
+        u = rotation(tmin)
+        norm_after = norm(u.dot(xc[i:i + nc]) - xc[np.arange(i + nc, i + 2*nc) % num_coarse], axis=1) #** 2
+
+        fmin_i = f(tmin_i)
+        u = rotation(tmin_i)
+        norm_after_i = norm(u.dot(xc[i:i + nc]) - xc[np.arange(i + nc, i + 2*nc) % num_coarse], axis=1) #** 2
+
+        _LOGGER.info("{:<3d} {:<+3f} {:6.2e} {:6.2e} ({:6.2f}) {} {} {:<+3f} {:6.2e} ({:6.2f}) {} {}".format(
+            i, tmin / np.pi, f0,
+            fmin, f0 / fmin, norm_before, norm_after,
+            tmin_i / np.pi, fmin_i, f0 / fmin_i, norm_before, norm_after))
+    return tmin
 
 
 def rotation(t):
@@ -81,7 +128,7 @@ def plot_min_functions(n, aggregate_size, nc, xc, ax):
         f = lambda t: get_local_rotation_min_function(
             xc[i:i + nc], xc[np.arange(i + nc, i + 2*nc) % num_coarse], t, scale=False, p=p)
         if j < 10:
-            ax.plot(t / (2 * np.pi), np.array([f(theta) for theta in t]), label="Agg {}".format(j))
+            ax.plot(t / np.pi, np.array([f(theta) for theta in t]), label="Agg {}".format(j))
     ax.grid(True);
-    ax.set_xlabel(r"$\theta / (2 \pi)$")
+    ax.set_xlabel(r"$\theta / \pi$")
     #ax.legend();

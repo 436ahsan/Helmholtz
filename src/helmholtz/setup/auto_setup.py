@@ -306,3 +306,11 @@ def create_interpolation(x: np.ndarray, a: scipy.sparse.csr_matrix,
     else:
         raise Exception("Unsupported interpolation method '{}'".format(method))
     return p
+
+
+def get_test_matrix(a, num_sweeps, num_examples: int = None):
+    level = hm.setup.hierarchy.create_finest_level(a)
+    x = hm.solve.run.random_test_matrix((a.shape[0],), num_examples=num_examples)
+    b = np.zeros_like(x)
+    x, _ = hm.solve.run.run_iterative_method(level.operator, lambda x: level.relax(x, b), x, num_sweeps=num_sweeps)
+    return x

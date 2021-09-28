@@ -1,5 +1,6 @@
 import helmholtz as hm
 import numpy as np
+from scipy.linalg import eig
 from scipy.sparse.linalg import eigs
 from scipy.optimize import fsolve
 
