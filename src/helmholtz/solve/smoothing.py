@@ -130,7 +130,7 @@ def plot_diminishing_returns_point(factor, num_sweeps, conv, ax, title: str = "R
 
 def check_relax_cycle_shrinkage(multilevel, max_sweeps: int = 20, num_levels: int = None,
                                 nu_pre: int = 2, nu_post: int = 2, nu_coarsest: int = 4,
-                                slow_conv_factor: float = 0.95):
+                                slow_conv_factor: float = 0.95, leeway_factor: float = 1.2):
     """Checks the two-level relaxation cycle shrinkage vs. relaxation."""
     level = multilevel[0]
     a = level.a
@@ -154,12 +154,14 @@ def check_relax_cycle_shrinkage(multilevel, max_sweeps: int = 20, num_levels: in
     relax_b = lambda x, b: level.relax(x, b)
     relax_cycle_b = lambda x, b: relax_cycle(x)
 
+    method_info = {}
     for title, method, method_b, work, color in zip(
         ("Kaczmarz", "Mini-cycle"), (relax, relax_cycle), (relax_b, relax_cycle_b), (1, work), ("blue", "red")):
         #print(title)
-        factor, num_sweeps, residual, conv, rer, relax_conv_factor = \
-            hm.solve.smoothing.shrinkage_factor(operator, method_b, (n,), print_frequency=1, max_sweeps=max_sweeps,
-                                                slow_conv_factor=slow_conv_factor)
+        info = hm.solve.smoothing.shrinkage_factor(operator, method_b, (n,), print_frequency=1, max_sweeps=max_sweeps,
+                                                slow_conv_factor=slow_conv_factor, leeway_factor=leeway_factor)
+        method_info[title] = info
+        factor, num_sweeps, residual, conv, rer, relax_conv_factor = info
         _LOGGER.info(
             "Relax conv {:.2f} shrinkage {:.2f} PODR RER {:.2f} after {} sweeps. Work {:.1f} eff {:.2f}".format(
                 relax_conv_factor, factor, np.mean(rer[num_sweeps]), num_sweeps, work,
@@ -167,3 +169,4 @@ def check_relax_cycle_shrinkage(multilevel, max_sweeps: int = 20, num_levels: in
         hm.solve.smoothing.plot_diminishing_returns_point(factor, num_sweeps, conv, ax, title=title, color=color)
 
     ax.legend()
+    return method_info
