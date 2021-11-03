@@ -11,13 +11,13 @@ NU_VALUES = np.arange(1, 7)
 M_VALUES = np.arange(2, 11)
 
 
-def mock_conv_factor(kh, n, aggregate_size, num_components, num_sweeps: int = 5, num_examples: int = 3,
+def mock_conv_factor(kh, discretization, n, aggregate_size, num_components, num_sweeps: int = 5, num_examples: int = 3,
                      nu_values: np.ndarray = NU_VALUES, m_values: np.ndarray = M_VALUES):
     # 'num_sweeps': number of relaxation sweeps to relax the TVs and to use in coarsening optimization
     # (determined by relaxation shrinkage).
 
     # Create fine-level matrix.
-    a = hm.linalg.helmholtz_1d_operator(kh, n)
+    a = hm.linalg.helmholtz_1d_discrete_operator(kh, discretization, n)
     # Use default Kacmzarz for kh != 0.
     level = hm.setup.hierarchy.create_finest_level(a, relaxer=hm.solve.relax.GsRelaxer(a) if kh == 0 else None)
     # For A*x=b cycle tests.
@@ -47,18 +47,18 @@ def mock_conv_factor_for_test_vectors(kh, x, aggregate_size, num_components,
     return r, mock_conv
 
 
-def mock_conv_factor_for_domain_size(kh, r, aggregate_size, m, nu_values):
+def mock_conv_factor_for_domain_size(kh, discretization, r, aggregate_size, m, nu_values):
     """Returns thre mock cycle conv factor for a domain of size m instead of n."""
     # Create fine-level matrix.
-    a = hm.linalg.helmholtz_1d_operator(kh, m)
+    a = hm.linalg.helmholtz_1d_discrete_operator(kh, discretization, m)
     # Use default Kacmzarz for kh != 0.
     level = hm.setup.hierarchy.create_finest_level(a, relaxer=hm.solve.relax.GsRelaxer(a) if kh == 0 else None)
     r_csr = r.tile(m // aggregate_size)
     return np.array([hm.setup.auto_setup.mock_cycle_conv_factor(level, r_csr, nu) for nu in nu_values])
 
 
-def create_two_level_hierarchy(kh, m, r, p, aggregate_size):
-    a = hm.linalg.helmholtz_1d_operator(kh, m)
+def create_two_level_hierarchy(kh, discretization, m, r, p, aggregate_size, use_r_as_restriction: bool = False):
+    a = hm.linalg.helmholtz_1d_discrete_operator(kh, discretization, m)
     if isinstance(r, scipy.sparse.csr_matrix):
         r_csr = r
     else:
@@ -69,20 +69,24 @@ def create_two_level_hierarchy(kh, m, r, p, aggregate_size):
         p_csr = hm.linalg.tile_array(p, m // aggregate_size)
     level0 = hm.setup.hierarchy.create_finest_level(a)
     # relaxer=hm.solve.relax.GsRelaxer(a) if kh == 0 else None)
-    level1 = hm.setup.hierarchy.create_coarse_level(level0.a, level0.b, r_csr, p_csr)
+    level1 = hm.setup.hierarchy.create_coarse_level(level0.a, level0.b, r_csr, p_csr,
+                                                    use_r_as_restriction=use_r_as_restriction)
     multilevel = hm.hierarchy.multilevel.Multilevel.create(level0)
     multilevel.add(level1)
     return multilevel
 
 
-def two_level_conv_factor(multilevel, nu, print_frequency: int = None):
+def two_level_conv_factor(multilevel, nu, print_frequency: int = None, debug: bool = False):
     level = multilevel.finest_level
     n = level.size
-    # Test two-level cycle convergence for A*x=b with random b.
-    b = np.random.random((n, ))
+    # Test two-level cycle convergence for A*x=b with b=A*x0, x0=random[-1, 1].
+    x0 = 2 * np.random.random((n, )) - 1
+    b = multilevel[0].operator(x0)
+    #b = np.random.random((n, ))
+    #b = np.ones((n, ))
 
     def two_level_cycle(y):
-        return hm.solve.solve_cycle.solve_cycle(multilevel, 1.0, nu, 0, nu_coarsest=-1, debug=False, rhs=b).run(y)
+        return hm.solve.solve_cycle.solve_cycle(multilevel, 1.0, nu, 0, nu_coarsest=-1, debug=debug, rhs=b).run(y)
 
     def residual(x):
         return b - multilevel[0].operator(x)
@@ -91,9 +95,9 @@ def two_level_conv_factor(multilevel, nu, print_frequency: int = None):
         residual, two_level_cycle, np.random.random((n, )), 15, print_frequency=print_frequency)
 
 
-def two_level_conv_data_frame(kh, r, p, aggregate_size, m_values, nu_values):
+def two_level_conv_data_frame(kh, discretization, r, p, aggregate_size, m_values, nu_values):
     return pd.DataFrame(np.array([
-        [two_level_conv_factor(create_two_level_hierarchy(kh, m * aggregate_size, r, p, aggregate_size), nu)[1]
+        [two_level_conv_factor(create_two_level_hierarchy(kh, discretization, m * aggregate_size, r, p, aggregate_size), nu)[1]
          for nu in nu_values]
         for m in m_values]),
             index=m_values, columns=nu_values)

@@ -78,9 +78,10 @@ class SolutionCycleProcessor(hm.hierarchy.processor.Processor):
         level = self._multilevel[l]
         if self._nu_coarsest < 0:
             self._x[l] = spsolve(level.a, self._b[l])
+            self._print_state(l, "exact")
         else:
             self._relax(l, self._nu_coarsest)
-        self._print_state(l, "coarsest")
+            self._print_state(l, "relax {}".format(self._nu_coarsest))
 
     def pre_process(self, l):
         # Execute at level L right before switching to the next-coarser level L+1.

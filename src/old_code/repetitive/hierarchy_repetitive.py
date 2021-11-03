@@ -4,7 +4,8 @@ import helmholtz as hm
 import helmholtz.hierarchy.multilevel as multilevel
 
 
-def create_tiled_coarse_level(a: scipy.sparse.spmatrix, b: scipy.sparse.spmatrix, r, p) -> multilevel.Level:
+def create_tiled_coarse_level(a: scipy.sparse.spmatrix, b: scipy.sparse.spmatrix, r, p,
+                              use_r_as_restriction: bool = False) -> multilevel.Level:
     # r: hm.repetitive.coarsening_repetitive.Coarsener,
     # p: hm.repetitive.interpolation_repetitive.Interpolator) -> \
     """
@@ -14,6 +15,7 @@ def create_tiled_coarse_level(a: scipy.sparse.spmatrix, b: scipy.sparse.spmatrix
         b: fine-level mass matrix.
         r: aggregate coarsening.
         p: aggregate interpolation.
+        use_r_as_restriction: use R*A*P as coarse operator, if True, else P^T*A*P.
 
     Returns: coarse level object.
     """
@@ -21,7 +23,7 @@ def create_tiled_coarse_level(a: scipy.sparse.spmatrix, b: scipy.sparse.spmatrix
     r_csr = r.tile(num_aggregates)
     p_csr = p.tile(num_aggregates)
     # Form the SYMMETRIC Galerkin coarse-level operator.
-    pt = p_csr.transpose()
+    pt = r_csr if use_r_as_restriction else p_csr.transpose()
     ac = (pt.dot(a)).dot(p_csr)
     bc = (pt.dot(b)).dot(p_csr)
     relaxer = hm.solve.relax.KaczmarzRelaxer(ac, bc)
