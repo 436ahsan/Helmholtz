@@ -21,7 +21,7 @@ def setup(a: scipy.sparse.spmatrix,
           max_coarsest_relax_conv_factor: float = 0.8,
           max_coarsest_level_size: int = 10,
           target_error: float = 0.2,
-          leeway_factor: float = 1.2) -> hm.hierarchy.multilevel.Multilevel:
+          leeway_factor: float = 1.2) -> hierarchy.multilevel.Multilevel:
     """
     Creates low-residual test functions and multilevel hierarchy for solving A*x=b.
     Args:
@@ -178,7 +178,8 @@ def bootstap(x, multilevel: hm.hierarchy.multilevel.Multilevel, num_levels: int,
              neighborhood: str = "extended",
              max_caliber: int = 6,
              target_error: float = 0.2,
-             repetitive: bool = False) -> Tuple[np.ndarray, hm.hierarchy.multilevel.Multilevel]:
+             repetitive: bool = False,
+             aggregate_size: int = None) -> Tuple[np.ndarray, hm.hierarchy.multilevel.Multilevel]:
     """
     Improves test functions and a multilevel hierarchy on a fixed-size domain by bootstrapping.
     Args:
@@ -245,7 +246,7 @@ def bootstap(x, multilevel: hm.hierarchy.multilevel.Multilevel, num_levels: int,
         info = coarsener.get_coarsening_info(1, fmt="dataframe")
         #_LOGGER.debug(info)
         r, aggregate_size, nc, cr, mean_energy_error, mock_conv, mock_work, mock_efficiency = \
-            coarsener.get_optimal_coarsening(max_conv_factor)
+            coarsener.get_optimal_coarsening(max_conv_factor, aggregate_size=aggregate_size)
         _LOGGER.info("R {} a {} nc {} cr {:.2f} mean_energy_error {:.4f}; mock cycle num_sweeps {} conv {:.2f} "
                      "eff {:.2f}".format(
             r.shape, aggregate_size, nc, cr, mean_energy_error, num_sweeps, mock_conv, mock_efficiency))

@@ -130,36 +130,38 @@ def plot_diminishing_returns_point(factor, num_sweeps, conv, ax, title: str = "R
 
 def check_relax_cycle_shrinkage(multilevel, max_sweeps: int = 20, num_levels: int = None,
                                 nu_pre: int = 2, nu_post: int = 2, nu_coarsest: int = 4,
-                                slow_conv_factor: float = 0.95, leeway_factor: float = 1.2):
-    """Checks the two-level relaxation cycle shrinkage vs. relaxation."""
+                                slow_conv_factor: float = 0.95, leeway_factor: float = 1.2,
+                                num_examples: int = 5):
+    """Checks the two-level relaxation cycle shrinkage vs. relaxation, unless num_levels=1, in which case
+    we only run relaxation."""
     level = multilevel[0]
     a = level.a
-    def relax_cycle(x):
-        return hm.solve.relax_cycle.relax_cycle(multilevel, 1.0, nu_pre, nu_post, nu_coarsest,
-                                                num_levels=num_levels).run(x)
-    # This is two-level work.
-    # TODO(orenlivne): generalize to multilevel work.
-    r = multilevel[1].r
-    work = nu_pre + nu_post + (r.shape[0] / r.shape[1]) * nu_coarsest
+    n = a.shape[0]
+    b = np.zeros((n, num_examples))
+    operator = lambda x: a.dot(x)
+    relax = lambda x: level.relax(x, b)
+    relax_b = lambda x, b: level.relax(x, b)
+    method_list = [("Kaczmarz", relax, relax_b, 1, "blue")]
+
+    if num_levels >= 2:
+        def relax_cycle(x):
+            return hm.solve.relax_cycle.relax_cycle(multilevel, 1.0, nu_pre, nu_post, nu_coarsest,
+                                                    num_levels=num_levels).run(x)
+        # This is two-level work.
+        # TODO(orenlivne): generalize to multilevel work.
+        r = multilevel[1].r
+        work = nu_pre + nu_post + (r.shape[0] / r.shape[1]) * nu_coarsest
+        relax_cycle_b = lambda x, b: relax_cycle(x)
+        method_list.append(("{}-level MiniCycle".format(num_levels), relax_cycle, relax_cycle_b, work, "red"))
 
     fig, ax = plt.subplots(1, 1, figsize=(6, 4))
 
-    num_examples = 5
-    n = a.shape[0]
-    b = np.zeros((n, num_examples))
-
-    operator = lambda x: a.dot(x)
-    relax = lambda x: level.relax(x, b)
-
-    relax_b = lambda x, b: level.relax(x, b)
-    relax_cycle_b = lambda x, b: relax_cycle(x)
-
     method_info = {}
-    for title, method, method_b, work, color in zip(
-        ("Kaczmarz", "Mini-cycle"), (relax, relax_cycle), (relax_b, relax_cycle_b), (1, work), ("blue", "red")):
-        #print(title)
-        info = hm.solve.smoothing.shrinkage_factor(operator, method_b, (n,), print_frequency=1, max_sweeps=max_sweeps,
-                                                slow_conv_factor=slow_conv_factor, leeway_factor=leeway_factor)
+    for title, method, method_b, work, color in method_list:
+        _LOGGER.info(title)
+        info = hm.solve.smoothing.shrinkage_factor(
+            operator, method_b, (n,), print_frequency=1, max_sweeps=max_sweeps,
+            slow_conv_factor=slow_conv_factor, leeway_factor=leeway_factor)
         method_info[title] = info
         factor, num_sweeps, residual, conv, rer, relax_conv_factor = info
         _LOGGER.info(

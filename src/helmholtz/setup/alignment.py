@@ -33,6 +33,8 @@ def optimal_rotation_angle(xc):
 
 
 def calculate_local_rotation_angles(n, aggregate_size, nc, xc):
+    """Returns the rotation angle of X_{i+1} with respect to X_i, where X_i is the pair of coarse variables
+    of aggregate i."""
     # Number of aggregates.
     N = n // aggregate_size
     num_coarse = nc * N
@@ -43,7 +45,7 @@ def calculate_local_rotation_angles(n, aggregate_size, nc, xc):
         "Agg", "t/pi", "f0", "fmin", "factor", "Dist Before", "Dist After"))
     for j, i in enumerate(range(0, num_coarse, nc)):
         f = lambda t: get_local_rotation_min_function(
-            xc[i:i + nc], xc[np.arange(i + nc, i + 2*nc) % num_coarse], t, scale=False, p=p)
+            xc[np.arange(i + nc, i + 2*nc) % num_coarse], xc[i:i + nc], t, scale=False, p=p)
         result = optimize.minimize_scalar(f, bounds=(-np.pi, np.pi), method='brent')
         tmin = result.x % (2 * np.pi)
         #tmin = optimize.shgo(f, [(-np.pi, np.pi)], sampling_method='sobol').x[0]

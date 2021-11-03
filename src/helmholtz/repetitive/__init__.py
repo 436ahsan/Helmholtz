@@ -1,1 +1,1 @@
-from . import coarsening_repetitive
+from . import coarsening_repetitive, locality

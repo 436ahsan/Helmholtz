@@ -6,8 +6,6 @@ coarse neighborhoods based on domain periodicity)."""
 import logging
 import numpy as np
 import scipy.sparse
-from typing import Tuple
-from scipy.linalg import norm
 
 import helmholtz.setup.interpolation_ls_fit as interpolation_ls_fit
 import helmholtz.setup.interpolation as interpolation
