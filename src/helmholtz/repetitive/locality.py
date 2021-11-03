@@ -5,6 +5,7 @@ import helmholtz.repetitive.coarsening_repetitive as hrc
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import scipy.sparse
 
 NU_VALUES = np.arange(1, 7)
 M_VALUES = np.arange(2, 11)
@@ -58,8 +59,14 @@ def mock_conv_factor_for_domain_size(kh, r, aggregate_size, m, nu_values):
 
 def create_two_level_hierarchy(kh, m, r, p, aggregate_size):
     a = hm.linalg.helmholtz_1d_operator(kh, m)
-    r_csr = hm.linalg.tile_array(r, m // aggregate_size)
-    p_csr = hm.linalg.tile_array(p, m // aggregate_size)
+    if isinstance(r, scipy.sparse.csr_matrix):
+        r_csr = r
+    else:
+        r_csr = hm.linalg.tile_array(r, m // aggregate_size)
+    if isinstance(p, scipy.sparse.csr_matrix):
+        p_csr = p
+    else:
+        p_csr = hm.linalg.tile_array(p, m // aggregate_size)
     level0 = hm.setup.hierarchy.create_finest_level(a)
     # relaxer=hm.solve.relax.GsRelaxer(a) if kh == 0 else None)
     level1 = hm.setup.hierarchy.create_coarse_level(level0.a, level0.b, r_csr, p_csr)
@@ -99,7 +106,7 @@ def create_coarsening(x, aggregate_size, num_components):
               for offset in range(max((4 * aggregate_size) // x.shape[1], 1))), axis=1).transpose()
     # Tile the same coarsening over all aggregates.
     r, s = hm.setup.coarsening_uniform.create_coarsening(x_aggregate_t, num_components)
-    print("Coarsening:", "a", aggregate_size, "nc", num_components, "#windows", x_aggregate_t.shape[0], "r", r, "s", s)
+    print("Coarsening:", "a", aggregate_size, "nc", num_components, "#windows", x_aggregate_t.shape[0], "s", s)
     return hrc.Coarsener(r), s
 
 

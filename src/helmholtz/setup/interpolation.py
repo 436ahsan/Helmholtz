@@ -95,8 +95,8 @@ def create_interpolation_least_squares_domain(
                       for kind in ("l2", "a"))
         _LOGGER.info("caliber {} error l2 {} a {}".format(
             caliber,
-            np.array2string(error["l2"], separator=", ", precision=2),
-            np.array2string(error["a"], separator=", ", precision=2)))
+            np.array2string(error["l2"], separator=", ", formatter={'float_kind': lambda x: "%4.2f" % x}),
+            np.array2string(error["a"], separator=", ", formatter={'float_kind': lambda x: "%.2e" % x})))
         # Check test set error.
         if error[kind][-1] < target_error:
             return p
