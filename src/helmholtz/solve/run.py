@@ -90,7 +90,6 @@ def run_iterative_eigen_method(operator, method, x: np.ndarray, lam, num_sweeps:
     """
     # Print the error and residual norm of the first test function.
     x0 = x[:, 0] if x.ndim == 2 else x
-    print(lam)
     r_norm = norm(operator(x0, lam))
     lam_error = 1
     _LOGGER.info("{:5d} |r| {:.4e} lam {:.5f}".format(0, r_norm, lam))

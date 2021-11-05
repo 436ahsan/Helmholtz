@@ -202,7 +202,7 @@ class UniformCoarsener:
             max_conv_factor: max convergence factor to allow. NOTE: in principle, should be derived from cycle index.
 
         Returns:
-            table of index into the _result array, aggregate_size, nc, cr, mean_energy_error, nu, mock_conv, mock_work,
+            table of index into the _result array, aggregate_size, nc, cr, mean_energy_error, mock_conv, mock_work,
             mock_efficiency.
         """
         aggregate_size = np.array([item[0] for item in self._result])

@@ -124,7 +124,7 @@ class TestCoarseningUniform:
         assert nc == 2
         assert cr == pytest.approx(0.5, 1e-2)
         assert mean_energy_error == pytest.approx(0.128, 1e-2)
-        assert mock_conv == pytest.approx(0.139, 1e-2)
+        assert mock_conv == pytest.approx(0.141, 1e-2)
         assert mock_work == pytest.approx(8, 1e-2)
         assert mock_efficiency == pytest.approx(0.782, 1e-2)
 
@@ -172,7 +172,7 @@ class TestCoarseningUniform:
         assert nc == 2
         assert cr == pytest.approx(0.5, 1e-2)
         assert mean_energy_error == pytest.approx(0.127, 1e-2)
-        assert mock_conv == pytest.approx(0.150, 1e-2)
+        assert mock_conv == pytest.approx(0.152, 1e-2)
         assert mock_work == pytest.approx(8, 1e-2)
         assert mock_efficiency == pytest.approx(0.789, 1e-2)
 

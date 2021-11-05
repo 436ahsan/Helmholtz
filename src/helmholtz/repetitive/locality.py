@@ -110,7 +110,6 @@ def create_coarsening(x, aggregate_size, num_components):
               for offset in range(max((4 * aggregate_size) // x.shape[1], 1))), axis=1).transpose()
     # Tile the same coarsening over all aggregates.
     r, s = hm.setup.coarsening_uniform.create_coarsening(x_aggregate_t, num_components)
-    print("Coarsening:", "a", aggregate_size, "nc", num_components, "#windows", x_aggregate_t.shape[0], "s", s)
     return hrc.Coarsener(r), s
 
 
