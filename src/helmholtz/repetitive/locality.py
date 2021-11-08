@@ -103,13 +103,13 @@ def two_level_conv_data_frame(kh, discretization, r, p, aggregate_size, m_values
             index=m_values, columns=nu_values)
 
 
-def create_coarsening(x, aggregate_size, num_components):
+def create_coarsening(x, aggregate_size, num_components, normalize: bool = False):
     # Construct coarsening on an aggregate.
     x_aggregate_t = np.concatenate(
         tuple(hm.linalg.get_window(x, offset, aggregate_size)
               for offset in range(max((4 * aggregate_size) // x.shape[1], 1))), axis=1).transpose()
     # Tile the same coarsening over all aggregates.
-    r, s = hm.setup.coarsening_uniform.create_coarsening(x_aggregate_t, num_components)
+    r, s = hm.setup.coarsening_uniform.create_coarsening(x_aggregate_t, num_components, normalize=normalize)
     return hrc.Coarsener(r), s
 
 

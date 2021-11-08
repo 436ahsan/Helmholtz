@@ -171,6 +171,11 @@ def fit_interpolation(xc_fit, x_fit, xc_val, x_val, alpha, intercept: bool = Fal
             info += list(p)
         return info
 
+    # print(x_fit)
+    # print(xc_fit)
+    # print("p", _solution_and_errors(0))
+    # print("ls", np.linalg.lstsq(xc_fit, x_fit))
+
     return np.array([_solution_and_errors(a) for a in alpha]) \
         if isinstance(alpha, (list, np.ndarray)) else np.array(_solution_and_errors(alpha))
 
@@ -212,9 +217,9 @@ def create_interpolation_least_squares(
         alpha: np.ndarray,
         fit_samples: int = None,
         val_samples: int = None,
-        test_samples: int = None) -> Tuple[scipy.sparse.csr_matrix, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        test_samples: int = None) -> scipy.sparse.csr_matrix:
     """
-    Creates the next coarse level interpolation operator P.
+    Creates the next coarse level interpolation operator P using ridge-regularized, unweighted least-squares.
     Args:
         x: fine-level test matrix.
         xc: coarse-level test matrix.
@@ -253,14 +258,50 @@ def create_interpolation_least_squares(
     # fit_error = np.array([info_i[0] for info_i in info])
     # val_error = np.array([info_i[1] for info_i in info])
     # alpha_opt = np.array([row[0] for row in result])
+    p_coefficients = [info_i[2:] for info_i in info]
 
+    return _create_csr_matrix(nbhr, p_coefficients, nc)
+
+
+def create_interpolation_least_squares_weighted(
+        x: np.ndarray,
+        xc: np.ndarray,
+        nbhr: List[np.ndarray],
+        weight: np.ndarray = None) -> scipy.sparse.csr_matrix:
+    """
+    Creates the next coarse level interpolation operator P using unregualized, weighted least-squares on a fitting set.
+
+    Args:
+        x: fine-level test matrix - fit set.
+        xc: coarse-level test matrix - fit set.
+        nbhr: list of neighbor lists for all fine points.
+        weight: optional least-squares weights to apply (same size as x). If None, weight = np.ones(x.shape).
+
+    Returns:
+        interpolation matrix P,
+        relative fit error at all fine points,
+        relative validation error at all fine points,
+        relative test error at all fine points,
+        optimal alpha for all fine points.
+    """
+    if weight is None:
+        weight = np.ones(x.shape)
+    n = x.shape[1]
+    nc = xc.shape[1]
+    assert len(nbhr) == n
+
+    # Fit interpolation by unregularized weighted least-squares.
+    p_coefficients = [np.linalg.lstsq(xc[:, nbhr_i], x[:, i])[0] for i, nbhr_i in enumerate(nbhr)]
+    return _create_csr_matrix(nbhr, p_coefficients, nc)
+
+
+def _create_csr_matrix(nbhr, p_coefficients, nc):
     # Build the sparse interpolation matrix.
+    n = len(nbhr)
     row = np.concatenate(tuple([i] * len(nbhr_i) for i, nbhr_i in enumerate(nbhr)))
     col = np.concatenate(tuple(nbhr))
-    data = np.concatenate(tuple(info_i[2:] for info_i in info))
-    p = scipy.sparse.coo_matrix((data, (row, col)), shape=(n, nc)).tocsr()
-
-    return p
+    data = np.concatenate(tuple(p_coefficients))
+    return scipy.sparse.coo_matrix((data, (row, col)), shape=(n, nc)).tocsr()
 
 
 def _filtered_mean(x):

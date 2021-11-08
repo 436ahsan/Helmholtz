@@ -21,7 +21,9 @@ def create_interpolation_least_squares_domain(
         caliber: int = None,
         max_caliber: int = 6,
         target_error: float = 0.2,
-        kind: str = "l2") -> \
+        kind: str = "l2",
+        schema: str = "ridge",
+        residual_window_size: int = 7) -> \
         scipy.sparse.csr_matrix:
     """
     Creates the interpolation operator P by least squares fitting from r*x to x. Interpolatory sets are automatically
@@ -41,6 +43,8 @@ def create_interpolation_least_squares_domain(
         max_caliber: maximum interpolation caliber to ty.
         target_error: target relative interpolation error in norm 'kind'.
         kind: interpolation norm kind ("l2"|"a" = energy norm).
+        schema: whether to use ridge-regularized unweighted LS ("ridge") or plain LS with TV residual weighting.
+        residual_window_size: #points in local neighborhood used for residual norm computation, if schema="weighted".
 
     Returns:
         interpolation matrix P.
@@ -66,6 +70,13 @@ def create_interpolation_least_squares_domain(
     else:
         x_disjoint_aggregate_t, xc_disjoint_aggregate_t = x.transpose(), xc.transpose()
 
+    if schema == "weighted":
+        weight = hm.linalg.interval_norm(x, residual_window_size)
+    elif schema == "ridge":
+        weight = None
+    else:
+        raise Exception("Unsupported interpolation fitting schema {}".format(schema))
+
     # Create folds.
     num_examples = int(x_disjoint_aggregate_t.shape[0])
     num_ls_examples = num_examples - num_test_examples
@@ -85,9 +96,15 @@ def create_interpolation_least_squares_domain(
     calibers = np.array([caliber]) if caliber is not None else np.arange(1, max_caliber + 1, dtype=int)
     for caliber in calibers:
         # Create an interpolation over the samples: a single aggregate (if repetitive) or entire domain (otherwise).
-        p = hm.setup.interpolation_ls_fit.create_interpolation_least_squares(
-            x_disjoint_aggregate_t, xc_disjoint_aggregate_t, [n[:caliber] for n in nbhr],
-            alpha=alpha, fit_samples=fit_samples, val_samples=val_samples, test_samples=num_test_examples)
+        nbhr_for_caliber = [n[:caliber] for n in nbhr]
+        if schema == "weighted":
+            p = hm.setup.interpolation_ls_fit.create_interpolation_least_squares_weighted(
+                x_disjoint_aggregate_t, xc_disjoint_aggregate_t, nbhr_for_caliber, weight=weight)
+        else:
+            # schema = "ridge"
+            p = hm.setup.interpolation_ls_fit.create_interpolation_least_squares(
+                x_disjoint_aggregate_t, xc_disjoint_aggregate_t, nbhr_for_caliber,
+                alpha=alpha, fit_samples=fit_samples, val_samples=val_samples, test_samples=num_test_examples)
         if repetitive:
             # TODO(oren): this will not work for the last aggregate if aggregate_size does not divide the domain size.
             p = _tile_interpolation_matrix(p, aggregate_size, nc, x.shape[0])

@@ -40,7 +40,8 @@ class Coarsener:
         return hm.linalg.tile_array(self.asarray(), n)
 
 
-def create_coarsening(x_aggregate_t, threshold: float, nc: int = None) -> Tuple[Coarsener, np.ndarray]:
+def create_coarsening(x_aggregate_t, threshold: float, nc: int = None, normalize: bool = False) -> \
+        Tuple[Coarsener, np.ndarray]:
     """
     Generates R (coarse variables) on an aggregate from SVD principal components.
 
@@ -48,13 +49,17 @@ def create_coarsening(x_aggregate_t, threshold: float, nc: int = None) -> Tuple[
         x_aggregate_t: fine-level test matrix on an aggregate, transposed.
         threshold: relative reconstruction error threshold. Determines nc.
         nc: if not None, overrides threshold with this fixed number of principal components.
+        normalize: if True, scales the row sums of R to 1.
 
     Returns:
         coarsening operator nc x {aggregate_size}, list of all singular values on aggregate.
     """
     u, s, vh = svd(x_aggregate_t)
     nc = nc if nc is not None else _get_interpolation_caliber(s, np.array([threshold]))[0]
-    return Coarsener(vh[:nc]), s
+    r = vh[:nc]
+    if normalize:
+        r /= r.sum(axis=1)
+    return Coarsener(r), s
 
 
 def create_coarsening_domain(x, threshold: float = 0.1, max_coarsening_ratio: float = 0.5,

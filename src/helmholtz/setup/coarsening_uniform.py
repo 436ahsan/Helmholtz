@@ -269,16 +269,20 @@ class UniformCoarsener:
             mock_work, mock_efficiency
 
 
-def create_coarsening(x_aggregate_t: np.ndarray, nc: int) -> Tuple[np.ndarray, np.ndarray]:
+def create_coarsening(x_aggregate_t: np.ndarray, nc: int, normalize: bool = False) -> Tuple[np.ndarray, np.ndarray]:
     """
     Generates R (coarse variables) on an aggregate from SVD principal components.
 
     Args:
         x_aggregate_t: fine-level test matrix on an aggregate, transposed.
         nc: number of principal components.
+        normalize: if True, scales the row sums of R to 1.
 
     Returns:
         coarsening matrix nc x {aggregate_size} (dense), list of ALL singular values on aggregate.
     """
     u, s, vh = svd(x_aggregate_t)
-    return vh[:nc], s
+    r = vh[:nc]
+    if normalize:
+        r /= r.sum(axis=1)
+    return r, s

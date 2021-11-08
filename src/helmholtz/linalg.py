@@ -88,6 +88,26 @@ def scaled_norm_of_matrix(e: np.ndarray) -> float:
     return norm(e, axis=0) / e.shape[0] ** 0.5
 
 
+def interval_norm(x: np.ndarray, window_size: int) -> np.ndarray:
+    """
+    Returns a matrix of local L2 norms calculated over periodic B.C. windows centered around each gridpoint.
+    For a matrix of size m x n, returns a matrix of size m x n whose (i, j) element is
+
+    norm([x[j % sz] for j in range(i - (window_size + 1)// 2 + 1, i - (window_size + 1)// 2 + 1 + window_size)])
+
+    That is, the norm is calculated along axis=0.
+
+    :param x:
+    :param window_size: size of window to calculate the local norm over.
+    :return: window norm matrix.
+    """
+    offset = (window_size + 1) // 2 - 1
+    sz = x.shape[0]
+    z = np.concatenate((x[-offset:], x, x[:window_size - offset - 1]))
+    indices = np.array(list(zip(range(sz), range(window_size, sz + window_size)))).flatten()
+    return ((np.add.reduceat(z ** 2, indices[:-1])[::2]) / window_size) ** 0.5
+
+
 def sparse_circulant(vals: np.array, offsets: np.array, n: int, dtype=np.double) -> scipy.sparse.dia_matrix:
     """
     Creates a sparse square circulant matrix from a stencil.
