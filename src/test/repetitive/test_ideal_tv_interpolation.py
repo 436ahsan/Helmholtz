@@ -20,7 +20,7 @@ class TestIdealTvInterpolation:
                             datefmt="%a, %d %b %Y %H:%M:%S")
         np.random.seed(1)
 
-    def test_laplace_ideal_vectors_good_cycle(self):
+    def test_laplace_ideal_vectors_weighted_ls_yields_good_cycle(self):
         # Domain size.
         n = 96
         discretization = "3-point"
@@ -46,7 +46,6 @@ class TestIdealTvInterpolation:
 
         r, s = hm.repetitive.locality.create_coarsening(x, aggregate_size, num_components, normalize=True)
         R = r.tile(level.size // aggregate_size)
-        xc = R.dot(x)
 
         p = hm.setup.auto_setup.create_interpolation(
             x, a, R, interpolation_method, aggregate_size=aggregate_size, nc=num_components,
