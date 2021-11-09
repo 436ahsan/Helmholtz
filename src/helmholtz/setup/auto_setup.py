@@ -290,11 +290,32 @@ def mock_cycle_conv_factor(level, r, num_relax_sweeps, print_frequency: int = No
 
 
 def create_interpolation(x: np.ndarray, a: scipy.sparse.csr_matrix,
-                         r: scipy.sparse.csr_matrix, method: str, aggregate_size: int = None, nc: int = None,
-                         neighborhood: str = "extended", caliber: int = None,
+                         r: scipy.sparse.csr_matrix,
+                         method: str,
+                         aggregate_size: int = None, nc: int = None,
+                         neighborhood: str = "extended",
+                         caliber: int = None,
+                         fit_scheme: str = "ridge",
                          max_caliber: int = 6,
                          target_error: float = 0.2,
-                         repetitive: bool = False) -> scipy.sparse.csr_matrix:
+                         repetitive: bool = False,
+                         weighted: bool = False) -> scipy.sparse.csr_matrix:
+    """
+
+    :param x:
+    :param a:
+    :param r:
+    :param method:
+    :param aggregate_size:
+    :param nc:
+    :param neighborhood:
+    :param caliber:
+    :param fit_scheme: whether to use regularized unweighted LS ("ridge") or plain LS ("plain").
+    :param max_caliber:
+    :param target_error:
+    :param repetitive:
+    :return: interpolation matrix.
+    """
     if method == "svd":
         p = r.transpose()
     elif method == "ls":
@@ -303,14 +324,8 @@ def create_interpolation(x: np.ndarray, a: scipy.sparse.csr_matrix,
         # one).
         p = hm.setup.interpolation.create_interpolation_least_squares_domain(
             x, a, r, aggregate_size=aggregate_size, nc=nc, neighborhood=neighborhood, repetitive=repetitive,
-            caliber=caliber, max_caliber=max_caliber, target_error=target_error)
-    elif method == "weighted_ls":
-        # TODO(oren): replace caliber by true max_caliber in this call (right now 'max_caliber' is interpreted here
-        # as the fixed interpolation caliber returned; make the call loop over all calibers and return the desirable
-        # one).
-        p = hm.setup.interpolation.create_interpolation_least_squares_domain(
-            x, a, r, aggregate_size=aggregate_size, nc=nc, neighborhood=neighborhood, repetitive=repetitive,
-            caliber=caliber, max_caliber=max_caliber, target_error=target_error, schema="weighted")
+            caliber=caliber, max_caliber=max_caliber, target_error=target_error, fit_scheme=fit_scheme,
+            weighted=weighted)
     else:
         raise Exception("Unsupported interpolation method '{}'".format(method))
     return p

@@ -33,7 +33,9 @@ class TestIdealTvInterpolation:
         num_components = 1  # 2
 
         # Interpolation parameters.
-        interpolation_method = "weighted_ls"
+        interpolation_method = "ls"
+        fit_scheme = "ridge"
+        weighted = True
         neighborhood = "extended"  # "aggregate" # "extended"
         num_test_examples = 5
         caliber = 2
@@ -50,7 +52,7 @@ class TestIdealTvInterpolation:
         p = hm.setup.auto_setup.create_interpolation(
             x, a, R, interpolation_method, aggregate_size=aggregate_size, nc=num_components,
             neighborhood=neighborhood, repetitive=repetitive, target_error=0.1,
-            caliber=caliber)
+            caliber=caliber, fit_scheme=fit_scheme, weighted=weighted)
         multilevel = hm.repetitive.locality.create_two_level_hierarchy(
             kh, discretization, n, R, p, aggregate_size, use_r_as_restriction=False)
 

@@ -8,7 +8,6 @@ from scipy.linalg import norm
 
 import helmholtz as hm
 
-
 _LOGGER = logging.getLogger(__name__)
 
 _AGGREGATOR = {"mean": np.mean, "max": np.max}
@@ -22,8 +21,8 @@ def create_interpolation_least_squares_domain(
         max_caliber: int = 6,
         target_error: float = 0.2,
         kind: str = "l2",
-        schema: str = "ridge",
-        residual_window_size: int = 7) -> \
+        fit_scheme: str = "ridge",
+        weighted: bool = False) -> \
         scipy.sparse.csr_matrix:
     """
     Creates the interpolation operator P by least squares fitting from r*x to x. Interpolatory sets are automatically
@@ -43,8 +42,8 @@ def create_interpolation_least_squares_domain(
         max_caliber: maximum interpolation caliber to ty.
         target_error: target relative interpolation error in norm 'kind'.
         kind: interpolation norm kind ("l2"|"a" = energy norm).
-        schema: whether to use ridge-regularized unweighted LS ("ridge") or plain LS with TV residual weighting.
-        residual_window_size: #points in local neighborhood used for residual norm computation, if schema="weighted".
+        fit_scheme: whether to use regularized unweighted LS ("ridge") or plain LS ("plain").
+        weighted: whether to use residual-weighted LS or not.
 
     Returns:
         interpolation matrix P.
@@ -80,14 +79,23 @@ def create_interpolation_least_squares_domain(
         #         hm.linalg.get_window(residual, offset + aggregate_size // 2 + residual_window_offset, residual_window_size),
         #         axis=1) / residual_window_size ** 0.5
         #     for offset in range(x.shape)), axis=1).transpose()
-
-    if schema == "weighted":
+    if weighted:
         # Weighted LS: sum(w*(xc- x))^2 = sum(w^2*xc^2 - w*x^2).
         weight = np.clip(r_norm_disjoint_aggregate_t, 1e-15, None) ** (-1)
-    elif schema == "ridge":
-        weight = None
     else:
-        raise Exception("Unsupported interpolation fitting schema {}".format(schema))
+        weight = np.ones_like(x_disjoint_aggregate_t)
+
+    if fit_scheme == "plain":
+        fitter = lambda x, xc, nbhr, weight: \
+            hm.setup.interpolation_ls_fit.create_interpolation_least_squares_plain(x, xc, nbhr, weight)
+    elif fit_scheme == "ridge":
+        fitter = lambda x, xc, nbhr, weight: \
+            hm.setup.interpolation_ls_fit.create_interpolation_least_squares_ridge(x, xc, nbhr, weight,
+                                                                                   alpha=alpha, fit_samples=fit_samples,
+                                                                                   val_samples=val_samples,
+                                                                                   test_samples=num_test_examples)
+    else:
+        raise Exception("Unsupported interpolation fitting schema {}".format(fit_scheme))
 
     # Create folds.
     num_examples = int(x_disjoint_aggregate_t.shape[0])
@@ -109,19 +117,12 @@ def create_interpolation_least_squares_domain(
     for caliber in calibers:
         # Create an interpolation over the samples: a single aggregate (if repetitive) or entire domain (otherwise).
         nbhr_for_caliber = [n[:caliber] for n in nbhr]
-        if schema == "weighted":
-            p = hm.setup.interpolation_ls_fit.create_interpolation_least_squares_weighted(
-                x_disjoint_aggregate_t, xc_disjoint_aggregate_t, nbhr_for_caliber, weight=weight)
-        else:
-            # schema = "ridge"
-            p = hm.setup.interpolation_ls_fit.create_interpolation_least_squares(
-                x_disjoint_aggregate_t, xc_disjoint_aggregate_t, nbhr_for_caliber,
-                alpha=alpha, fit_samples=fit_samples, val_samples=val_samples, test_samples=num_test_examples)
+        p = fitter(x_disjoint_aggregate_t, xc_disjoint_aggregate_t, nbhr_for_caliber, weight)
         if repetitive:
             # TODO(oren): this will not work for the last aggregate if aggregate_size does not divide the domain size.
             p = _tile_interpolation_matrix(p, aggregate_size, nc, x.shape[0])
         error = dict((kind, np.array([relative_interpolation_error(p, r, a, f, kind) for f in folds]))
-                      for kind in ("l2", "a"))
+                     for kind in ("l2", "a"))
         _LOGGER.info("caliber {} error l2 {} a {}".format(
             caliber,
             np.array2string(error["l2"], separator=", ", formatter={'float_kind': lambda x: "%4.2f" % x}),
@@ -236,7 +237,6 @@ def _similarity(x, xc):
     assumes intercept = False in fitting interpolation.
     """
     return hm.linalg.pairwise_cos_similarity(x, xc, squared=True)
-
 
 # def update_interpolation(p: scipy.sparse.csr_matrix, e, ec, nbhr: np.ndarray, threshold: float = 0.1) -> \
 #     scipy.sparse.csr_matrix:

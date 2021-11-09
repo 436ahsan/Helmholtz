@@ -210,20 +210,22 @@ def optimized_fit_interpolation(xc_fit, x_fit, xc_val, x_val, alpha: np.ndarray,
     return alpha[alpha_opt_index], info[alpha_opt_index]
 
 
-def create_interpolation_least_squares(
+def create_interpolation_least_squares_ridge(
         x: np.ndarray,
         xc: np.ndarray,
         nbhr: List[np.ndarray],
+        weight: np.ndarray,
         alpha: np.ndarray,
         fit_samples: int = None,
         val_samples: int = None,
         test_samples: int = None) -> scipy.sparse.csr_matrix:
     """
-    Creates the next coarse level interpolation operator P using ridge-regularized, unweighted least-squares.
+    Creates the next coarse level interpolation operator P using ridge-regularized, ueighted least-squares.
     Args:
         x: fine-level test matrix.
         xc: coarse-level test matrix.
         nbhr: list of neighbor lists for all fine points.
+        weight: least-squares weights to apply (same size as x).
         alpha: Ridge regularization parameter (list of values).
         fit_samples: number of samples to use for fitting interpolation.
         val_samples: number of samples to use for determining interpolation fitting regularization parameter.
@@ -245,11 +247,16 @@ def create_interpolation_least_squares(
     folds = (fit_samples, val_samples, test_samples)
     x_fit, x_val, x_test = hm.linalg.create_folds(x, folds)
     xc_fit, xc_val, xc_test = hm.linalg.create_folds(xc, folds)
+    weight_fit, weight_val, _ = hm.linalg.create_folds(weight, folds)
 
     # Fit interpolation by least-squares.
     result = [optimized_fit_interpolation(
-        xc_fit[:, nbhr_i], x_fit[:, i], xc_val[:, nbhr_i], x_val[:, i], alpha, return_weights=True)
-              for i, nbhr_i in enumerate(nbhr)]
+        np.diag(weight_fit[:, i]).dot(xc_fit[:, nbhr_i]),
+        np.diag(weight_fit[:, i]).dot(x_fit[:, i]),
+        np.diag(weight_val[:, i]).dot(xc_val[:, nbhr_i]),
+        np.diag(weight_val[:, i]).dot(x_val[:, i]),
+        alpha, return_weights=True)
+        for i, nbhr_i in enumerate(nbhr)]
     info = [row[1] for row in result]
     # In each 'info' element:
     # Interpolation fit error = error[:, 0]
@@ -263,19 +270,19 @@ def create_interpolation_least_squares(
     return _create_csr_matrix(nbhr, p_coefficients, nc)
 
 
-def create_interpolation_least_squares_weighted(
+def create_interpolation_least_squares_plain(
         x: np.ndarray,
         xc: np.ndarray,
         nbhr: List[np.ndarray],
-        weight: np.ndarray = None) -> scipy.sparse.csr_matrix:
+        weight: np.ndarray) -> scipy.sparse.csr_matrix:
     """
-    Creates the next coarse level interpolation operator P using unregualized, weighted least-squares on a fitting set.
+    Creates the next coarse level interpolation operator P using plain weighted least-squares on a fitting set.
 
     Args:
         x: fine-level test matrix - fit set.
         xc: coarse-level test matrix - fit set.
         nbhr: list of neighbor lists for all fine points.
-        weight: optional least-squares weights to apply (same size as x). If None, weight = np.ones(x.shape).
+        weight: least-squares weights to apply (same size as x).
 
     Returns:
         interpolation matrix P,
@@ -284,8 +291,6 @@ def create_interpolation_least_squares_weighted(
         relative test error at all fine points,
         optimal alpha for all fine points.
     """
-    if weight is None:
-        weight = np.ones(x.shape)
     n = x.shape[1]
     nc = xc.shape[1]
     assert len(nbhr) == n

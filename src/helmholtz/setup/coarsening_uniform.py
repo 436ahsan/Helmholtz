@@ -283,6 +283,7 @@ def create_coarsening(x_aggregate_t: np.ndarray, nc: int, normalize: bool = Fals
     """
     u, s, vh = svd(x_aggregate_t)
     r = vh[:nc]
+    print(r)
     if normalize:
-        r /= r.sum(axis=1)
+        r /= r.sum(axis=1)[:, None]
     return r, s

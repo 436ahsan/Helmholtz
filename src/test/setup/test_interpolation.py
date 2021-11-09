@@ -269,7 +269,7 @@ class TestInterpolation:
             [-0.11,-0.01,0.00,0.00,-0.30,-0.16],
         ], decimal=2)
 
-    def test_create_interpolation_least_squares_domain_repetitive_weighted(self):
+    def test_create_interpolation_least_squares_domain_repetitive_plain_weighted(self):
         """Weighted least-squares interpolation fitting."""
         n = 32
         kh = 0.5
@@ -285,13 +285,35 @@ class TestInterpolation:
 
         p = hm.setup.interpolation.create_interpolation_least_squares_domain(
             x, a, r, aggregate_size=aggregate_size, nc=nc, repetitive=True, target_error=0.07,
-            schema="weighted")
+            fit_scheme="plain", weighted=True)
 
         error_a = np.mean(norm(a.dot(x - p.dot(r.dot(x))), axis=0) / norm(x, axis=0))
         assert p[0].nnz == 4
         assert error_a == pytest.approx(0.128, 1e-2)
         assert p.shape == (32, 16)
 
+    def test_create_interpolation_least_squares_domain_repetitive_ridge_weighted(self):
+        """Weighted least-squares interpolation fitting."""
+        n = 32
+        kh = 0.5
+        a = hm.linalg.helmholtz_1d_operator(kh, n).tocsr()
+        level = hm.setup.hierarchy.create_finest_level(a)
+        # Generate relaxed test matrix.
+        x = _get_test_matrix(a, n, 10, num_examples=4)
+        max_conv_factor = 0.3
+        coarsener = hm.setup.coarsening_uniform.UniformCoarsener(level, x, 4, repetitive=True)
+        r, aggregate_size, nc = coarsener.get_optimal_coarsening(max_conv_factor)[:3]
+        assert aggregate_size == 4
+        assert nc == 2
+
+        p = hm.setup.interpolation.create_interpolation_least_squares_domain(
+            x, a, r, aggregate_size=aggregate_size, nc=nc, repetitive=True, target_error=0.07,
+            fit_scheme="ridge", weighted=True)
+
+        error_a = np.mean(norm(a.dot(x - p.dot(r.dot(x))), axis=0) / norm(x, axis=0))
+        assert p[0].nnz == 4
+        assert error_a == pytest.approx(0.125, 1e-2)
+        assert p.shape == (32, 16)
 
 def _get_test_matrix(a, n, num_sweeps, num_examples: int = None):
     level = hm.setup.hierarchy.create_finest_level(a)
