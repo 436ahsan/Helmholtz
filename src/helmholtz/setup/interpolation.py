@@ -64,15 +64,26 @@ def create_interpolation_least_squares_domain(
 
     # Prepare fine and coarse test matrices.
     xc = r.dot(x)
+    residual = a.dot(x)
     if repetitive:
-        x_disjoint_aggregate_t, xc_disjoint_aggregate_t = \
-            hm.setup.sampling.get_disjoint_windows(x, xc, aggregate_size, nc, max_caliber)
+        x_disjoint_aggregate_t, xc_disjoint_aggregate_t, r_norm_disjoint_aggregate_t = \
+            hm.setup.sampling.get_disjoint_windows(x, xc, residual, aggregate_size, nc, max_caliber)
     else:
         x_disjoint_aggregate_t, xc_disjoint_aggregate_t = x.transpose(), xc.transpose()
+        # TODO(orenlivne): fix this to be all local residual norms in the non-repetitive case.
+        r_norm_disjoint_aggregate_t = None
+        # residual_window_size = 3 * aggregate_size  # Good for 1D.
+        # residual_window_offset = -(residual_window_size // 2)
+        # r_norm_disjoint_aggregate_t = np.concatenate(
+        # tuple(
+        #     np.linalg.norm(
+        #         hm.linalg.get_window(residual, offset + aggregate_size // 2 + residual_window_offset, residual_window_size),
+        #         axis=1) / residual_window_size ** 0.5
+        #     for offset in range(x.shape)), axis=1).transpose()
 
     if schema == "weighted":
         # Weighted LS: sum(w*(xc- x))^2 = sum(w^2*xc^2 - w*x^2).
-        weight = np.clip(hm.linalg.interval_norm(residual, residual_window_size), 1e-15, None) ** (-1)
+        weight = np.clip(r_norm_disjoint_aggregate_t, 1e-15, None) ** (-1)
     elif schema == "ridge":
         weight = None
     else:

@@ -112,8 +112,9 @@ def bootstap(x, multilevel: Multilevel, max_levels: int,
     for l in range(1, max_levels):
         _LOGGER.info("Coarsening level {}->{}".format(l - 1, l))
         domain_size = level.a.shape[0]
-        r, p, _ = create_transfer_operators(x_level, domain_size, threshold=threshold, caliber=caliber,
-                                            interpolation_method=interpolation_method)
+        residual_level = level.operator(x_level)
+        r, p, _ = create_transfer_operators(x_level, residual_level, domain_size, threshold=threshold,
+                                            caliber=caliber, interpolation_method=interpolation_method)
         # 'level' now becomes the next coarser level and x_level the corresponding test matrix.
         level = hierarchy.create_tiled_coarse_level(level.a, level.b, r, p)
         new_multilevel.add(level)
@@ -170,13 +171,14 @@ def fmg(multilevel, nu_pre: int = 1, nu_post: int = 1, nu_coarsest: int = 10, nu
     return x
 
 
-def create_transfer_operators(x, domain_size: int, threshold: float = 0.1, caliber: int = 2,
+def create_transfer_operators(x, residual: np.ndarray, domain_size: int, threshold: float = 0.1, caliber: int = 2,
                               interpolation_method: str = "svd", max_coarsening_ratio: float = 0.5) -> \
         Tuple[Coarsener,Interpolator]:
     """
     Creates the next coarse level's R and P operators.
     Args:
         x: fine-level test matrix.
+        residual: fine-level residual matrix.
         domain_size: #gridpoints in fine level.
         threshold: relative reconstruction error threshold. Determines nc.
         caliber: interpolation caliber.
@@ -211,7 +213,7 @@ def create_transfer_operators(x, domain_size: int, threshold: float = 0.1, calib
     xc = r_csr.dot(x)
 
     x_disjoint_aggregate_t, xc_disjoint_aggregate_t = \
-        hm.setup.sampling.get_disjoint_windows(x, xc, aggregate_size, nc, caliber)
+        hm.setup.sampling.get_disjoint_windows(x, xc, residual, aggregate_size, nc, caliber)
 
     p = hm.setup.interpolation.create_interpolation_repetitive(
         interpolation_method, r.asarray(), x_disjoint_aggregate_t, xc_disjoint_aggregate_t, domain_size, nc)

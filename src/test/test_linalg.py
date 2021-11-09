@@ -36,19 +36,6 @@ class TestLinalg:
         expected = factor * np.array([norm(y[:, i]) for i in range(y.shape[1])])
         assert_array_almost_equal(actual, expected, 10)
 
-    @pytest.mark.parametrize("sz,m", [(10, 3), (10, 4), (11, 4)])
-    def test_interval_norm(self, sz, m):
-        x = 2 * np.random.random((sz, 5)) - 1
-
-        actual = hm.linalg.interval_norm(x, m)
-
-        expected = np.array(
-            list(map(
-                lambda x: norm(x, axis=0) / x.shape[0] ** 0.5,
-                (np.array([x[j % sz] for j in range(i - (m + 1) // 2 + 1, i - (m + 1) // 2 + 1 + m)])
-                 for i in range(sz)))))
-        assert_array_almost_equal(actual, expected, 10)
-
     def test_sparse_circulant(self):
         vals = np.array([1, 2, 3, 5, 4])
         offsets = np.array([-2, -1, 0, 2, 1])

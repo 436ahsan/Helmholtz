@@ -77,8 +77,8 @@ class SolutionCycleProcessor(hm.hierarchy.processor.Processor):
         self._print_state(l, "initial")
         level = self._multilevel[l]
         if self._nu_coarsest < 0:
-            #self._x[l] = spsolve(level.a, self._b[l])
-            self._x[l] = np.linalg.solve(level.a.todense(), self._b[l])
+            self._x[l] = spsolve(level.a, self._b[l])
+            #self._x[l] = np.linalg.solve(level.a.todense(), self._b[l])
             self._print_state(l, "exact")
         else:
             self._relax(l, self._nu_coarsest)
