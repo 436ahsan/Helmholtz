@@ -33,7 +33,7 @@ class TestIdealTvInterpolation:
         num_components = 1  # 2
 
         # Interpolation parameters.
-        interpolation_method = "ls"
+        interpolation_method = "weighted_ls"
         neighborhood = "extended"  # "aggregate" # "extended"
         num_test_examples = 5
         caliber = 2

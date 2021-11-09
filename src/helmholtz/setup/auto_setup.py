@@ -304,6 +304,13 @@ def create_interpolation(x: np.ndarray, a: scipy.sparse.csr_matrix,
         p = hm.setup.interpolation.create_interpolation_least_squares_domain(
             x, a, r, aggregate_size=aggregate_size, nc=nc, neighborhood=neighborhood, repetitive=repetitive,
             caliber=caliber, max_caliber=max_caliber, target_error=target_error)
+    elif method == "weighted_ls":
+        # TODO(oren): replace caliber by true max_caliber in this call (right now 'max_caliber' is interpreted here
+        # as the fixed interpolation caliber returned; make the call loop over all calibers and return the desirable
+        # one).
+        p = hm.setup.interpolation.create_interpolation_least_squares_domain(
+            x, a, r, aggregate_size=aggregate_size, nc=nc, neighborhood=neighborhood, repetitive=repetitive,
+            caliber=caliber, max_caliber=max_caliber, target_error=target_error, schema="weighted")
     else:
         raise Exception("Unsupported interpolation method '{}'".format(method))
     return p

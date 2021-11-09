@@ -291,7 +291,10 @@ def create_interpolation_least_squares_weighted(
     assert len(nbhr) == n
 
     # Fit interpolation by unregularized weighted least-squares.
-    p_coefficients = [np.linalg.lstsq(xc[:, nbhr_i], x[:, i])[0] for i, nbhr_i in enumerate(nbhr)]
+    p_coefficients = [np.linalg.lstsq(
+        np.diag(weight[:, i]).dot(xc[:, nbhr_i]),
+        np.diag(weight[:, i]).dot(x[:, i])
+    )[0] for i, nbhr_i in enumerate(nbhr)]
     return _create_csr_matrix(nbhr, p_coefficients, nc)
 
 

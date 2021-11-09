@@ -71,7 +71,8 @@ def create_interpolation_least_squares_domain(
         x_disjoint_aggregate_t, xc_disjoint_aggregate_t = x.transpose(), xc.transpose()
 
     if schema == "weighted":
-        weight = hm.linalg.interval_norm(x, residual_window_size)
+        # Weighted LS: sum(w*(xc- x))^2 = sum(w^2*xc^2 - w*x^2).
+        weight = np.clip(hm.linalg.interval_norm(residual, residual_window_size), 1e-15, None) ** (-1)
     elif schema == "ridge":
         weight = None
     else:

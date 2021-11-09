@@ -289,7 +289,7 @@ class TestInterpolation:
 
         error_a = np.mean(norm(a.dot(x - p.dot(r.dot(x))), axis=0) / norm(x, axis=0))
         assert p[0].nnz == 4
-        assert error_a == pytest.approx(0.129, 1e-2)
+        assert error_a == pytest.approx(0.132, 1e-2)
         assert p.shape == (32, 16)
 
 

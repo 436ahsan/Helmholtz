@@ -14,10 +14,7 @@ def get_disjoint_windows(x, xc, aggregate_size, nc, max_caliber):
     num_aggregates = int(np.ceil(domain_size / aggregate_size))
     num_windows = max(np.minimum(num_aggregates, (12 * max_caliber) // num_test_functions), 1)
 #    print("max_caliber", max_caliber, "num_test_functions", num_test_functions, "num_windows", num_windows, "num_aggregates", num_aggregates)
-    x_disjoint_aggregate_t = np.concatenate(
-        tuple(hm.linalg.get_window(x, aggregate_size * offset, aggregate_size)
-              for offset in range(num_windows)),
-        axis=1).transpose()
+    x_disjoint_aggregate_t = _get_disjoint_windows(x, aggregate_size, num_windows)
     # Create corresponding windows of xc. Note: we are currently concatenating the entire coarse domain 'num_windows'
     # times. This is not necessary if neighbor computation is done here and not inside create_interpolation(). For
     # now, we keep create_interpolation() general and do the nbhr computation there.
@@ -27,3 +24,10 @@ def get_disjoint_windows(x, xc, aggregate_size, nc, max_caliber):
     xc_disjoint_aggregate_t = np.concatenate(tuple(hm.linalg.get_window(xc, nc * offset, num_coarse_vars)
                                                    for offset in range(num_windows)), axis=1).transpose()
     return x_disjoint_aggregate_t, xc_disjoint_aggregate_t
+
+
+def _get_disjoint_windows(x, aggregate_size, num_windows):
+    return np.concatenate(
+        tuple(hm.linalg.get_window(x, aggregate_size * offset, aggregate_size)
+              for offset in range(num_windows)),
+        axis=1).transpose()
