@@ -123,7 +123,7 @@ def create_interpolation_least_squares_domain(
             p = _tile_interpolation_matrix(p, aggregate_size, nc, x.shape[0])
         error = dict((kind, np.array([relative_interpolation_error(p, r, a, f, kind) for f in folds]))
                      for kind in ("l2", "a"))
-        _LOGGER.info("caliber {} error l2 {} a {}".format(
+        _LOGGER.debug("caliber {} error l2 {} a {}".format(
             caliber,
             np.array2string(error["l2"], separator=", ", formatter={'float_kind': lambda x: "%4.2f" % x}),
             np.array2string(error["a"], separator=", ", formatter={'float_kind': lambda x: "%.2e" % x})))
