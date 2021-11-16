@@ -12,7 +12,7 @@ _LOGGER = logging.getLogger(__name__)
 
 def shrinkage_factor(operator, method, domain_shape: np.ndarray, num_examples: int = 5,
                      slow_conv_factor: float = 1.3, print_frequency: int = None, max_sweeps: int = 100,
-                     leeway_factor: float = 1.2) -> float:
+                     leeway_factor: float = 1.2, output: str = "stats", x0: np.ndarray = None) -> float:
     """
     Returns the shrinkage factor of an iterative method, the residual-to-error ratio (RER) reduction in the first
     num_sweeps steps for A*x = 0, starting from an initial guess.
@@ -28,6 +28,8 @@ def shrinkage_factor(operator, method, domain_shape: np.ndarray, num_examples: i
         max_sweeps: maximum number of iterations to run.
         leeway_factor: efficiency inflation factor past the point of diminishing returns to use in estimating where
             slowness starts.
+        output: if "stats", outputs the main stats (5 fields of the return values documented below). If "history",
+            also outputs the x and residual (A*x) history.
 
     Returns:
         mu: shrinkage factor.
@@ -36,11 +38,24 @@ def shrinkage_factor(operator, method, domain_shape: np.ndarray, num_examples: i
         conv_history: residual norm convergence factor run history array.
         conv_factor: asymptotic convergence factor estimate. This is only good for detecting a strong divergence or
             convergence, and not meant to be quantitatively accurate for slow, converging iterations.
+        x_history: list of x iterates (x_history[0] is the initial guess, etc.).
+            Outputted only if output="history".
+        r_history: list of residual iterates (r_history[0] is the initial residual, etc.).
+            Outputted only if output="history".
     """
 #    assert num_examples > 1
-    x = hm.solve.run.random_test_matrix(domain_shape, num_examples=num_examples)
+    if x0 is None:
+        x = hm.solve.run.random_test_matrix(domain_shape, num_examples=num_examples)
+    else:
+        x = x0
+    r = operator(x)
+    x_history = []
+    r_history = []
+    if output == "history":
+        x_history.append(x)
+        r_history.append(r)
     x_norm = norm(x, axis=0)
-    r_norm = norm(operator(x), axis=0)
+    r_norm = norm(r, axis=0)
     rer = r_norm / x_norm
     if print_frequency is not None:
         _LOGGER.info("Iter     |r|                         |x|         RER")
@@ -59,8 +74,12 @@ def shrinkage_factor(operator, method, domain_shape: np.ndarray, num_examples: i
         r_norm_old = r_norm
         rer_old = rer
         x = method(x, b)
-        r_norm = norm(operator(x), axis=0)
+        r = operator(x)
+        if output == "history":
+            x_history.append(x)
+            r_history.append(r)
         x_norm = norm(x, axis=0)
+        r_norm = norm(r, axis=0)
         rer = r_norm / x_norm
         rer_conv_factor = np.mean(rer / np.clip(rer_old, 1e-30, None))
         residual_conv_factor = np.mean(r_norm / np.clip(r_norm_old, 1e-30, None))
@@ -90,8 +109,10 @@ def shrinkage_factor(operator, method, domain_shape: np.ndarray, num_examples: i
     # Residual convergence factor history.
     conv_history = np.mean(np.exp(np.diff(np.log(residual_history), axis=0)), axis=1)
     conv_factor = conv_history[min(max(10, 2 * index), len(conv_history) - 1)]
-    return factor, index, residual_history, conv_history, rer_history, conv_factor
-
+    result = (factor, index, residual_history, conv_history, rer_history, conv_factor)
+    if output == "history":
+        result = result + (x_history, r_history)
+    return result
 
 def _conv_model(x, x0, y0, c, p):
     return np.piecewise(x, [x < x0],
@@ -131,7 +152,7 @@ def plot_diminishing_returns_point(factor, num_sweeps, conv, ax, title: str = "R
 def check_relax_cycle_shrinkage(multilevel, max_sweeps: int = 20, num_levels: int = None,
                                 nu_pre: int = 2, nu_post: int = 2, nu_coarsest: int = 4,
                                 slow_conv_factor: float = 0.95, leeway_factor: float = 1.2,
-                                num_examples: int = 5):
+                                num_examples: int = 5, x0: np.ndarray = None):
     """Checks the two-level relaxation cycle shrinkage vs. relaxation, unless num_levels=1, in which case
     we only run relaxation."""
     level = multilevel[0]
@@ -154,21 +175,38 @@ def check_relax_cycle_shrinkage(multilevel, max_sweeps: int = 20, num_levels: in
         relax_cycle_b = lambda x, b: relax_cycle(x)
         method_list.append(("{}-level MiniCycle".format(num_levels), relax_cycle, relax_cycle_b, work, "red"))
 
-    fig, ax = plt.subplots(1, 1, figsize=(6, 4))
+    fig, axs = plt.subplots(len(method_list), 5, figsize=(16, 4 * len(method_list)))
 
     method_info = {}
-    for title, method, method_b, work, color in method_list:
+    for row, (title, method, method_b, work, color) in enumerate(method_list):
+        ax_row = axs[row] if len(method_list) > 1 else axs
         _LOGGER.info(title)
         info = hm.solve.smoothing.shrinkage_factor(
             operator, method_b, (n,), print_frequency=1, max_sweeps=max_sweeps,
-            slow_conv_factor=slow_conv_factor, leeway_factor=leeway_factor)
+            slow_conv_factor=slow_conv_factor, leeway_factor=leeway_factor, output="history", x0=x0)
         method_info[title] = info
-        factor, num_sweeps, residual, conv, rer, relax_conv_factor = info
+        factor, num_sweeps, residual, conv, rer, relax_conv_factor, x_history, r_history = info
         _LOGGER.info(
             "Relax conv {:.2f} shrinkage {:.2f} PODR RER {:.2f} after {} sweeps. Work {:.1f} eff {:.2f}".format(
                 relax_conv_factor, factor, np.mean(rer[num_sweeps]), num_sweeps, work,
                 np.mean(residual[num_sweeps] / residual[0]) ** (1 / (num_sweeps * work))))
-        hm.solve.smoothing.plot_diminishing_returns_point(factor, num_sweeps, conv, ax, title=title, color=color)
+        hm.solve.smoothing.plot_diminishing_returns_point(factor, num_sweeps, conv, ax_row[0], title=title, color=color)
+
+        ax = ax_row[1]
+        ax.plot(x_history[0])
+        ax.set_title("Initial Error")
+
+        ax = ax_row[2]
+        ax.plot(x_history[1])
+        ax.set_title("Error after 1 sweep")
+
+        ax = ax_row[3]
+        ax.plot(r_history[0])
+        ax.set_title("Initial Residual")
+
+        ax = ax_row[4]
+        ax.plot(r_history[1])
+        ax.set_title("Residual after 1 sweep")
 
     ax.legend()
     return method_info
