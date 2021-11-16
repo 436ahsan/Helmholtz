@@ -48,8 +48,9 @@ class TestBootstrapAuto:
         n = 16
         kh = 0
         a = hm.linalg.helmholtz_1d_5_point_operator(kh, n).tocsr()
+        location = np.arange(n)
 
-        multilevel = hm.setup.auto_setup.setup(a, max_levels=2, repetitive=True)
+        multilevel = hm.setup.auto_setup.setup(a, location, max_levels=2, repetitive=True)
 
         assert len(multilevel) == 2
 
@@ -109,8 +110,9 @@ class TestBootstrapAuto:
         n = 16
         kh = 0.5
         a = hm.linalg.helmholtz_1d_5_point_operator(kh, n).tocsr()
+        location = np.arange(n)
 
-        multilevel = hm.setup.auto_setup.setup(a, max_levels=2)
+        multilevel = hm.setup.auto_setup.setup(a, location, max_levels=2)
 
         assert len(multilevel) == 2
 
@@ -136,6 +138,7 @@ class TestBootstrapAuto:
         # Initialize test functions (to random) and hierarchy at coarsest level.
         a = hm.linalg.helmholtz_1d_5_point_operator(kh, n).tocsr()
         level = hierarchy.create_finest_level(a)
+        level.location = np.arange(n)
         multilevel = hm.hierarchy.multilevel.Multilevel.create(level)
         x = hm.solve.run.random_test_matrix((a.shape[0],), num_examples=num_examples)
         assert norm(a.dot(x)) / norm(x) == pytest.approx(2.91, 1e-2)

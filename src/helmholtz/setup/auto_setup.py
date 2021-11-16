@@ -13,6 +13,7 @@ _LOGGER = logging.getLogger(__name__)
 
 
 def setup(a: scipy.sparse.spmatrix,
+          fine_location: np.ndarray,
           max_levels: int = 100000,
           num_bootstrap_steps: int = 1,
           interpolation_method: str = "ls",
@@ -47,6 +48,8 @@ def setup(a: scipy.sparse.spmatrix,
     min_relax_reduction_factor = 0.5
     min_relax_sweeps = 2
     level = hierarchy.create_finest_level(a)
+    # Manually/separately set locations on the level object, as this is geometry-specific and Level is morre general.
+    level.location = fine_location
     multilevel = hm.hierarchy.multilevel.Multilevel.create(level)
     num_levels = 1
     shrinkage_factor, num_sweeps, residual, _, _, relax_conv_factor = \
@@ -168,7 +171,10 @@ def check_relaxation_speed(index, level, leeway_factor: float = 1.2):
     return factor, num_sweeps, residual, conv, rer, relax_conv_factor
 
 
-def bootstap(x, multilevel: hm.hierarchy.multilevel.Multilevel, num_levels: int, relax_conv_factor: float,
+def bootstap(x,
+             multilevel: hm.hierarchy.multilevel.Multilevel,
+             num_levels: int,
+             relax_conv_factor: float,
              num_sweeps: int = 10,
              interpolation_method: str = "ls",
              num_test_examples: int = 5,
@@ -258,8 +264,10 @@ def bootstap(x, multilevel: hm.hierarchy.multilevel.Multilevel, num_levels: int,
 
         # Create the interpolation operator P.
         p = create_interpolation(
-            x_level, level.a, r, interpolation_method, aggregate_size=aggregate_size, nc=nc, max_caliber=max_caliber,
+            x_level, level.a, r, level.location, interpolation_method, aggregate_size=aggregate_size, nc=nc, max_caliber=max_caliber,
             neighborhood=neighborhood, repetitive=repetitive, target_error=target_error)
+        coarse_location = hm.setup.geometry.coarse_locations(level.location, aggregate_size, nc)
+
         for title, x_set in ((("all", x),) if repetitive else (("fit", x_fit), ("test", x_test))):
             error = norm(x_set - p.dot(r.dot(x_set)), axis=0) / norm(x_set, axis=0)
             error_a = norm(level.a.dot(x_set - p.dot(r.dot(x_set))), axis=0) / norm(x_set, axis=0)
@@ -269,6 +277,7 @@ def bootstap(x, multilevel: hm.hierarchy.multilevel.Multilevel, num_levels: int,
 
         # 'level' now becomes the next coarser level and x_level the corresponding test matrix.
         level = hierarchy.create_coarse_level(level.a, level.b, r, p)
+        level.location = coarse_location
         _LOGGER.info("Level {} size {}".format(l, level.size))
         new_multilevel.add(level)
         if l < num_levels - 1:
@@ -289,8 +298,10 @@ def mock_cycle_conv_factor(level, r, num_relax_sweeps, print_frequency: int = No
         num_sweeps=15, print_frequency=print_frequency)[1]
 
 
-def create_interpolation(x: np.ndarray, a: scipy.sparse.csr_matrix,
+def create_interpolation(x: np.ndarray,
+                         a: scipy.sparse.csr_matrix,
                          r: scipy.sparse.csr_matrix,
+                         fine_location: np.ndarray,
                          method: str,
                          aggregate_size: int = None, nc: int = None,
                          neighborhood: str = "extended",
@@ -314,6 +325,7 @@ def create_interpolation(x: np.ndarray, a: scipy.sparse.csr_matrix,
     :param max_caliber:
     :param target_error:
     :param repetitive:
+    :param weighted: use weighting in LS or not.
     :return: interpolation matrix.
     """
     if method == "svd":
@@ -323,9 +335,9 @@ def create_interpolation(x: np.ndarray, a: scipy.sparse.csr_matrix,
         # as the fixed interpolation caliber returned; make the call loop over all calibers and return the desirable
         # one).
         p = hm.setup.interpolation.create_interpolation_least_squares_domain(
-            x, a, r, aggregate_size=aggregate_size, nc=nc, neighborhood=neighborhood, repetitive=repetitive,
-            caliber=caliber, max_caliber=max_caliber, target_error=target_error, fit_scheme=fit_scheme,
-            weighted=weighted)
+            x, a, r, fine_location, aggregate_size=aggregate_size, nc=nc, neighborhood=neighborhood,
+            repetitive=repetitive, caliber=caliber, max_caliber=max_caliber, target_error=target_error,
+            fit_scheme=fit_scheme, weighted=weighted)
     else:
         raise Exception("Unsupported interpolation method '{}'".format(method))
     return p

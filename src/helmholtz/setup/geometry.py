@@ -13,7 +13,7 @@ def coarse_locations(fine_location: np.ndarray, aggregate_size: int, nc: int):
     At each aggregate center we have 'num_components' coarse variables.
 
     Args:
-        fine_location: fine-levl variable location.
+        fine_location: fine-level variable location.
         aggregate_size: size of window (aggregate).
         nc: number of coarse variables per aggregate.
 
@@ -51,3 +51,31 @@ def geometric_neighbors(aggregate_size: int, nc: int):
     # All nbhrs = central aggregate coarse vars + neighboring aggregate coarse vars.
     coarse_vars_center = np.tile(np.arange(nc, dtype=int), (aggregate_size, 1))
     return np.concatenate((coarse_vars_center, coarse_vars_center + nc * coarse_nbhr[:, None]), axis=1)
+
+
+def geometric_neighbors_from_locations(fine_location: np.ndarray,
+                                       coarse_location: np.ndarray,
+                                       domain_size: float,
+                                       aggregate_size: int,
+                                       max_caliber: int = 6):
+    """
+    Calculate coarse-level variable locations given fine-level locations coarsened with aggregate_size/nc coarsening.
+    At each aggregate center we have 'num_components' coarse variables.
+
+    Args:
+        fine_location: fine-level variable location.
+        coarse_location: coarse-level variable location.
+        domain_size: size of domain.
+        aggregate_size: size of window (aggregate).
+        nc: number of coarse variables per aggregate.
+        max_caliber: number of neighbors to return.
+
+    Returns: array of coarse variable location.
+    """
+    xf = hm.setup.sampling.wrap_index_to_low_value(fine_location, domain_size)
+    xc = hm.setup.sampling.wrap_index_to_low_value(coarse_location, domain_size)
+
+    # Find nearest neighbors of each fine P^T*A point (pta_vars).
+    # These are INDICES into the rap_vars array.
+    nbhr = np.argsort(np.abs(xf[:, None] - xc), axis=1)
+    return nbhr[:aggregate_size, :max_caliber]

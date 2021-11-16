@@ -14,8 +14,14 @@ _AGGREGATOR = {"mean": np.mean, "max": np.max}
 
 
 def create_interpolation_least_squares_domain(
-        x: np.ndarray, a: scipy.sparse.csr_matrix, r: scipy.sparse.csr_matrix,
-        aggregate_size: int = None, nc: int = None, neighborhood: str = "extended", num_test_examples: int = 5,
+        x: np.ndarray,
+        a: scipy.sparse.csr_matrix,
+        r: scipy.sparse.csr_matrix,
+        fine_location: np.ndarray,
+        aggregate_size: int = None,
+        nc: int = None,
+        neighborhood: str = "extended",
+        num_test_examples: int = 5,
         repetitive: bool = False,
         caliber: int = None,
         max_caliber: int = 6,
@@ -30,9 +36,10 @@ def create_interpolation_least_squares_domain(
     Args:
         x: fine-level test matrix. shape = (num_fine_vars, num_examples).
         a: fine-level operator (only its adjacency graph is used here).
+        r: coarsening operator.
+        fine_location: fine-level variable location.
         aggregate_size: size of aggregate (assumed uniform over domain).
         nc: number of coarse variables per aggregate.
-        r: coarsening operator.
         neighborhood: "aggregate"|"extended" coarse neighborhood to interpolate from: only coarse variables in the
             aggregate, or the R*A*R^T sparsity pattern.
         num_test_examples: number of test functions dedicated to testing (do not participate in SVD, LS fit).
@@ -52,9 +59,12 @@ def create_interpolation_least_squares_domain(
     """
     # Find nearest neighbors of each fine point in an aggregate.
     if repetitive:
+        n = a.shape[0]
         num_aggregates = int(np.ceil(a.shape[0] / aggregate_size))
         num_coarse_vars = nc * num_aggregates
-        nbhr = np.mod(hm.setup.geometry.geometric_neighbors(aggregate_size, nc), num_coarse_vars)
+#        nbhr = np.mod(hm.setup.geometry.geometric_neighbors(aggregate_size, nc), num_coarse_vars)
+        coarse_location = hm.setup.geometry.coarse_locations(fine_location, aggregate_size, nc)
+        nbhr = hm.setup.geometry.geometric_neighbors_from_locations(fine_location, coarse_location, n, aggregate_size)
     else:
         nbhr = _get_neighbor_set(x, a, r, neighborhood)
 

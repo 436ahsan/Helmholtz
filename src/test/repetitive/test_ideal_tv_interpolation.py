@@ -41,6 +41,7 @@ class TestIdealTvInterpolation:
         # Generate test vectors.
         a = hm.linalg.helmholtz_1d_operator(kh, n)
         level = hm.setup.hierarchy.create_finest_level(a)
+        level.location = np.arange(level.size)
 #        x = hm.setup.auto_setup.get_test_matrix(a, nu, num_examples=num_examples)
         x, _ = hm.analysis.ideal.ideal_tv(level.a, num_examples)
 
@@ -48,11 +49,11 @@ class TestIdealTvInterpolation:
         R = r.tile(level.size // aggregate_size)
 
         p = hm.setup.auto_setup.create_interpolation(
-            x, a, R, interpolation_method, aggregate_size=aggregate_size, nc=num_components,
+            x, a, R, level.location, interpolation_method, aggregate_size=aggregate_size, nc=num_components,
             neighborhood=neighborhood, repetitive=repetitive, target_error=0.1,
             caliber=caliber, fit_scheme=fit_scheme, weighted=weighted)
         multilevel = hm.repetitive.locality.create_two_level_hierarchy(
-            kh, discretization, n, R, p, aggregate_size, use_r_as_restriction=False)
+            kh, discretization, n, R, p, aggregate_size, num_components, use_r_as_restriction=False)
 
         ac = multilevel[1].a
         fill_in_factor = (ac.nnz / multilevel[0].a.nnz) * (multilevel[0].a.shape[0] / ac.shape[0])

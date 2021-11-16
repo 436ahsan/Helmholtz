@@ -57,7 +57,7 @@ def mock_conv_factor_for_domain_size(kh, discretization, r, aggregate_size, m, n
     return np.array([hm.setup.auto_setup.mock_cycle_conv_factor(level, r_csr, nu) for nu in nu_values])
 
 
-def create_two_level_hierarchy(kh, discretization, m, r, p, aggregate_size, use_r_as_restriction: bool = False):
+def create_two_level_hierarchy(kh, discretization, m, r, p, aggregate_size, nc, use_r_as_restriction: bool = False):
     a = hm.linalg.helmholtz_1d_discrete_operator(kh, discretization, m)
     if isinstance(r, scipy.sparse.csr_matrix):
         r_csr = r
@@ -68,9 +68,13 @@ def create_two_level_hierarchy(kh, discretization, m, r, p, aggregate_size, use_
     else:
         p_csr = hm.linalg.tile_array(p, m // aggregate_size)
     level0 = hm.setup.hierarchy.create_finest_level(a)
+    level0.location = np.arange(a.shape[0])
     # relaxer=hm.solve.relax.GsRelaxer(a) if kh == 0 else None)
     level1 = hm.setup.hierarchy.create_coarse_level(level0.a, level0.b, r_csr, p_csr,
                                                     use_r_as_restriction=use_r_as_restriction)
+    # Calculate coarse-level variable locations. At each aggregate center we have 'num_components' coarse variables.
+    level1.location = hm.setup.geometry.coarse_locations(level0.location, aggregate_size, nc)
+
     multilevel = hm.hierarchy.multilevel.Multilevel.create(level0)
     multilevel.add(level1)
     return multilevel
@@ -92,7 +96,7 @@ def two_level_conv_factor(multilevel, nu, print_frequency: int = None, debug: bo
         return b - multilevel[0].operator(x)
 
     return hm.solve.run.run_iterative_method(
-        residual, two_level_cycle, np.random.random((n, )), 15, print_frequency=print_frequency)
+        residual, two_level_cycle, np.random.random((n, )), 20, print_frequency=print_frequency)
 
 
 def two_level_conv_data_frame(kh, discretization, r, p, aggregate_size, m_values, nu_values):

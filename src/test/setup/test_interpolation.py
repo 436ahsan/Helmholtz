@@ -23,6 +23,7 @@ class TestInterpolation:
         kh = 0.6
         num_sweeps = 100
         a = hm.linalg.helmholtz_1d_operator(kh, n).tocsr()
+        location = np.arange(n)
         # Generate relaxed test matrix.
         level = hm.setup.hierarchy.create_finest_level(a)
         x = hm.solve.run.random_test_matrix((n,))
@@ -32,7 +33,7 @@ class TestInterpolation:
         # Generate coarse variables (R) on the non-repetitive domain. Use a uniform coarsening.
         r, aggregates, nc, energy_error = cr.create_coarsening_domain(x, threshold=0.15)
 
-        p = hm.setup.interpolation.create_interpolation_least_squares_domain(x, a, r, target_error=0.07)
+        p = hm.setup.interpolation.create_interpolation_least_squares_domain(x, a, r, location,target_error=0.07)
 
         num_test_examples = 5
         x_test = x[:, -num_test_examples:]
@@ -97,6 +98,7 @@ class TestInterpolation:
         n = 32
         kh = 0.5
         a = hm.linalg.helmholtz_1d_operator(kh, n).tocsr()
+        location = np.arange(n)
         level = hm.setup.hierarchy.create_finest_level(a)
         # Generate relaxed test matrix.
         x = _get_test_matrix(a, n, 10, num_examples=4)
@@ -107,7 +109,7 @@ class TestInterpolation:
         assert nc == 2
 
         p = hm.setup.interpolation.create_interpolation_least_squares_domain(
-            x, a, r, aggregate_size=aggregate_size, nc=nc, repetitive=True, target_error=0.07)
+            x, a, r, location,aggregate_size=aggregate_size, nc=nc, repetitive=True, target_error=0.07)
 
         error_a = np.mean(norm(a.dot(x - p.dot(r.dot(x))), axis=0) / norm(x, axis=0))
         assert p[0].nnz == 4
@@ -120,6 +122,7 @@ class TestInterpolation:
         kh = 0.6
         max_conv_factor = 0.3
         a = hm.linalg.helmholtz_1d_operator(kh, n).tocsr()
+        location = np.arange(n)
         level = hm.setup.hierarchy.create_finest_level(a)
         # Generate relaxed test matrix.
         x = _get_test_matrix(a, n, 10, num_examples=4)
@@ -129,7 +132,7 @@ class TestInterpolation:
         assert nc == 2
 
         p = hm.setup.interpolation.create_interpolation_least_squares_domain(
-            x, a, r, aggregate_size=aggregate_size, nc=nc, repetitive=True, target_error=0.04)
+            x, a, r, location,aggregate_size=aggregate_size, nc=nc, repetitive=True, target_error=0.04)
 
         num_test_examples = 5
         x_test = x[:, -num_test_examples:]
@@ -156,6 +159,7 @@ class TestInterpolation:
         kh = 1.0
         max_conv_factor = 0.3
         a = hm.linalg.helmholtz_1d_operator(kh, n).tocsr()
+        location = np.arange(n)
         level = hm.setup.hierarchy.create_finest_level(a)
         # Generate relaxed test matrix.
         x = _get_test_matrix(a, n, 10, num_examples=8)
@@ -165,7 +169,7 @@ class TestInterpolation:
         assert nc == 2
 
         p = hm.setup.interpolation.create_interpolation_least_squares_domain(
-            x, a, r, aggregate_size=aggregate_size, nc=nc, repetitive=True, target_error=0.07)
+            x, a, r, location,aggregate_size=aggregate_size, nc=nc, repetitive=True, target_error=0.07)
 
         num_test_examples = 5
         x_test = x[:, -num_test_examples:]
@@ -189,6 +193,7 @@ class TestInterpolation:
         n = 32
         kh = 0.6
         a = hm.linalg.helmholtz_1d_operator(kh, n).tocsr()
+        location = np.arange(n)
         # Generate relaxed test matrix.
         x, _ = helmholtz.analysis.ideal.ideal_tv(a, 10)
         assert x.shape == (32, 10)
@@ -199,38 +204,40 @@ class TestInterpolation:
         assert_array_equal(aggregate_size, [6, 6, 4, 6, 6, 4])
         assert_array_equal(nc, [3, 3, 2, 3, 3, 2])
 
-        p = hm.setup.interpolation.create_interpolation_least_squares_domain(x, a, r, neighborhood="aggregate")
+        p = hm.setup.interpolation.create_interpolation_least_squares_domain(x, a, r, location, neighborhood="aggregate")
 
     def test_create_interpolation_least_squares_domain_repetitive_large_aggregate(self):
         n = 18
         kh = 1.0
         a = hm.linalg.helmholtz_1d_operator(kh, n).tocsr()
+        location = np.arange(n)
 
         # Generate relaxed test matrix.
-        level = hm.setup.hierarchy.create_finest_level(a)
-        x = _get_test_matrix(a, n, 10, num_examples=8)
+        x = _get_test_matrix(a, n, 30, num_examples=8)
 
         # Generate coarsening.
         aggregate_size = 6
         nc = 2
         coarsener = hm.setup.coarsening_uniform.FixedAggSizeUniformCoarsener(x, aggregate_size)
         r, mean_energy_error = coarsener[nc]
-        assert mean_energy_error == pytest.approx(0.213, 1e-2)
+        assert mean_energy_error == pytest.approx(0.0128, 1e-2)
 
         p = hm.setup.interpolation.create_interpolation_least_squares_domain(
-            x, a, r, aggregate_size=aggregate_size, nc=nc, repetitive=True)
+            x, a, r, location, aggregate_size=aggregate_size, nc=nc, repetitive=True)
 
         num_test_examples = 5
         x_test = x[:, -num_test_examples:]
+        error_l2 = np.mean(norm(x_test - p.dot(r.dot(x_test)), axis=0) / norm(x_test, axis=0))
         error_a = np.mean(norm(a.dot(x_test - p.dot(r.dot(x_test))), axis=0) / norm(x_test, axis=0))
-        assert p[0].nnz == 4
-        assert error_a == pytest.approx(0.776, 1e-2)
+        assert p[0].nnz == 2
+        assert error_l2 == pytest.approx(0.0236, 1e-2)
+        assert error_a == pytest.approx(0.0328, 1e-2)
         assert p.shape == (18, 6)
 
         # To print p:
         #print(','.join(np.array2string(y, separator=",", formatter={'float_kind':lambda x: "%.2f" % x}) for y in np.array(p.todense())))
         assert_array_almost_equal(p.todense(), [
-            [-0.16,0.50,0.00,0.00,-0.05,0.05],[-0.40,0.12,0.00,0.00,-0.01,0.00],[-0.31,-0.26,0.00,0.00,0.03,-0.00],[0.21,-0.64,-0.09,-0.04,0.00,0.00],[0.43,-0.05,-0.00,-0.01,0.00,0.00],[0.30,0.26,0.04,-0.06,0.00,0.00],[-0.05,0.05,-0.16,0.50,0.00,0.00],[-0.01,0.00,-0.40,0.12,0.00,0.00],[0.03,-0.00,-0.31,-0.26,0.00,0.00],[0.00,0.00,0.21,-0.64,-0.09,-0.04],[0.00,0.00,0.43,-0.05,-0.00,-0.01],[0.00,0.00,0.30,0.26,0.04,-0.06],[0.00,0.00,-0.05,0.05,-0.16,0.50],[0.00,0.00,-0.01,0.00,-0.40,0.12],[0.00,0.00,0.03,-0.00,-0.31,-0.26],[-0.09,-0.04,0.00,0.00,0.21,-0.64],[-0.00,-0.01,0.00,0.00,0.43,-0.05],[0.04,-0.06,0.00,0.00,0.30,0.26],
+            [-0.23,-0.53,0.00,0.00,0.00,0.00],[-0.57,-0.06,0.00,0.00,0.00,0.00],[-0.34,0.47,0.00,0.00,0.00,0.00],[0.23,0.53,0.00,0.00,0.00,0.00],[0.57,0.06,0.00,0.00,0.00,0.00],[0.34,-0.47,0.00,0.00,0.00,0.00],[0.00,0.00,-0.23,-0.53,0.00,0.00],[0.00,0.00,-0.57,-0.06,0.00,0.00],[0.00,0.00,-0.34,0.47,0.00,0.00],[0.00,0.00,0.23,0.53,0.00,0.00],[0.00,0.00,0.57,0.06,0.00,0.00],[0.00,0.00,0.34,-0.47,0.00,0.00],[0.00,0.00,0.00,0.00,-0.23,-0.53],[0.00,0.00,0.00,0.00,-0.57,-0.06],[0.00,0.00,0.00,0.00,-0.34,0.47],[0.00,0.00,0.00,0.00,0.23,0.53],[0.00,0.00,0.00,0.00,0.57,0.06],[0.00,0.00,0.00,0.00,0.34,-0.47]
         ], decimal=2)
 
     @unittest.skip("WIP")
@@ -240,6 +247,7 @@ class TestInterpolation:
         kh = 1.0
         max_conv_factor = 0.3
         a = hm.linalg.helmholtz_1d_operator(kh, n).tocsr()
+        location = np.arange(n)
         level = hm.setup.hierarchy.create_finest_level(a)
         # Generate relaxed test matrix.
         x = _get_test_matrix(a, n, 10, num_examples=8)
@@ -249,7 +257,7 @@ class TestInterpolation:
         assert nc == 2
 
         p = hm.setup.interpolation.create_interpolation_least_squares_domain(
-            x, a, r, aggregate_size=aggregate_size, nc=nc, repetitive=True)
+            x, a, r, location,aggregate_size=aggregate_size, nc=nc, repetitive=True)
 
         num_test_examples = 5
         x_test = x[:, -num_test_examples:]
@@ -274,6 +282,7 @@ class TestInterpolation:
         n = 32
         kh = 0.5
         a = hm.linalg.helmholtz_1d_operator(kh, n).tocsr()
+        location = np.arange(n)
         level = hm.setup.hierarchy.create_finest_level(a)
         # Generate relaxed test matrix.
         x = _get_test_matrix(a, n, 10, num_examples=4)
@@ -284,7 +293,7 @@ class TestInterpolation:
         assert nc == 2
 
         p = hm.setup.interpolation.create_interpolation_least_squares_domain(
-            x, a, r, aggregate_size=aggregate_size, nc=nc, repetitive=True, target_error=0.07,
+            x, a, r, location,aggregate_size=aggregate_size, nc=nc, repetitive=True, target_error=0.07,
             fit_scheme="plain", weighted=True)
 
         error_a = np.mean(norm(a.dot(x - p.dot(r.dot(x))), axis=0) / norm(x, axis=0))
@@ -297,6 +306,7 @@ class TestInterpolation:
         n = 32
         kh = 0.5
         a = hm.linalg.helmholtz_1d_operator(kh, n).tocsr()
+        location = np.arange(n)
         level = hm.setup.hierarchy.create_finest_level(a)
         # Generate relaxed test matrix.
         x = _get_test_matrix(a, n, 10, num_examples=4)
@@ -307,13 +317,14 @@ class TestInterpolation:
         assert nc == 2
 
         p = hm.setup.interpolation.create_interpolation_least_squares_domain(
-            x, a, r, aggregate_size=aggregate_size, nc=nc, repetitive=True, target_error=0.07,
+            x, a, r, location, aggregate_size=aggregate_size, nc=nc, repetitive=True, target_error=0.07,
             fit_scheme="ridge", weighted=True)
 
         error_a = np.mean(norm(a.dot(x - p.dot(r.dot(x))), axis=0) / norm(x, axis=0))
         assert p[0].nnz == 4
         assert error_a == pytest.approx(0.125, 1e-2)
         assert p.shape == (32, 16)
+
 
 def _get_test_matrix(a, n, num_sweeps, num_examples: int = None):
     level = hm.setup.hierarchy.create_finest_level(a)
