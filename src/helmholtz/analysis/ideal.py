@@ -35,7 +35,8 @@ def find_singular_kh(discretization, n):
     Returns: kh, minimum eigenvalue.
     """
     def func(kh):
-        return np.min(np.abs(eigs(hm.linalg.helmholtz_1d_discrete_operator(kh, discretization, n), 1, which="SM")[0]))
+        """Returns the minimal eigenvalue of Helmholtz(kh). kh is an array of size 1 (a scalar unknown in fsolve())."""
+        return np.min(np.abs(eigs(hm.linalg.helmholtz_1d_discrete_operator(kh[0], discretization, n), 1, which="SM")[0]))
 
     wavelength = 2 * np.pi * n
     root = fsolve(func, wavelength / (2 * np.round(wavelength)))

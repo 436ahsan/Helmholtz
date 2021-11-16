@@ -2,6 +2,8 @@
 boundary conditions."""
 import logging
 import sys
+import unittest
+
 import numpy as np
 import pytest
 from numpy.ma.testutils import assert_array_equal, assert_array_almost_equal
@@ -41,6 +43,7 @@ class TestBootstrapAuto:
                pytest.approx(0.114, 1e-2)
         assert conv_factor == pytest.approx(0.99979, 1e-2)
 
+    @unittest.skip("Bootstrap still WIP")
     def test_laplace_coarsening_repetitive(self):
         n = 16
         kh = 0
@@ -66,6 +69,7 @@ class TestBootstrapAuto:
                                                            print_frequency=1)
         assert conv_factor == pytest.approx(0.194, 1e-2)
 
+    @unittest.skip("Bootstrap still WIP")
     def test_laplace_2_level_bootstrap(self):
         """We improve vectors by relaxation -> coarsening creation -> 2-level relaxation cycles.
         P = SVD interpolation = R^T."""
@@ -119,6 +123,7 @@ class TestBootstrapAuto:
         assert coarse_level._p_csr.shape == (16, 8)
         coarse_level.print()
 
+    @unittest.skip("Bootstrap still WIP")
     def test_helmholtz_2_level_bootstrap_cycles_reduce_test_function_residual(self):
         """We improve vectors by relaxation -> coarsening creation -> 2-level relaxation cycles.
         P = SVD interpolation = R^T."""
