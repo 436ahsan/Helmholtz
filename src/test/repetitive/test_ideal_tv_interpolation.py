@@ -2,7 +2,6 @@ import logging
 import sys
 import numpy as np
 import pytest
-from numpy.ma.testutils import assert_array_almost_equal
 
 import helmholtz as hm
 import helmholtz.analysis
@@ -11,7 +10,6 @@ logger = logging.getLogger("nb")
 
 
 class TestIdealTvInterpolation:
-
     def setup_method(self):
         """Fixed random seed for deterministic results."""
         np.set_printoptions(precision=6, linewidth=1000)

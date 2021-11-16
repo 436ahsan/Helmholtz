@@ -1,1 +1,1 @@
-from . import sampling, coarsening_uniform, interpolation, interpolation_ls_fit, auto_setup, hierarchy
+from . import sampling, geometry, coarsening_uniform, interpolation, interpolation_ls_fit, auto_setup, hierarchy

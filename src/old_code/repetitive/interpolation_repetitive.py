@@ -6,6 +6,7 @@ coarse neighborhoods based on domain periodicity)."""
 import logging
 import numpy as np
 import scipy.sparse
+import helmholtz as hm
 
 import helmholtz.setup.interpolation_ls_fit as interpolation_ls_fit
 import helmholtz.setup.interpolation as interpolation
@@ -100,7 +101,7 @@ def _create_interpolation_least_squares_repetitive_auto(
     num_aggregates = domain_size // aggregate_size
     num_coarse_vars = nc * num_aggregates
     # Find nearest neighbors of each fine point in an aggregate.
-    nbhr = np.mod(interpolation.geometric_neighbors(aggregate_size, nc), num_coarse_vars)
+    nbhr = np.mod(hm.setup.geometry.geometric_neighbors(aggregate_size, nc), num_coarse_vars)
     nbhr = interpolation.sort_neighbors_by_similarity(x_aggregate_t, xc_t, nbhr)
 
     return _create_interpolation_least_squares_repetitive(

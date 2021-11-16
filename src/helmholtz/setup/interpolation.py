@@ -54,7 +54,7 @@ def create_interpolation_least_squares_domain(
     if repetitive:
         num_aggregates = int(np.ceil(a.shape[0] / aggregate_size))
         num_coarse_vars = nc * num_aggregates
-        nbhr = np.mod(geometric_neighbors(aggregate_size, nc), num_coarse_vars)
+        nbhr = np.mod(hm.setup.geometry.geometric_neighbors(aggregate_size, nc), num_coarse_vars)
     else:
         nbhr = _get_neighbor_set(x, a, r, neighborhood)
 
@@ -165,36 +165,6 @@ def relative_interpolation_error(p: scipy.sparse.csr_matrix,
         raise Exception("Unsupported error norm {}".format(kind))
     aggregator = _AGGREGATOR[aggregation]
     return aggregator(error)
-
-
-def geometric_neighbors(aggregate_size: int, nc: int):
-    """
-    Returns the relative indices of the interpolation set of each fine variable in a window. Center neighbors are
-    listed first, then neighboring aggregates.
-
-    Args:
-        aggregate_size: size of window (aggregate).
-        nc: number of coarse variables per aggregate. In 1D at the finest level, we know there are two principal
-            components, so nc=2 makes sense there.
-
-    Returns: array of size w x {num_neighbors} of coarse neighbor indices (relative to fine variable indices) of each
-        fine variable.
-    """
-    # Here we assume w points per aggregate and the same number mc of coarse vars per aggregate, but in general
-    # aggregate sizes may vary.
-    fine_var = np.arange(aggregate_size, dtype=int)
-
-    # Index of neighboring coarse variable. Left neighboring aggregate for points on the left half of the window;
-    # right for right.
-    coarse_nbhr = np.zeros_like(fine_var)
-    left = fine_var < aggregate_size // 2
-    right = fine_var >= aggregate_size // 2
-    coarse_nbhr[left] = -1
-    coarse_nbhr[right] = 1
-
-    # All nbhrs = central aggregate coarse vars + neighboring aggregate coarse vars.
-    coarse_vars_center = np.tile(np.arange(nc, dtype=int), (aggregate_size, 1))
-    return np.concatenate((coarse_vars_center, coarse_vars_center + nc * coarse_nbhr[:, None]), axis=1)
 
 
 def sort_neighbors_by_similarity(x_aggregate: np.array, xc: np.array, nbhr: np.array):
