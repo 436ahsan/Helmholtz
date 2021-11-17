@@ -1,3 +1,5 @@
+from numpy.linalg import norm
+
 import helmholtz as hm
 import numpy as np
 from scipy.linalg import eig
@@ -21,6 +23,12 @@ def ideal_tv(a, num_examples):
     return np.array(v[:, :num_examples]), lam
 
 
+def null_space(a, tol=1e-7):
+    """Returns the null space vectors of a. Assumes a is symmetric so it has a basis of orthogonal real eigenvectors."""
+    lam, v = eig(a.todense())
+    return np.real(hm.linalg.gram_schmidt(v[:, np.abs(lam) < tol]))
+
+
 def find_singular_kh(discretization, n):
     """
     Finds a k near 0.5 for which the smallest eigenvalue of the discrete Helmholtz operator is singular. That is,
@@ -41,3 +49,29 @@ def find_singular_kh(discretization, n):
     wavelength = 2 * np.pi * n
     root = fsolve(func, wavelength / (2 * np.round(wavelength)))
     return root[0], func(root)
+
+
+def compare_spectrum(multilevel: hm.hierarchy.multilevel.Multilevel):
+    # Calculate eigenpairs at all levels.
+    vl = []
+    laml = []
+    for l, lev in enumerate(multilevel):
+        a = lev.a
+        lam, v = eig(a.todense())
+        lam = np.real(lam)
+        ind = np.argsort(np.abs(lam))
+        lam = lam[ind]
+        v = v[:, ind]
+        vl.append(v)
+        laml.append(lam)
+
+    # Interpolate eigenvectors at all levels to the finest level.
+    num_levels = len(multilevel)
+    vl_finest = []
+    for l in range(num_levels):
+        v = vl[l]
+        for k in range(l, 0, -1):
+            v = multilevel[k].p.dot(v)
+        vl_finest.append(v)
+
+    return laml, vl_finest

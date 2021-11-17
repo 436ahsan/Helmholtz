@@ -18,6 +18,7 @@ def create_interpolation_least_squares_domain(
         a: scipy.sparse.csr_matrix,
         r: scipy.sparse.csr_matrix,
         fine_location: np.ndarray,
+        domain_size: float,
         aggregate_size: int = None,
         nc: int = None,
         neighborhood: str = "extended",
@@ -64,7 +65,7 @@ def create_interpolation_least_squares_domain(
         num_coarse_vars = nc * num_aggregates
 #        nbhr = np.mod(hm.setup.geometry.geometric_neighbors(aggregate_size, nc), num_coarse_vars)
         coarse_location = hm.setup.geometry.coarse_locations(fine_location, aggregate_size, nc)
-        nbhr = hm.setup.geometry.geometric_neighbors_from_locations(fine_location, coarse_location, n, aggregate_size)
+        nbhr = hm.setup.geometry.geometric_neighbors_from_locations(fine_location, coarse_location, domain_size, aggregate_size)
     else:
         nbhr = _get_neighbor_set(x, a, r, neighborhood)
 

@@ -80,7 +80,30 @@ def create_two_level_hierarchy(kh, discretization, m, r, p, aggregate_size, nc, 
     return multilevel
 
 
-def two_level_conv_factor(multilevel, nu, print_frequency: int = None, debug: bool = False):
+def create_two_level_hierarchy_from_matrix(a, location, r, p, aggregate_size, nc, use_r_as_restriction: bool = False):
+    m = a.shape[0]
+    if isinstance(r, scipy.sparse.csr_matrix):
+        r_csr = r
+    else:
+        r_csr = hm.linalg.tile_array(r, m // aggregate_size)
+    if isinstance(p, scipy.sparse.csr_matrix):
+        p_csr = p
+    else:
+        p_csr = hm.linalg.tile_array(p, m // aggregate_size)
+    level0 = hm.setup.hierarchy.create_finest_level(a)
+    level0.location = location
+    # relaxer=hm.solve.relax.GsRelaxer(a) if kh == 0 else None)
+    level1 = hm.setup.hierarchy.create_coarse_level(level0.a, level0.b, r_csr, p_csr,
+                                                    use_r_as_restriction=use_r_as_restriction)
+    # Calculate coarse-level variable locations. At each aggregate center we have 'num_components' coarse variables.
+    level1.location = hm.setup.geometry.coarse_locations(level0.location, aggregate_size, nc)
+
+    multilevel = hm.hierarchy.multilevel.Multilevel.create(level0)
+    multilevel.add(level1)
+    return multilevel
+
+
+def two_level_conv_factor(multilevel, nu_pre, nu_post: int = 0, print_frequency: int = None, debug: bool = False):
     level = multilevel.finest_level
     n = level.size
     # Test two-level cycle convergence for A*x=b with b=A*x0, x0=random[-1, 1].
@@ -90,7 +113,7 @@ def two_level_conv_factor(multilevel, nu, print_frequency: int = None, debug: bo
     #b = np.ones((n, ))
 
     def two_level_cycle(y):
-        return hm.solve.solve_cycle.solve_cycle(multilevel, 1.0, nu, 0, nu_coarsest=-1, debug=debug, rhs=b).run(y)
+        return hm.solve.solve_cycle.solve_cycle(multilevel, 1.0, nu_pre, nu_post, nu_coarsest=-1, debug=debug, rhs=b).run(y)
 
     def residual(x):
         return b - multilevel[0].operator(x)

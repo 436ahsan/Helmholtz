@@ -49,7 +49,7 @@ class TestIdealTvInterpolation:
         R = r.tile(level.size // aggregate_size)
 
         p = hm.setup.auto_setup.create_interpolation(
-            x, a, R, level.location, interpolation_method, aggregate_size=aggregate_size, nc=num_components,
+            x, a, R, level.location, n, interpolation_method, aggregate_size=aggregate_size, nc=num_components,
             neighborhood=neighborhood, repetitive=repetitive, target_error=0.1,
             caliber=caliber, fit_scheme=fit_scheme, weighted=weighted)
         multilevel = hm.repetitive.locality.create_two_level_hierarchy(

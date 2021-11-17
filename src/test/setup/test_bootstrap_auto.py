@@ -50,7 +50,7 @@ class TestBootstrapAuto:
         a = hm.linalg.helmholtz_1d_5_point_operator(kh, n).tocsr()
         location = np.arange(n)
 
-        multilevel = hm.setup.auto_setup.setup(a, location, max_levels=2, repetitive=True)
+        multilevel = hm.setup.auto_setup.setup(a, location, n, max_levels=2, repetitive=True)
 
         assert len(multilevel) == 2
 
@@ -112,7 +112,7 @@ class TestBootstrapAuto:
         a = hm.linalg.helmholtz_1d_5_point_operator(kh, n).tocsr()
         location = np.arange(n)
 
-        multilevel = hm.setup.auto_setup.setup(a, location, max_levels=2)
+        multilevel = hm.setup.auto_setup.setup(a, location, n, max_levels=2)
 
         assert len(multilevel) == 2
 

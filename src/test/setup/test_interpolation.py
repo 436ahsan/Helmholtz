@@ -33,7 +33,7 @@ class TestInterpolation:
         # Generate coarse variables (R) on the non-repetitive domain. Use a uniform coarsening.
         r, aggregates, nc, energy_error = cr.create_coarsening_domain(x, threshold=0.15)
 
-        p = hm.setup.interpolation.create_interpolation_least_squares_domain(x, a, r, location,target_error=0.07)
+        p = hm.setup.interpolation.create_interpolation_least_squares_domain(x, a, r, location, n, target_error=0.07)
 
         num_test_examples = 5
         x_test = x[:, -num_test_examples:]
@@ -109,7 +109,7 @@ class TestInterpolation:
         assert nc == 2
 
         p = hm.setup.interpolation.create_interpolation_least_squares_domain(
-            x, a, r, location,aggregate_size=aggregate_size, nc=nc, repetitive=True, target_error=0.07)
+            x, a, r, location, n, aggregate_size=aggregate_size, nc=nc, repetitive=True, target_error=0.07)
 
         error_a = np.mean(norm(a.dot(x - p.dot(r.dot(x))), axis=0) / norm(x, axis=0))
         assert p[0].nnz == 4
@@ -204,7 +204,7 @@ class TestInterpolation:
         assert_array_equal(aggregate_size, [6, 6, 4, 6, 6, 4])
         assert_array_equal(nc, [3, 3, 2, 3, 3, 2])
 
-        p = hm.setup.interpolation.create_interpolation_least_squares_domain(x, a, r, location, neighborhood="aggregate")
+        p = hm.setup.interpolation.create_interpolation_least_squares_domain(x, a, r, location, n,  neighborhood="aggregate")
 
     def test_create_interpolation_least_squares_domain_repetitive_large_aggregate(self):
         n = 18
@@ -223,7 +223,7 @@ class TestInterpolation:
         assert mean_energy_error == pytest.approx(0.0128, 1e-2)
 
         p = hm.setup.interpolation.create_interpolation_least_squares_domain(
-            x, a, r, location, aggregate_size=aggregate_size, nc=nc, repetitive=True)
+            x, a, r, location, n,  aggregate_size=aggregate_size, nc=nc, repetitive=True)
 
         num_test_examples = 5
         x_test = x[:, -num_test_examples:]
@@ -257,7 +257,7 @@ class TestInterpolation:
         assert nc == 2
 
         p = hm.setup.interpolation.create_interpolation_least_squares_domain(
-            x, a, r, location,aggregate_size=aggregate_size, nc=nc, repetitive=True)
+            x, a, r, location, n, aggregate_size=aggregate_size, nc=nc, repetitive=True)
 
         num_test_examples = 5
         x_test = x[:, -num_test_examples:]
@@ -293,7 +293,7 @@ class TestInterpolation:
         assert nc == 2
 
         p = hm.setup.interpolation.create_interpolation_least_squares_domain(
-            x, a, r, location,aggregate_size=aggregate_size, nc=nc, repetitive=True, target_error=0.07,
+            x, a, r, location, n, aggregate_size=aggregate_size, nc=nc, repetitive=True, target_error=0.07,
             fit_scheme="plain", weighted=True)
 
         error_a = np.mean(norm(a.dot(x - p.dot(r.dot(x))), axis=0) / norm(x, axis=0))
@@ -317,7 +317,7 @@ class TestInterpolation:
         assert nc == 2
 
         p = hm.setup.interpolation.create_interpolation_least_squares_domain(
-            x, a, r, location, aggregate_size=aggregate_size, nc=nc, repetitive=True, target_error=0.07,
+            x, a, r, location, n, aggregate_size=aggregate_size, nc=nc, repetitive=True, target_error=0.07,
             fit_scheme="ridge", weighted=True)
 
         error_a = np.mean(norm(a.dot(x - p.dot(r.dot(x))), axis=0) / norm(x, axis=0))

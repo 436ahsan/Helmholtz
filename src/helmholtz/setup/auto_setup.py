@@ -14,6 +14,7 @@ _LOGGER = logging.getLogger(__name__)
 
 def setup(a: scipy.sparse.spmatrix,
           fine_location: np.ndarray,
+          domain_size: float,
           max_levels: int = 100000,
           num_bootstrap_steps: int = 1,
           interpolation_method: str = "ls",
@@ -50,6 +51,7 @@ def setup(a: scipy.sparse.spmatrix,
     level = hierarchy.create_finest_level(a)
     # Manually/separately set locations on the level object, as this is geometry-specific and Level is morre general.
     level.location = fine_location
+    level.domain_size = domain_size
     multilevel = hm.hierarchy.multilevel.Multilevel.create(level)
     num_levels = 1
     shrinkage_factor, num_sweeps, residual, _, _, relax_conv_factor = \
@@ -264,7 +266,7 @@ def bootstap(x,
 
         # Create the interpolation operator P.
         p = create_interpolation(
-            x_level, level.a, r, level.location, interpolation_method, aggregate_size=aggregate_size, nc=nc, max_caliber=max_caliber,
+            x_level, level.a, r, level.location, level.domain_size, interpolation_method, aggregate_size=aggregate_size, nc=nc, max_caliber=max_caliber,
             neighborhood=neighborhood, repetitive=repetitive, target_error=target_error)
         coarse_location = hm.setup.geometry.coarse_locations(level.location, aggregate_size, nc)
 
@@ -276,8 +278,10 @@ def bootstap(x,
                     title, len(error), np.mean(error), np.max(error), np.mean(error_a), np.max(error_a)))
 
         # 'level' now becomes the next coarser level and x_level the corresponding test matrix.
-        level = hierarchy.create_coarse_level(level.a, level.b, r, p)
-        level.location = coarse_location
+        coarse_level = hierarchy.create_coarse_level(level.a, level.b, r, p)
+        coarse_level.location = coarse_location
+        coarse_level.domain_size = level.domain_size
+        level = coarse_level
         _LOGGER.info("Level {} size {}".format(l, level.size))
         new_multilevel.add(level)
         if l < num_levels - 1:
@@ -302,6 +306,7 @@ def create_interpolation(x: np.ndarray,
                          a: scipy.sparse.csr_matrix,
                          r: scipy.sparse.csr_matrix,
                          fine_location: np.ndarray,
+                         domain_size: float,
                          method: str,
                          aggregate_size: int = None, nc: int = None,
                          neighborhood: str = "extended",
@@ -335,7 +340,7 @@ def create_interpolation(x: np.ndarray,
         # as the fixed interpolation caliber returned; make the call loop over all calibers and return the desirable
         # one).
         p = hm.setup.interpolation.create_interpolation_least_squares_domain(
-            x, a, r, fine_location, aggregate_size=aggregate_size, nc=nc, neighborhood=neighborhood,
+            x, a, r, fine_location, domain_size, aggregate_size=aggregate_size, nc=nc, neighborhood=neighborhood,
             repetitive=repetitive, caliber=caliber, max_caliber=max_caliber, target_error=target_error,
             fit_scheme=fit_scheme, weighted=weighted)
     else:
