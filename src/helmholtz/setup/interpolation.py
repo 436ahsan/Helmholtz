@@ -128,6 +128,7 @@ def create_interpolation_least_squares_domain(
     for caliber in calibers:
         # Create an interpolation over the samples: a single aggregate (if repetitive) or entire domain (otherwise).
         nbhr_for_caliber = [n[:caliber] for n in nbhr]
+        _LOGGER.info("X sample matrix  {}".format(x_disjoint_aggregate_t.shape))
         p = fitter(x_disjoint_aggregate_t, xc_disjoint_aggregate_t, nbhr_for_caliber, weight)
         if repetitive:
             # TODO(oren): this will not work for the last aggregate if aggregate_size does not divide the domain size.
