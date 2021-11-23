@@ -3,7 +3,7 @@ import helmholtz as hm
 import numpy as np
 
 
-def get_disjoint_windows(x, xc, r, aggregate_size, nc, max_caliber):
+def get_disjoint_windows(x, xc, r, aggregate_size, num_components, max_caliber):
     """
     Samples windows of test functions.
 
@@ -15,7 +15,7 @@ def get_disjoint_windows(x, xc, r, aggregate_size, nc, max_caliber):
     :param xc: coarse-level test matrix.
     :param r: fine-level residual matrix A*x.
     :param aggregate_size: aggregate size.
-    :param nc: number of coarse variables per aggregate.
+    :param num_components: number of coarse variables per aggregate.
     :param max_caliber: maximum caliber to consider. #windows is proportional to it.
     :return:
     - Windows of fine-level test functions 'x' on disjoint aggregates (e.g., points 0..3, 4..7, etc. for
@@ -38,7 +38,7 @@ def get_disjoint_windows(x, xc, r, aggregate_size, nc, max_caliber):
     # TODO(orenlivne): reduce storage here using smart periodic indexing or calculate the nbhr set here first
     # and only pass windows of nbhr values to create_interpolation.
     xc_disjoint_aggregate_t = np.concatenate(
-        tuple(hm.linalg.get_window(xc, nc * offset, nc * num_aggregates)
+        tuple(hm.linalg.get_window(xc, num_components * offset, num_components * num_aggregates)
               for offset in range(num_windows)), axis=1).transpose()
 
     # Create local residual norms corresponding to the 'x'-windows.

@@ -40,7 +40,7 @@ class Coarsener:
         return hm.linalg.tile_array(self.asarray(), n)
 
 
-def create_coarsening(x_aggregate_t, threshold: float, nc: int = None, normalize: bool = False) -> \
+def create_coarsening(x_aggregate_t, threshold: float, num_components: int = None, normalize: bool = False) -> \
         Tuple[Coarsener, np.ndarray]:
     """
     Generates R (coarse variables) on an aggregate from SVD principal components.
@@ -48,15 +48,16 @@ def create_coarsening(x_aggregate_t, threshold: float, nc: int = None, normalize
     Args:
         x_aggregate_t: fine-level test matrix on an aggregate, transposed.
         threshold: relative reconstruction error threshold. Determines nc.
-        nc: if not None, overrides threshold with this fixed number of principal components.
+        num_components: if not None, overrides threshold with this fixed number of principal components.
         normalize: if True, scales the row sums of R to 1.
 
     Returns:
         coarsening operator nc x {aggregate_size}, list of all singular values on aggregate.
     """
     u, s, vh = svd(x_aggregate_t)
-    nc = nc if nc is not None else _get_interpolation_caliber(s, np.array([threshold]))[0]
-    r = vh[:nc]
+    num_components = num_components if num_components is not None else \
+        _get_interpolation_caliber(s, np.array([threshold]))[0]
+    r = vh[:num_components]
     if normalize:
         r /= r.sum(axis=1)
     return Coarsener(r), s
@@ -164,7 +165,7 @@ def create_q_matrix(fine_level: hm.hierarchy.multilevel.Level,
                     coarse_level: hm.hierarchy.multilevel.Level,
                     coarse_location: np.ndarray,
                     aggregate_size: int,
-                    nc: int,
+                    num_components: int,
                     num_test_examples: int = 5):
     a = fine_level.a
     p = coarse_level.p
@@ -200,7 +201,7 @@ def create_q_matrix(fine_level: hm.hierarchy.multilevel.Level,
     max_caliber = 6
 
     num_aggregates = int(np.ceil(a.shape[0] / aggregate_size))
-    num_coarse_vars = nc * num_aggregates
+    num_coarse_vars = num_components * num_aggregates
     domain_size, num_test_functions = x.shape
 
     # Prepare fine and coarse test matrices.
@@ -252,6 +253,7 @@ def create_q_matrix(fine_level: hm.hierarchy.multilevel.Level,
     # x_disjoint_aggregate_t.shape, xc_disjoint_aggregate_t.shape, weight.shape
 
     print("q", q.todense())
+    return q
 
 
 def create_ptaq_matrix(pta, pta_vars, nc, q):

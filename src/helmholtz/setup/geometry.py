@@ -7,7 +7,7 @@ import helmholtz as hm
 _LOGGER = logging.getLogger(__name__)
 
 
-def coarse_locations(fine_location: np.ndarray, aggregate_size: int, nc: int):
+def coarse_locations(fine_location: np.ndarray, aggregate_size: int, num_components: int):
     """
     Calculate coarse-level variable locations given fine-level locations coarsened with aggregate_size/nc coarsening.
     At each aggregate center we have 'num_components' coarse variables.
@@ -15,23 +15,23 @@ def coarse_locations(fine_location: np.ndarray, aggregate_size: int, nc: int):
     Args:
         fine_location: fine-level variable location.
         aggregate_size: size of window (aggregate).
-        nc: number of coarse variables per aggregate.
+        num_components: number of coarse variables per aggregate.
 
     Returns: array of coarse variable location.
     """
     return np.tile(np.add.reduceat(fine_location, np.arange(0, len(fine_location), aggregate_size)) / aggregate_size,
-                   (nc, 1)).transpose().flatten()
+                   (num_components, 1)).transpose().flatten()
 
 
-def geometric_neighbors(aggregate_size: int, nc: int):
+def geometric_neighbors(aggregate_size: int, num_components: int):
     """
     Returns the relative indices of the interpolation set of each fine variable in a window. Center neighbors are
     listed first, then neighboring aggregates.
 
     Args:
         aggregate_size: size of window (aggregate).
-        nc: number of coarse variables per aggregate. In 1D at the finest level, we know there are two principal
-            components, so nc=2 makes sense there.
+        num_components: number of coarse variables per aggregate. In 1D at the finest level, we know there are two principal
+            components, so num_components=2 makes sense there.
 
     Returns: array of size w x {num_neighbors} of coarse neighbor indices (relative to fine variable indices) of each
         fine variable.
@@ -49,8 +49,8 @@ def geometric_neighbors(aggregate_size: int, nc: int):
     coarse_nbhr[right] = 1
 
     # All nbhrs = central aggregate coarse vars + neighboring aggregate coarse vars.
-    coarse_vars_center = np.tile(np.arange(nc, dtype=int), (aggregate_size, 1))
-    return np.concatenate((coarse_vars_center, coarse_vars_center + nc * coarse_nbhr[:, None]), axis=1)
+    coarse_vars_center = np.tile(np.arange(num_components, dtype=int), (aggregate_size, 1))
+    return np.concatenate((coarse_vars_center, coarse_vars_center + num_components * coarse_nbhr[:, None]), axis=1)
 
 
 def geometric_neighbors_from_locations(fine_location: np.ndarray,
@@ -67,7 +67,7 @@ def geometric_neighbors_from_locations(fine_location: np.ndarray,
         coarse_location: coarse-level variable location.
         domain_size: size of domain.
         aggregate_size: size of window (aggregate).
-        nc: number of coarse variables per aggregate.
+        num_components: number of coarse variables per aggregate.
         max_caliber: number of neighbors to return.
 
     Returns: array of coarse variable location.

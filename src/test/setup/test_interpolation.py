@@ -31,7 +31,7 @@ class TestInterpolation:
         x, _ = hm.solve.run.run_iterative_method(level.operator, lambda x: level.relax(x, b), x, num_sweeps=num_sweeps)
         assert x.shape == (32, 128)
         # Generate coarse variables (R) on the non-repetitive domain. Use a uniform coarsening.
-        r, aggregates, nc, energy_error = cr.create_coarsening_domain(x, threshold=0.15)
+        r, aggregates, num_components, energy_error = cr.create_coarsening_domain(x, threshold=0.15)
 
         p = hm.setup.interpolation.create_interpolation_least_squares_domain(x, a, r, location, n, target_error=0.07)
 
@@ -104,12 +104,12 @@ class TestInterpolation:
         x = _get_test_matrix(a, n, 10, num_examples=4)
         max_conv_factor = 0.3
         coarsener = hm.setup.coarsening_uniform.UniformCoarsener(level, x, 4, repetitive=True)
-        r, aggregate_size, nc = coarsener.get_optimal_coarsening(max_conv_factor)[:3]
+        r, aggregate_size, num_components = coarsener.get_optimal_coarsening(max_conv_factor)[:3]
         assert aggregate_size == 4
-        assert nc == 2
+        assert num_components == 2
 
         p = hm.setup.interpolation.create_interpolation_least_squares_domain(
-            x, a, r, location, n, aggregate_size=aggregate_size, nc=nc, repetitive=True, target_error=0.07)
+            x, a, r, location, n, aggregate_size=aggregate_size, num_components=num_components, repetitive=True, target_error=0.07)
 
         error_a = np.mean(norm(a.dot(x - p.dot(r.dot(x))), axis=0) / norm(x, axis=0))
         assert p[0].nnz == 4
@@ -127,12 +127,12 @@ class TestInterpolation:
         # Generate relaxed test matrix.
         x = _get_test_matrix(a, n, 10, num_examples=4)
         coarsener = hm.setup.coarsening_uniform.UniformCoarsener(level, x, 4, repetitive=True)
-        r, aggregate_size, nc = coarsener.get_optimal_coarsening(max_conv_factor)[:3]
+        r, aggregate_size, num_components = coarsener.get_optimal_coarsening(max_conv_factor)[:3]
         assert aggregate_size == 4
-        assert nc == 2
+        assert num_components == 2
 
         p = hm.setup.interpolation.create_interpolation_least_squares_domain(
-            x, a, r, location,aggregate_size=aggregate_size, nc=nc, repetitive=True, target_error=0.04)
+            x, a, r, location,aggregate_size=aggregate_size, num_components=num_components, repetitive=True, target_error=0.04)
 
         num_test_examples = 5
         x_test = x[:, -num_test_examples:]
@@ -164,12 +164,12 @@ class TestInterpolation:
         # Generate relaxed test matrix.
         x = _get_test_matrix(a, n, 10, num_examples=8)
         coarsener = hm.setup.coarsening_uniform.UniformCoarsener(level, x, 4, repetitive=True)
-        r, aggregate_size, nc = coarsener.get_optimal_coarsening(max_conv_factor)[:3]
+        r, aggregate_size, num_components = coarsener.get_optimal_coarsening(max_conv_factor)[:3]
         assert aggregate_size == 6
-        assert nc == 2
+        assert num_components == 2
 
         p = hm.setup.interpolation.create_interpolation_least_squares_domain(
-            x, a, r, location,aggregate_size=aggregate_size, nc=nc, repetitive=True, target_error=0.07)
+            x, a, r, location,aggregate_size=aggregate_size, num_components=num_components, repetitive=True, target_error=0.07)
 
         num_test_examples = 5
         x_test = x[:, -num_test_examples:]
@@ -198,11 +198,11 @@ class TestInterpolation:
         x, _ = helmholtz.analysis.ideal.ideal_tv(a, 10)
         assert x.shape == (32, 10)
         # Generate coarse variables (R) on the non-repetitive domain.
-        r, aggregates, nc, energy_error = cr.create_coarsening_domain(x, threshold=0.15)
+        r, aggregates, num_components, energy_error = cr.create_coarsening_domain(x, threshold=0.15)
 
         aggregate_size = np.array([len(aggregate) for aggregate in aggregates])
         assert_array_equal(aggregate_size, [6, 6, 4, 6, 6, 4])
-        assert_array_equal(nc, [3, 3, 2, 3, 3, 2])
+        assert_array_equal(num_components, [3, 3, 2, 3, 3, 2])
 
         p = hm.setup.interpolation.create_interpolation_least_squares_domain(x, a, r, location, n,  neighborhood="aggregate")
 
@@ -217,13 +217,13 @@ class TestInterpolation:
 
         # Generate coarsening.
         aggregate_size = 6
-        nc = 2
+        num_components = 2
         coarsener = hm.setup.coarsening_uniform.FixedAggSizeUniformCoarsener(x, aggregate_size)
-        r, mean_energy_error = coarsener[nc]
+        r, mean_energy_error = coarsener[num_components]
         assert mean_energy_error == pytest.approx(0.0128, 1e-2)
 
         p = hm.setup.interpolation.create_interpolation_least_squares_domain(
-            x, a, r, location, n,  aggregate_size=aggregate_size, nc=nc, repetitive=True)
+            x, a, r, location, n,  aggregate_size=aggregate_size, num_components=num_components, repetitive=True)
 
         num_test_examples = 5
         x_test = x[:, -num_test_examples:]
@@ -252,12 +252,12 @@ class TestInterpolation:
         # Generate relaxed test matrix.
         x = _get_test_matrix(a, n, 10, num_examples=8)
         coarsener = hm.setup.coarsening_uniform.UniformCoarsener(level, x, 4, repetitive=True)
-        r, aggregate_size, nc = coarsener.get_optimal_coarsening(max_conv_factor)[:3]
+        r, aggregate_size, num_components = coarsener.get_optimal_coarsening(max_conv_factor)[:3]
         assert aggregate_size == 6
-        assert nc == 2
+        assert num_components == 2
 
         p = hm.setup.interpolation.create_interpolation_least_squares_domain(
-            x, a, r, location, n, aggregate_size=aggregate_size, nc=nc, repetitive=True)
+            x, a, r, location, n, aggregate_size=aggregate_size, num_components=num_components, repetitive=True)
 
         num_test_examples = 5
         x_test = x[:, -num_test_examples:]
@@ -288,12 +288,12 @@ class TestInterpolation:
         x = _get_test_matrix(a, n, 10, num_examples=4)
         max_conv_factor = 0.3
         coarsener = hm.setup.coarsening_uniform.UniformCoarsener(level, x, 4, repetitive=True)
-        r, aggregate_size, nc = coarsener.get_optimal_coarsening(max_conv_factor)[:3]
+        r, aggregate_size, num_components = coarsener.get_optimal_coarsening(max_conv_factor)[:3]
         assert aggregate_size == 4
-        assert nc == 2
+        assert num_components == 2
 
         p = hm.setup.interpolation.create_interpolation_least_squares_domain(
-            x, a, r, location, n, aggregate_size=aggregate_size, nc=nc, repetitive=True, target_error=0.07,
+            x, a, r, location, n, aggregate_size=aggregate_size, num_components=num_components, repetitive=True, target_error=0.07,
             fit_scheme="plain", weighted=True)
 
         error_a = np.mean(norm(a.dot(x - p.dot(r.dot(x))), axis=0) / norm(x, axis=0))
@@ -312,12 +312,12 @@ class TestInterpolation:
         x = _get_test_matrix(a, n, 10, num_examples=4)
         max_conv_factor = 0.3
         coarsener = hm.setup.coarsening_uniform.UniformCoarsener(level, x, 4, repetitive=True)
-        r, aggregate_size, nc = coarsener.get_optimal_coarsening(max_conv_factor)[:3]
+        r, aggregate_size, num_components = coarsener.get_optimal_coarsening(max_conv_factor)[:3]
         assert aggregate_size == 4
-        assert nc == 2
+        assert num_components == 2
 
         p = hm.setup.interpolation.create_interpolation_least_squares_domain(
-            x, a, r, location, n, aggregate_size=aggregate_size, nc=nc, repetitive=True, target_error=0.07,
+            x, a, r, location, n, aggregate_size=aggregate_size, num_components=num_components, repetitive=True, target_error=0.07,
             fit_scheme="ridge", weighted=True)
 
         error_a = np.mean(norm(a.dot(x - p.dot(r.dot(x))), axis=0) / norm(x, axis=0))

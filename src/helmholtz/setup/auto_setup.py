@@ -266,7 +266,7 @@ def bootstap(x,
 
         # Create the interpolation operator P.
         p = create_interpolation(
-            x_level, level.a, r, level.location, level.domain_size, interpolation_method, aggregate_size=aggregate_size, nc=nc, max_caliber=max_caliber,
+            x_level, level.a, r, level.location, level.domain_size, interpolation_method, aggregate_size=aggregate_size, num_components=nc, max_caliber=max_caliber,
             neighborhood=neighborhood, repetitive=repetitive, target_error=target_error)
         coarse_location = hm.setup.geometry.coarse_locations(level.location, aggregate_size, nc)
 
@@ -294,12 +294,13 @@ def bootstap(x,
     return x, new_multilevel
 
 
-def mock_cycle_conv_factor(level, r, num_relax_sweeps, print_frequency: int = None):
+def mock_cycle_conv_factor(level, r, num_relax_sweeps, print_frequency: int = None,
+                           num_tf_sweeps: int = 15):
     return hm.solve.run.run_iterative_method(
         level.operator,
         hm.solve.mock_cycle.MockCycle(lambda x, b: level.relax(x, b), r, num_relax_sweeps),
         hm.solve.run.random_test_matrix((level.size,), num_examples=1),
-        num_sweeps=15, print_frequency=print_frequency)[1]
+        num_sweeps=num_tf_sweeps, print_frequency=print_frequency)[1]
 
 
 def create_interpolation(x: np.ndarray,
@@ -308,7 +309,7 @@ def create_interpolation(x: np.ndarray,
                          fine_location: np.ndarray,
                          domain_size: float,
                          method: str,
-                         aggregate_size: int = None, nc: int = None,
+                         aggregate_size: int = None, num_components: int = None,
                          neighborhood: str = "extended",
                          caliber: int = None,
                          fit_scheme: str = "ridge",
@@ -323,7 +324,7 @@ def create_interpolation(x: np.ndarray,
     :param r:
     :param method:
     :param aggregate_size:
-    :param nc:
+    :param num_components:
     :param neighborhood:
     :param caliber:
     :param fit_scheme: whether to use regularized unweighted LS ("ridge") or plain LS ("plain").
@@ -340,7 +341,7 @@ def create_interpolation(x: np.ndarray,
         # as the fixed interpolation caliber returned; make the call loop over all calibers and return the desirable
         # one).
         p = hm.setup.interpolation.create_interpolation_least_squares_domain(
-            x, a, r, fine_location, domain_size, aggregate_size=aggregate_size, nc=nc, neighborhood=neighborhood,
+            x, a, r, fine_location, domain_size, aggregate_size=aggregate_size, num_components=num_components, neighborhood=neighborhood,
             repetitive=repetitive, caliber=caliber, max_caliber=max_caliber, target_error=target_error,
             fit_scheme=fit_scheme, weighted=weighted)
     else:

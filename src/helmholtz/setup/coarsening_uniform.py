@@ -31,7 +31,7 @@ class FixedAggSizeUniformCoarsener:
                 using windows from a single (or few) test vectors.
 
         Returns: a generator of (coarsening operator R, mean energy error over all aggregates), for all
-            nc = 1..max_components (that satisfy the cycle work bound).
+            num_components = 1..max_components (that satisfy the cycle work bound).
         """
         assert (0 <= cycle_coarse_level_work_bound <= 1) and (cycle_index > 0)
         self._x = x
@@ -269,20 +269,20 @@ class UniformCoarsener:
             mock_work, mock_efficiency
 
 
-def create_coarsening(x_aggregate_t: np.ndarray, nc: int, normalize: bool = False) -> Tuple[np.ndarray, np.ndarray]:
+def create_coarsening(x_aggregate_t: np.ndarray, num_components: int, normalize: bool = False) -> Tuple[np.ndarray, np.ndarray]:
     """
     Generates R (coarse variables) on an aggregate from SVD principal components.
 
     Args:
         x_aggregate_t: fine-level test matrix on an aggregate, transposed.
-        nc: number of principal components.
+        num_components: number of principal components.
         normalize: if True, scales the row sums of R to 1.
 
     Returns:
         coarsening matrix nc x {aggregate_size} (dense), list of ALL singular values on aggregate.
     """
     u, s, vh = svd(x_aggregate_t)
-    r = vh[:nc]
+    r = vh[:num_components]
     if normalize:
         r /= r.sum(axis=1)[:, None]
     return r, s

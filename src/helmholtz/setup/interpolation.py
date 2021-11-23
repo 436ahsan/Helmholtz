@@ -20,7 +20,7 @@ def create_interpolation_least_squares_domain(
         fine_location: np.ndarray,
         domain_size: float,
         aggregate_size: int = None,
-        nc: int = None,
+        num_components: int = None,
         neighborhood: str = "extended",
         num_test_examples: int = 5,
         repetitive: bool = False,
@@ -40,7 +40,7 @@ def create_interpolation_least_squares_domain(
         r: coarsening operator.
         fine_location: fine-level variable location.
         aggregate_size: size of aggregate (assumed uniform over domain).
-        nc: number of coarse variables per aggregate.
+        num_components: number of coarse variables per aggregate.
         neighborhood: "aggregate"|"extended" coarse neighborhood to interpolate from: only coarse variables in the
             aggregate, or the R*A*R^T sparsity pattern.
         num_test_examples: number of test functions dedicated to testing (do not participate in SVD, LS fit).
@@ -62,22 +62,70 @@ def create_interpolation_least_squares_domain(
     if repetitive:
         n = a.shape[0]
         num_aggregates = int(np.ceil(a.shape[0] / aggregate_size))
-        num_coarse_vars = nc * num_aggregates
+        num_coarse_vars = num_components * num_aggregates
 #        nbhr = np.mod(hm.setup.geometry.geometric_neighbors(aggregate_size, nc), num_coarse_vars)
-        coarse_location = hm.setup.geometry.coarse_locations(fine_location, aggregate_size, nc)
+        coarse_location = hm.setup.geometry.coarse_locations(fine_location, aggregate_size, num_components)
         nbhr = hm.setup.geometry.geometric_neighbors_from_locations(fine_location, coarse_location, domain_size, aggregate_size)
     else:
         nbhr = _get_neighbor_set(x, a, r, neighborhood)
 
-    # Ridge regularization parameter (list of values).
-    alpha = np.array([0, 0.01, 0.1, 0.1, 1])
-
     # Prepare fine and coarse test matrices.
     xc = r.dot(x)
     residual = a.dot(x)
+    fitter, fold_sizes = _create_interpolation_fitter(
+        x, xc, residual, aggregate_size, num_components, repetitive=repetitive,
+        num_test_examples=num_test_examples, max_caliber=max_caliber, fit_scheme=fit_scheme, weighted=weighted)
+    folds = tuple(f.transpose() for f in hm.linalg.create_folds(x.transpose(), fold_sizes))
+
+    # Increase caliber (fitting interpolation with LS) until the test error A-norm is below the accuracy threshold.
+    max_caliber = min(max_caliber, max(len(n) for n in nbhr))
+    calibers = np.array([caliber]) if caliber is not None else np.arange(1, max_caliber + 1, dtype=int)
+    for caliber in calibers:
+        p = fitter([n[:caliber] for n in nbhr])
+        if repetitive:
+            # TODO(oren): this will not work for the last aggregate if aggregate_size does not divide the domain size.
+            p = _tile_interpolation_matrix(p, aggregate_size, num_components, x.shape[0])
+        error = dict((kind, np.array([relative_interpolation_error(p, r, a, f, kind) for f in folds]))
+                     for kind in ("l2", "a"))
+        _LOGGER.debug("caliber {} error l2 {} a {}".format(
+            caliber,
+            np.array2string(error["l2"], separator=", ", formatter={'float_kind': lambda x: "%4.2f" % x}),
+            np.array2string(error["a"], separator=", ", formatter={'float_kind': lambda x: "%.2e" % x})))
+        # Check test set error.
+        if error[kind][-1] < target_error:
+            return p
+
+    if caliber is None:
+        _LOGGER.warning("Could not find a good caliber for threshold {}, using max caliber {}".format(
+            target_error, caliber))
+    return p
+
+
+def _create_interpolation_fitter(x: np.ndarray, xc: np.ndarray, residual: np.ndarray,
+                                 aggregate_size: int, num_components: int,
+                                 repetitive: bool = False, num_test_examples: int = 5,
+                                 max_caliber: int = 6,
+                                 fit_scheme: str = "ridge",
+                                 weighted: bool = False):
+    """
+    Creates an interpolation factory over the samples: a single aggregate (if repetitive) or entire domain (otherwise).
+
+    :param x:
+    :param xc:
+    :param residual:
+    :param aggregate_size:
+    :param num_components:
+    :param repetitive:
+    :param num_test_examples:
+    :param max_caliber:
+    :param fit_scheme:
+    :param weighted:
+    :return:
+    """
     if repetitive:
+        # TODO(orenlivne): change window stride from aggregate_size to nc.
         x_disjoint_aggregate_t, xc_disjoint_aggregate_t, r_norm_disjoint_aggregate_t = \
-            hm.setup.sampling.get_disjoint_windows(x, xc, residual, aggregate_size, nc, max_caliber)
+            hm.setup.sampling.get_disjoint_windows(x, xc, residual, aggregate_size, num_components, max_caliber)
     else:
         x_disjoint_aggregate_t, xc_disjoint_aggregate_t = x.transpose(), xc.transpose()
         # TODO(orenlivne): fix this to be all local residual norms in the non-repetitive case.
@@ -96,23 +144,12 @@ def create_interpolation_least_squares_domain(
     else:
         weight = np.ones_like(x_disjoint_aggregate_t)
 
-    if fit_scheme == "plain":
-        fitter = lambda x, xc, nbhr, weight: \
-            hm.setup.interpolation_ls_fit.create_interpolation_least_squares_plain(x, xc, nbhr, weight)
-    elif fit_scheme == "ridge":
-        fitter = lambda x, xc, nbhr, weight: \
-            hm.setup.interpolation_ls_fit.create_interpolation_least_squares_ridge(x, xc, nbhr, weight,
-                                                                                   alpha=alpha, fit_samples=fit_samples,
-                                                                                   val_samples=val_samples,
-                                                                                   test_samples=num_test_examples)
-    else:
-        raise Exception("Unsupported interpolation fitting schema {}".format(fit_scheme))
-
     # Create folds.
     num_examples = int(x_disjoint_aggregate_t.shape[0])
     num_ls_examples = num_examples - num_test_examples
     val_samples = int(0.2 * num_ls_examples)
     fit_samples = num_examples - val_samples - num_test_examples
+
     if repetitive:
         # Since we are fitting to a sample of windows, there is no sense in calculating the interpolation error of
         # parts of vectors to exactly correspond to the non-repetitive case. Simply lump all test vectors into a single
@@ -120,34 +157,25 @@ def create_interpolation_least_squares_domain(
         fold_sizes = (int(x.shape[1]),)
     else:
         fold_sizes = (fit_samples, val_samples, num_test_examples)
-    folds = tuple(f.transpose() for f in hm.linalg.create_folds(x.transpose(), fold_sizes))
 
-    # Increase caliber (fitting interpolation with LS) until the test error A-norm is below the accuracy threshold.
-    max_caliber = min(max_caliber, max(len(n) for n in nbhr))
-    calibers = np.array([caliber]) if caliber is not None else np.arange(1, max_caliber + 1, dtype=int)
-    for caliber in calibers:
-        # Create an interpolation over the samples: a single aggregate (if repetitive) or entire domain (otherwise).
-        nbhr_for_caliber = [n[:caliber] for n in nbhr]
-        _LOGGER.info("X sample matrix  {}".format(x_disjoint_aggregate_t.shape))
-        p = fitter(x_disjoint_aggregate_t, xc_disjoint_aggregate_t, nbhr_for_caliber, weight)
-        if repetitive:
-            # TODO(oren): this will not work for the last aggregate if aggregate_size does not divide the domain size.
-            p = _tile_interpolation_matrix(p, aggregate_size, nc, x.shape[0])
-        error = dict((kind, np.array([relative_interpolation_error(p, r, a, f, kind) for f in folds]))
-                     for kind in ("l2", "a"))
-        _LOGGER.debug("caliber {} error l2 {} a {}".format(
-            caliber,
-            np.array2string(error["l2"], separator=", ", formatter={'float_kind': lambda x: "%4.2f" % x}),
-            np.array2string(error["a"], separator=", ", formatter={'float_kind': lambda x: "%.2e" % x})))
-        # Check test set error.
-        if error[kind][-1] < target_error:
-            return p
+    # Ridge regularization parameter (list of values).
+    alpha = np.array([0, 0.01, 0.1, 0.1, 1])
 
-    if caliber is not None:
-        _LOGGER.warning("Could not find a good caliber for threshold {}, using max caliber {}".format(
-            target_error, caliber))
-    return p
+    if fit_scheme == "plain":
+        fitter = lambda nbhr: \
+            hm.setup.interpolation_ls_fit.create_interpolation_least_squares_plain(
+                x_disjoint_aggregate_t, xc_disjoint_aggregate_t, nbhr, weight)
+    elif fit_scheme == "ridge":
+        fitter = lambda nbhr: \
+            hm.setup.interpolation_ls_fit.create_interpolation_least_squares_ridge(
+                x_disjoint_aggregate_t, xc_disjoint_aggregate_t, nbhr, weight,
+                                                                                   alpha=alpha, fit_samples=fit_samples,
+                                                                                   val_samples=val_samples,
+                                                                                   test_samples=num_test_examples)
+    else:
+        raise Exception("Unsupported interpolation fitting schema {}".format(fit_scheme))
 
+    return fitter, fold_sizes
 
 def relative_interpolation_error(p: scipy.sparse.csr_matrix,
                                  r: scipy.sparse.csr_matrix,

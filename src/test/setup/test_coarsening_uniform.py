@@ -116,12 +116,12 @@ class TestCoarseningUniform:
 
         coarsener = hm.setup.coarsening_uniform.UniformCoarsener(level, x, 4)
         # Calculate best mock cycle predicted efficiency.
-        r, aggregate_size, nc, cr, mean_energy_error, mock_conv, mock_work, mock_efficiency = \
+        r, aggregate_size, num_components, cr, mean_energy_error, mock_conv, mock_work, mock_efficiency = \
             coarsener.get_optimal_coarsening(max_conv_factor)
 
         assert r.shape == (48, 96)
         assert aggregate_size == 4
-        assert nc == 2
+        assert num_components == 2
         assert cr == pytest.approx(0.5, 1e-2)
         assert mean_energy_error == pytest.approx(0.128, 1e-2)
         assert mock_conv == pytest.approx(0.141, 1e-2)
