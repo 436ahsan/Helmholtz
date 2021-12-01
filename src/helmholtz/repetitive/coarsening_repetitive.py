@@ -159,61 +159,83 @@ def _create_aggregate_coarsening(x, threshold, max_coarsening_ratio, max_aggrega
     return r, energy_error
 
 
-def create_q_matrix(fine_level: hm.hierarchy.multilevel.Level,
+def create_ptaq_matrix(fine_level: hm.hierarchy.multilevel.Level,
                     fine_location: np.ndarray,
                     x: np.ndarray,
                     coarse_level: hm.hierarchy.multilevel.Level,
                     coarse_location: np.ndarray,
                     aggregate_size: int,
                     num_components: int,
+                    caliber: int,
+                    max_caliber: int = 6,
                     num_test_examples: int = 5):
-    a = fine_level.a
-    p = coarse_level.p
-    r = coarse_level.r
-
-    # TODO(orenlivne): convert everything below to local computations, since it's a repetitive fraemwork.
-    pta = p.transpose().dot(a)
-    print("nnz in P^T*A stencil", pta[0].nnz)
+    # TODO(orenlivne): convert everything below to local computations, since it's a repetitive framework.
+    pta = coarse_level.p.transpose().dot(fine_level.a)
+    # Arbitrarily use the first point in the domain as the center of P^T*A.
+    # TODO(orenlivne): should that be replaced by the union of P^T*A stencils for i=0..num_components-1? We know
+    # it won't make a difference at level 0 but maybe at level 1 or in more general problems?
     i = 0
     pta_vars = np.sort(pta[i].nonzero()[1])
-    print("center", i)
-    print("pta_vars", pta_vars)
-    print("stencil values", np.array(pta[i, pta[i].nonzero()[1]].todense()))
-    # pd.DataFrame(pta.todense()[:5])
 
-    # P^T*A*R^T sparsity pattern.
-    rap = pta.dot(r.transpose())
+    # Calculate 'rap_vars' = target sparsity pattern = P^T*A*R^T sparsity pattern.
+    rap = pta.dot(coarse_level.r.transpose())
     rap_vars = np.sort(rap[i].nonzero()[1])
-    print("rap_vars", rap_vars)
 
+    q = _create_q_interpolation_matrix(fine_level, fine_location, x, coarse_level, coarse_location,
+                                       max_caliber, aggregate_size, num_components, caliber, pta_vars, rap_vars,
+                                       num_test_examples=num_test_examples)
+    ptaq = pta[:num_components, pta_vars].dot(q)
+    return _tile_csr_matrix(ptaq, rap_vars, coarse_level.size)
+
+
+def create_qtap_matrix(fine_level: hm.hierarchy.multilevel.Level,
+                    fine_location: np.ndarray,
+                    x: np.ndarray,
+                    coarse_level: hm.hierarchy.multilevel.Level,
+                    coarse_location: np.ndarray,
+                    aggregate_size: int,
+                    num_components: int,
+                    caliber: int,
+                    max_caliber: int = 6,
+                    num_test_examples: int = 5):
+    # TODO(orenlivne): convert everything below to local computations, since it's a repetitive framework.
+    ap = fine_level.a.dot(coarse_level.p)
+    # Arbitrarily use the first aggregate in the domain as the center of P^T*A.
+    pt = coarse_level.p.transpose()
+    pt_vars = np.unique(pt[:num_components].nonzero()[1])
+
+    # Calculate 'rap_vars' = target sparsity pattern = P^T*A*R^T sparsity pattern.
+    rap = coarse_level.r.dot(ap)
+    rap_vars = np.unique(rap[:num_components].nonzero()[1])
+
+    q = _create_q_interpolation_matrix(fine_level, fine_location, x, coarse_level, coarse_location,
+                                       max_caliber, aggregate_size, num_components, caliber, pt_vars, rap_vars,
+                                       num_test_examples=num_test_examples)
+    qtap = q.transpose().dot(ap[:num_components, rap_vars])
+    return _tile_csr_matrix(qtap, rap_vars, coarse_level.size)
+
+
+def _create_q_interpolation_matrix(fine_level, fine_location, x, coarse_level, coarse_location, max_caliber,
+                                   aggregate_size, num_components, caliber, pta_vars, rap_vars,
+                                   num_test_examples: int = 5):
     # Find P^T*A fine and coarse var locations. Wrapping works on locations a well even
     # though they are not integers (apply periodic B.C. so distances don't wrap around).
     n = fine_level.size
-    xf = hm.setup.sampling.wrap_index_to_low_value(fine_location[pta_vars], n)
-    xc = hm.setup.sampling.wrap_index_to_low_value(coarse_location[rap_vars], n)
-
+    location_f = hm.setup.sampling.wrap_index_to_low_value(fine_location[pta_vars], n)
+    location_c = hm.setup.sampling.wrap_index_to_low_value(coarse_location[rap_vars], n)
     # Find nearest neighbors of each fine P^T*A point (pta_vars).
     # These are INDICES into the rap_vars array.
-    nbhr = np.argsort(np.abs(xf[:, None] - xc), axis=1)
-    print("nbhr", nbhr)
-
-    caliber = 4
-    max_caliber = 6
-
-    num_aggregates = int(np.ceil(a.shape[0] / aggregate_size))
-    num_coarse_vars = num_components * num_aggregates
-    domain_size, num_test_functions = x.shape
-
+    nbhr = np.argsort(np.abs(location_f[:, None] - location_c), axis=1)
+    num_aggregates = int(np.ceil(fine_level.size / aggregate_size))
     # Prepare fine and coarse test matrices.
-    xc = r.dot(x)
-    residual = a.dot(x)
-
-    # Prepare sampled windows of x, xc, residual normn.
+    xc = coarse_level.coarsen(x)
+    residual = fine_level.a.dot(x)
+    # Prepare samples (windows) of x, xc, residual norm over the local neighborhood only (P^T*A / R*A*P).
+    domain_size, num_test_functions = x.shape
     max_caliber = min(max_caliber, max(len(n) for n in nbhr))
     num_windows = max(np.minimum(num_aggregates, (12 * max_caliber) // num_test_functions), 1)
     x_disjoint_aggregate_t = hm.setup.sampling.get_windows_by_index(x, pta_vars, aggregate_size, num_windows)
     xc_disjoint_aggregate_t = hm.setup.sampling.get_windows_by_index(xc, rap_vars, num_components, num_windows)
-
     # Calculate residual norms.
     index = pta_vars
     stride = aggregate_size
@@ -227,62 +249,41 @@ def create_q_matrix(fine_level: hm.hierarchy.multilevel.Level,
                      np.arange(residual_window_size) % residual.shape[0]],
             axis=0)
         for offset in range(0, num_windows * stride, stride))) / residual_window_size ** 0.5
-
     # In principle, each point in the aggregate should have a slightly shifted residual window, but we just take the
     # same residual norm for all points for simplicity. Should not matter much.
     r_norm_disjoint_aggregate_t = np.tile(r_norm_disjoint_aggregate_t[:, None], (len(index),))
-
     weight = np.clip(r_norm_disjoint_aggregate_t, 1e-15, None) ** (-1)
-
     nbhr_for_caliber = [n[:caliber] for n in nbhr]
-
+    # print("nbhr_for_caliber", nbhr_for_caliber)
     # Create folds.
     num_samples = int(x_disjoint_aggregate_t.shape[0])
     num_ls_examples = num_samples - num_test_examples
     val_samples = int(0.2 * num_ls_examples)
     fit_samples = num_samples - val_samples - num_test_examples
-
     # Ridge regularization parameter (list of values).
     alpha = np.array([0, 0.01, 0.1, 0.1, 1])
-
-    q = hm.setup.interpolation_ls_fit.create_interpolation_least_squares_ridge(
+    q_local = hm.setup.interpolation_ls_fit.create_interpolation_least_squares_ridge(
         x_disjoint_aggregate_t, xc_disjoint_aggregate_t, nbhr_for_caliber, weight,
         alpha=alpha, fit_samples=fit_samples,
         val_samples=val_samples, test_samples=num_test_examples)
-
-    # x_disjoint_aggregate_t.shape, xc_disjoint_aggregate_t.shape, weight.shape
-
-    print("q", q.todense())
-    return q
+    qq = scipy.sparse.lil_matrix((len(pta_vars), coarse_level.size))
+    qq[:, rap_vars] = q_local
+    return q_local
 
 
-def create_ptaq_matrix(pta, pta_vars, nc, q):
-    ptaq = pta[:nc, pta_vars].dot(q)
-    print("ptaq", ptaq.todense())
-    # TODO(orenlivne): tile ptaq to the entire domain and return it.
-    # k = hm.linalg.tile_csr_matrix(ptaq, n // aggregate_size, stride=num_components, total_col=multilevel[1].size)
-    # i = scipy.sparse.csr_matrix(np.arange(1, 13).reshape((2, 6)))
-    # n = 4
-    # stride = 2
-    # total_col = 12
-    #
-    # n_row, n_col = i.shape
-    # row, col = i.nonzero()
-    # data = i.data
-    #
-    # # Calculate the positions of stencil neighbors relative to the stencil center.
-    # relative_col = col
-    # relative_col = col - row
-    # relative_col[relative_col >= n_col // 2] -= n_col
-    # relative_col[relative_col < -(n_col // 2)] += n_col
-    # print(relative_col)
-    #
-    # tiled_data = np.tile(data, n)
-    # tiled_row = np.concatenate([row + i * n_row for i in range(n)])
-    # tiled_col = np.concatenate([(row + relative_col + j * stride) % total_col for j in range(n)])
-    #
-    # k = scipy.sparse.coo_matrix((tiled_data, (tiled_row, tiled_col)), shape=(n * n_row, total_col)).tocsr()
-    # #k = hm.linalg.tile_csr_matrix(i, 4, stride=2, total_col=12)
+def _tile_csr_matrix(ptaq, rap_vars, nc):
+    num_components = ptaq.shape[0]
+    ac_local = scipy.sparse.lil_matrix((num_components, nc))
+    ac_local[:, rap_vars] = ptaq
+    ac_local = ac_local.tocsr()
+    row_local, col_local = ac_local.nonzero()
+    data_local = ac_local.data
+    row = (row_local + np.arange(0, nc, num_components)[:, None]).flatten()
+    col = (col_local + np.arange(0, nc, num_components)[:, None]).flatten() % nc
+    data = np.tile(data_local, nc // num_components)
+    ac = scipy.sparse.csr_matrix((data, (row, col)), shape=(nc, nc))
+    return ac
+
 
 def _relative_reconstruction_error(s):
     """Returns the fit squared error for a singular value array 's'."""

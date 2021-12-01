@@ -3,7 +3,7 @@ import helmholtz as hm
 import numpy as np
 
 
-def get_disjoint_windows(x, xc, r, aggregate_size, num_components, max_caliber):
+def get_disjoint_windows(x, xc, r, aggregate_size: int, num_components: int, num_windows: int):
     """
     Samples windows of test functions.
 
@@ -16,7 +16,7 @@ def get_disjoint_windows(x, xc, r, aggregate_size, num_components, max_caliber):
     :param r: fine-level residual matrix A*x.
     :param aggregate_size: aggregate size.
     :param num_components: number of coarse variables per aggregate.
-    :param max_caliber: maximum caliber to consider. #windows is proportional to it.
+    :param num_windows: #windows to use.
     :return:
     - Windows of fine-level test functions 'x' on disjoint aggregates (e.g., points 0..3, 4..7, etc. for
     aggregate_size = 4).
@@ -25,12 +25,12 @@ def get_disjoint_windows(x, xc, r, aggregate_size, num_components, max_caliber):
     """
     domain_size, num_test_functions = x.shape
     num_aggregates = int(np.ceil(domain_size / aggregate_size))
-    num_windows = max(np.minimum(num_aggregates, (12 * max_caliber) // num_test_functions), 1)
     #    print("max_caliber", max_caliber, "num_test_functions", num_test_functions, "num_windows",
     #    num_windows, "num_aggregates", num_aggregates)
 
     # Create windows of 'x'.
     x_disjoint_aggregate_t = get_disjoint_windows_by_range(x, aggregate_size, num_windows)
+    #x_disjoint_aggregate_t = get_windows_by_index(x, np.arange(aggregate_size), aggregate_size, num_windows)
 
     # Create corresponding windows of 'xc'. Note: we are currently concatenating the entire coarse domain 'num_windows'
     # times. This is not necessary if neighbor computation is done here and not inside create_interpolation(). For
@@ -49,17 +49,25 @@ def get_disjoint_windows(x, xc, r, aggregate_size, num_components, max_caliber):
     return x_disjoint_aggregate_t, xc_disjoint_aggregate_t, r_norm_disjoint_aggregate_t
 
 
-def get_windows_by_index(x, index, stride, num_windows):
-    return np.concatenate(
-        tuple(x[(index + offset) % x.shape[0]] for offset in range(0, num_windows * stride, stride)),
-        axis=1).transpose()
-
-
 def get_disjoint_windows_by_range(x, aggregate_size, num_windows):
     return np.concatenate(
         tuple(hm.linalg.get_window(x, aggregate_size * offset, aggregate_size)
               for offset in range(num_windows)),
         axis=1).transpose()
+
+def get_windows_by_index(x, index, stride, num_windows):
+    """
+    Returns periodic-index windows (samples) of a test matrix.
+    :param x: test matrix (#points x #functions).
+    :param index: relative window index to be extracted.
+    :param stride: stride between windows.
+    :param num_windows: number of windows to return.
+    :return: len(index) x num_windows matrix of samples.
+    """
+    return np.concatenate(tuple(
+        np.take(x, index + stride * offset, axis=0, mode="wrap")
+        for offset in range(int(np.ceil(num_windows / x.shape[1])))),
+        axis=1).transpose()[:num_windows]
 
 
 def wrap_index_to_low_value(index, n):

@@ -36,11 +36,7 @@ def get_window(x: np.ndarray, offset: int, aggregate_size: int) -> np.ndarray:
 
     Returns: x[offset:offset+aggregate_size]. Wraps around if out of bounds.
     """
-    # Wrap around window since we're on a periodic domain.
-    x_aggregate = x[offset:min(offset + aggregate_size, len(x))]
-    if offset + aggregate_size > len(x):
-        x_aggregate = np.concatenate((x_aggregate, x[:offset + aggregate_size - len(x)]), axis=0)
-    return x_aggregate
+    return np.take(x, range(offset, offset + aggregate_size), axis=0, mode="wrap")
 
 
 def get_uniform_aggregate_starts(domain_size, aggregate_size):

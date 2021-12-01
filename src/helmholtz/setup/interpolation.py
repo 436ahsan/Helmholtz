@@ -26,6 +26,7 @@ def create_interpolation_least_squares_domain(
         repetitive: bool = False,
         caliber: int = None,
         max_caliber: int = 6,
+        num_windows: int = None,
         target_error: float = 0.2,
         kind: str = "l2",
         fit_scheme: str = "ridge",
@@ -47,7 +48,8 @@ def create_interpolation_least_squares_domain(
         repetitive: whether to exploit problem repetitiveness by creating a constant R stencil on all aggregates
             using windows from a single (or few) test vectors.
         caliber: if None, automatically selects caliber. If non-None, uses this caliber value.
-        max_caliber: maximum interpolation caliber to ty.
+        max_caliber: maximum interpolation caliber to use.
+        num_windows: for the repetitive case, custom # windows (samples) to use. If None, default to 4 * max_caliber.
         target_error: target relative interpolation error in norm 'kind'.
         kind: interpolation norm kind ("l2"|"a" = energy norm).
         fit_scheme: whether to use regularized unweighted LS ("ridge") or plain LS ("plain").
@@ -60,10 +62,6 @@ def create_interpolation_least_squares_domain(
     """
     # Find nearest neighbors of each fine point in an aggregate.
     if repetitive:
-        n = a.shape[0]
-        num_aggregates = int(np.ceil(a.shape[0] / aggregate_size))
-        num_coarse_vars = num_components * num_aggregates
-#        nbhr = np.mod(hm.setup.geometry.geometric_neighbors(aggregate_size, nc), num_coarse_vars)
         coarse_location = hm.setup.geometry.coarse_locations(fine_location, aggregate_size, num_components)
         nbhr = hm.setup.geometry.geometric_neighbors_from_locations(fine_location, coarse_location, domain_size, aggregate_size)
     else:
@@ -72,16 +70,21 @@ def create_interpolation_least_squares_domain(
     # Prepare fine and coarse test matrices.
     xc = r.dot(x)
     residual = a.dot(x)
+    max_caliber = min(max_caliber, max(len(n) for n in nbhr))
+    if repetitive and num_windows is None:
+        fine_level_size, num_test_functions = x.shape
+        num_aggregates = int(np.ceil(fine_level_size / aggregate_size))
+        num_windows = max(np.minimum(num_aggregates, (12 * max_caliber) // num_test_functions), 1)
     fitter, fold_sizes = _create_interpolation_fitter(
-        x, xc, residual, aggregate_size, num_components, repetitive=repetitive,
-        num_test_examples=num_test_examples, max_caliber=max_caliber, fit_scheme=fit_scheme, weighted=weighted)
+        x, xc, residual, aggregate_size, num_components, num_windows, repetitive=repetitive,
+        num_test_examples=num_test_examples, fit_scheme=fit_scheme, weighted=weighted)
     folds = tuple(f.transpose() for f in hm.linalg.create_folds(x.transpose(), fold_sizes))
 
-    # Increase caliber (fitting interpolation with LS) until the test error A-norm is below the accuracy threshold.
-    max_caliber = min(max_caliber, max(len(n) for n in nbhr))
     calibers = np.array([caliber]) if caliber is not None else np.arange(1, max_caliber + 1, dtype=int)
+    # Increase caliber (fitting interpolation with LS) until the test error A-norm is below the accuracy threshold.
     for caliber in calibers:
-        p = fitter([n[:caliber] for n in nbhr])
+        nbhr_caliber = [n[:caliber] for n in nbhr]
+        p = fitter(nbhr_caliber)
         if repetitive:
             # TODO(oren): this will not work for the last aggregate if aggregate_size does not divide the domain size.
             p = _tile_interpolation_matrix(p, aggregate_size, num_components, x.shape[0])
@@ -102,9 +105,10 @@ def create_interpolation_least_squares_domain(
 
 
 def _create_interpolation_fitter(x: np.ndarray, xc: np.ndarray, residual: np.ndarray,
-                                 aggregate_size: int, num_components: int,
+                                 aggregate_size: int,
+                                 num_components: int,
+                                 num_windows: int,
                                  repetitive: bool = False, num_test_examples: int = 5,
-                                 max_caliber: int = 6,
                                  fit_scheme: str = "ridge",
                                  weighted: bool = False):
     """
@@ -117,7 +121,7 @@ def _create_interpolation_fitter(x: np.ndarray, xc: np.ndarray, residual: np.nda
     :param num_components:
     :param repetitive:
     :param num_test_examples:
-    :param max_caliber:
+    :param num_windows:
     :param fit_scheme:
     :param weighted:
     :return:
@@ -125,7 +129,7 @@ def _create_interpolation_fitter(x: np.ndarray, xc: np.ndarray, residual: np.nda
     if repetitive:
         # TODO(orenlivne): change window stride from aggregate_size to nc.
         x_disjoint_aggregate_t, xc_disjoint_aggregate_t, r_norm_disjoint_aggregate_t = \
-            hm.setup.sampling.get_disjoint_windows(x, xc, residual, aggregate_size, num_components, max_caliber)
+            hm.setup.sampling.get_disjoint_windows(x, xc, residual, aggregate_size, num_components, num_windows)
     else:
         x_disjoint_aggregate_t, xc_disjoint_aggregate_t = x.transpose(), xc.transpose()
         # TODO(orenlivne): fix this to be all local residual norms in the non-repetitive case.
