@@ -16,7 +16,7 @@ _LOGGER = logging.getLogger("multilevel")
 class Level:
     """A single level in the multilevel hierarchy."""
 
-    def __init__(self, a, b, relaxer, r, p, r_csr, p_csr):
+    def __init__(self, a, b, relaxer, r_csr, p_csr):
         """
         Creates a level in the multilevel hierarchy.
         Args:
@@ -30,8 +30,6 @@ class Level:
         """
         self.a = a
         self.b = b
-        self.r = r
-        self.p = p
         self._r_csr = r_csr
         self._p_csr = p_csr
         self._restriction_csr = p_csr.transpose() if p_csr is not None else None
@@ -39,7 +37,7 @@ class Level:
 
     @staticmethod
     def create_finest_level(a, relaxer) -> "Level":
-        return Level(a, scipy.sparse.eye(a.shape[0]), relaxer, None, None, None, None)
+        return Level(a, scipy.sparse.eye(a.shape[0]), relaxer, None, None)
 
     @property
     def size(self):

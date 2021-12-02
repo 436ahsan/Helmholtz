@@ -94,7 +94,7 @@ class TestBootstrapAuto:
 #        assert np.array(p.sum(axis=1)).flatten().std() < 1e-4
 
         # Coarsening ~ averaging.
-        r = coarse_level.r
+        r = coarse_level._r_csr
         assert_array_equal(r[0].nonzero()[0], [0, 0])
         assert_array_equal(r[0].nonzero()[1], [0, 1])
         assert_array_almost_equal(r[0].data, [-0.7, -0.71], decimal=2)

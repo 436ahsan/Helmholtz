@@ -114,13 +114,13 @@ def build_coarse_level(level: hm.hierarchy.multilevel.Level,
     """
     multilevel = hm.hierarchy.multilevel.Multilevel.create(level)
     a = level.a
-    x_log = []
-    r_log = []
+    # x_log = []
+    # r_log = []
 
     # Initialize fine-level test functions to random. Use enough to have enough windows if repetitive.
     num_examples = 20 if not repetitive else int(np.ceil(24 * max_caliber / level.size))
     x = hm.solve.run.random_test_matrix((a.shape[0],), num_examples=num_examples)
-    x_log.append(x)
+    # x_log.append(x)
 
     # Improve vectors with 1-level relaxation.
     _LOGGER.info("Generating {} TV with {} sweeps".format(num_examples, num_sweeps))
@@ -128,7 +128,7 @@ def build_coarse_level(level: hm.hierarchy.multilevel.Level,
     x, _ = hm.solve.run.run_iterative_method(
         level.operator, lambda x: level.relax(x, b), x, num_sweeps=num_sweeps)
     _LOGGER.info("RER {:.3f}".format(norm(a.dot(x)) / norm(x)))
-    x_log.append(x)
+    # x_log.append(x)
 
     # Bootstrap to improve vectors, R, P.
     num_levels = 2
@@ -142,8 +142,9 @@ def build_coarse_level(level: hm.hierarchy.multilevel.Level,
             num_sweeps=num_sweeps, interpolation_method=interpolation_method, neighborhood=neighborhood,
             repetitive=repetitive, num_test_examples=num_test_examples, max_caliber=max_caliber,
             target_error=target_error)
-        x_log.append(x)
-        r_log.append(multilevel[1].r)
+        # x_log.append(x)
+        # # TODO(orenlivne): remove this since it's a private  memnber.
+        # r_log.append(multilevel[1]._r_csr)
         _LOGGER.info("RER {:.6f}".format(norm(a.dot(x)) / norm(x)))
         _LOGGER.info("-" * 80)
     return multilevel[1]
@@ -227,7 +228,7 @@ def bootstap(x,
     coarse_level = multilevel[1] if len(multilevel) > 1 else None
     _LOGGER.info("Relax cycle conv factor {:.3f} asymptotic RQ {:.3f} RER {:.3f} P error {:.3f}".format(
         conv_factor, level.rq(y), norm(level.operator(y)) / norm(y),
-        norm(y - coarse_level.p.dot(coarse_level.r.dot(y))) / norm(y) if coarse_level is not None else -1))
+        norm(y - coarse_level.p.dot(coarse_level.coarsen(y))) / norm(y) if coarse_level is not None else -1))
 
     # if conv_factor < relax_conv_factor:
     #     # Relaxation cycle is more efficient than relaxation, smooth the previous vectors.

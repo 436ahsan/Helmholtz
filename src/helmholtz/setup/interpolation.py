@@ -63,7 +63,8 @@ def create_interpolation_least_squares_domain(
     # Find nearest neighbors of each fine point in an aggregate.
     if repetitive:
         coarse_location = hm.setup.geometry.coarse_locations(fine_location, aggregate_size, num_components)
-        nbhr = hm.setup.geometry.geometric_neighbors_from_locations(fine_location, coarse_location, domain_size, aggregate_size)
+        nbhr = hm.setup.geometry.geometric_neighbors_from_locations(
+            fine_location, coarse_location, domain_size, aggregate_size)
     else:
         nbhr = _get_neighbor_set(x, a, r, neighborhood)
 
@@ -148,14 +149,7 @@ def _create_interpolation_fitter(x: np.ndarray, xc: np.ndarray, residual: np.nda
         x_disjoint_aggregate_t, xc_disjoint_aggregate_t = x.transpose(), xc.transpose()
         # TODO(orenlivne): fix this to be all local residual norms in the non-repetitive case.
         r_norm_disjoint_aggregate_t = None
-        # residual_window_size = 3 * aggregate_size  # Good for 1D.
-        # residual_window_offset = -(residual_window_size // 2)
-        # r_norm_disjoint_aggregate_t = np.concatenate(
-        # tuple(
-        #     np.linalg.norm(
-        #         hm.linalg.get_window(residual, offset + aggregate_size // 2 + residual_window_offset, residual_window_size),
-        #         axis=1) / residual_window_size ** 0.5
-        #     for offset in range(x.shape)), axis=1).transpose()
+
     if weighted:
         # Weighted LS: sum(w*(xc- x))^2 = sum(w^2*xc^2 - w*x^2).
         weight = np.clip(r_norm_disjoint_aggregate_t, 1e-15, None) ** (-1)
