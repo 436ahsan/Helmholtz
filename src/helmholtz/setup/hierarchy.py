@@ -19,11 +19,11 @@ def create_coarse_level(a: scipy.sparse.csr_matrix, b: scipy.sparse.csr_matrix,
     Returns: coarse level object.
     """
     # Form the SYMMETRIC Galerkin coarse-level operator.
-    pt = r if use_r_as_restriction else p.transpose()
-    ac = (pt.dot(a)).dot(p)
-    bc = (pt.dot(b)).dot(p)
+    restriction = r if use_r_as_restriction else p.transpose()
+    ac = (restriction.dot(a)).dot(p)
+    bc = (restriction.dot(b)).dot(p)
     relaxer = hm.solve.relax.KaczmarzRelaxer(ac, bc)
-    return hm.hierarchy.multilevel.Level(ac, bc, relaxer, r, p)
+    return hm.hierarchy.multilevel.Level(ac, bc, relaxer, r, p, restriction)
 
 
 def create_finest_level(a: scipy.sparse.spmatrix, relaxer=None) -> multilevel.Level:
