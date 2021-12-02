@@ -74,7 +74,7 @@ def create_interpolation_least_squares_domain(
     if repetitive and num_windows is None:
         fine_level_size, num_test_functions = x.shape
         num_aggregates = int(np.ceil(fine_level_size / aggregate_size))
-        num_windows = max(np.minimum(num_aggregates, (12 * max_caliber) // num_test_functions), 1)
+        num_windows = np.minimum(num_aggregates * num_test_functions, 12 * max_caliber)
     fitter, fold_sizes = _create_interpolation_fitter(
         x, xc, residual, aggregate_size, num_components, num_windows, repetitive=repetitive,
         num_test_examples=num_test_examples, fit_scheme=fit_scheme, weighted=weighted)

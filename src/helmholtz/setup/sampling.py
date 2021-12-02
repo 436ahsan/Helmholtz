@@ -23,35 +23,31 @@ def get_disjoint_windows(x, xc, r, aggregate_size: int, num_components: int, num
     - Windows of coarse-level test functions on the same aggregates.
     - Windows of local residual norms corresponding to the 'x' windows.
     """
-    num_test_functions = x.shape[1]
-
     # Create windows of 'x'.
-    x_disjoint_aggregate_t = hm.linalg.get_windows_by_index(x, np.arange(aggregate_size), aggregate_size, num_windows * num_test_functions)
+    x_disjoint_aggregate_t = hm.linalg.get_windows_by_index(x, np.arange(aggregate_size), aggregate_size, num_windows)
 
     # Create corresponding windows of 'xc'. Note: we are currently concatenating the entire coarse domain 'num_windows'
     # times. This is not necessary if neighbor computation is done here and not inside create_interpolation(). For
     # now, we keep create_interpolation() general and do the nbhr computation there.
     # TODO(orenlivne): reduce storage here using smart periodic indexing or calculate the nbhr set here first
     # and only pass windows of nbhr values to create_interpolation.
-    xc_disjoint_aggregate_t = hm.linalg.get_windows_by_index(
-        xc, np.arange(xc.shape[0]), num_components, num_windows * num_test_functions)
+    xc_disjoint_aggregate_t = hm.linalg.get_windows_by_index(xc, np.arange(xc.shape[0]), num_components, num_windows)
 
-    # Create local residual norms corresponding to the 'x'-windows.
+    # Create local residual norms corresponding to the 'x'-windows. 3 * aggregate_size domain for norm is good for 1D.
     # TODO(orenlivne): in graph problems, replace residual_window_size by aggregate_size + sum of its
     #  residual_window_size aggregate sizes.
-    residual_window_size = 3 * aggregate_size  # Good for 1D.
-    r_norm_disjoint_aggregate_t = residual_norm_windows(r, aggregate_size, num_windows, residual_window_size)
+    r_norm_disjoint_aggregate_t = residual_norm_windows(r, 3 * aggregate_size, aggregate_size, num_windows)
 
     return x_disjoint_aggregate_t, xc_disjoint_aggregate_t, r_norm_disjoint_aggregate_t
 
 
-def residual_norm_windows(r, aggregate_size, num_windows, residual_window_size):
+def residual_norm_windows(r, residual_window_size, aggregate_size, num_windows):
     # Each residual window is centered at the center of the aggregate = offset + aggregate_size // 2, and
     # extends ~ 0.5 * residual_window_size in each direction. Then the scaled L2 norm of window is calculated.
     window_start = aggregate_size // 2 - (residual_window_size // 2)
 
     r_windows = hm.linalg.get_windows_by_index(
-        r, np.arange(window_start, window_start + residual_window_size), aggregate_size, num_windows * r.shape[1])
+        r, np.arange(window_start, window_start + residual_window_size), aggregate_size, num_windows)
     r_norm_disjoint_aggregate_t = np.linalg.norm(r_windows, axis=1) / residual_window_size ** 0.5
 
     # In principle, each point in the aggregate should have a slightly shifted residual window, but we just take the
