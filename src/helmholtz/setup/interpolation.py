@@ -127,9 +127,23 @@ def _create_interpolation_fitter(x: np.ndarray, xc: np.ndarray, residual: np.nda
     :return:
     """
     if repetitive:
-        # TODO(orenlivne): change window stride from aggregate_size to nc.
-        x_disjoint_aggregate_t, xc_disjoint_aggregate_t, r_norm_disjoint_aggregate_t = \
-            hm.setup.sampling.get_disjoint_windows(x, xc, residual, aggregate_size, num_components, num_windows)
+        # TODO(orenlivne): change window stride from aggregate_size to nc; we can create more windows this way. xc
+        # needs to be locally computed on each window=aggregate in that case.
+        # Create windows of 'x'.
+        x_disjoint_aggregate_t = hm.linalg.get_windows_by_index(
+            x, np.arange(aggregate_size), aggregate_size, num_windows)
+
+        # Create corresponding windows of 'xc'. Note: we are currently including the entire domainin the window.
+        # TODO(orenlivne): reduce storage here using smart periodic indexing or calculate the nbhr set here first
+        # and only pass windows of nbhr values to create_interpolation.
+        xc_disjoint_aggregate_t = hm.linalg.get_windows_by_index(
+            xc, np.arange(xc.shape[0]), num_components, num_windows)
+
+        # Create local residual norms corresponding to the 'x'-windows. 3 * aggregate_size domain is good for 1D.
+        # TODO(orenlivne): in graph problems, replace residual_window_size by aggregate_size + sum of its
+        #  residual_window_size aggregate sizes.
+        r_norm_disjoint_aggregate_t = hm.setup.sampling.residual_norm_windows(
+            residual, 3 * aggregate_size, aggregate_size, num_windows)
     else:
         x_disjoint_aggregate_t, xc_disjoint_aggregate_t = x.transpose(), xc.transpose()
         # TODO(orenlivne): fix this to be all local residual norms in the non-repetitive case.
