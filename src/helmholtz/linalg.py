@@ -375,3 +375,18 @@ def get_window(x: np.ndarray, offset: int, aggregate_size: int) -> np.ndarray:
     Returns: x[offset:offset+aggregate_size]. Wraps around if out of bounds.
     """
     return np.take(x, range(offset, offset + aggregate_size), axis=0, mode="wrap")
+
+
+def get_windows_by_index(x, index, stride, num_windows):
+    """
+    Returns periodic-index windows (samples) of a test matrix (x[index % x.shape[0]] and shifts of it).
+    :param x: test matrix (#points x #functions).
+    :param index: relative window index to be extracted.
+    :param stride: stride between windows.
+    :param num_windows: number of windows to return.
+    :return: len(index) x num_windows matrix of samples.
+    """
+    return np.concatenate(tuple(
+        np.take(x, index + stride * offset, axis=0, mode="wrap")
+        for offset in range(int(np.ceil(num_windows / x.shape[1])))),
+        axis=1).transpose()[:num_windows]

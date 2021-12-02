@@ -26,14 +26,14 @@ def get_disjoint_windows(x, xc, r, aggregate_size: int, num_components: int, num
     num_test_functions = x.shape[1]
 
     # Create windows of 'x'.
-    x_disjoint_aggregate_t = get_windows_by_index(x, np.arange(aggregate_size), aggregate_size, num_windows * num_test_functions)
+    x_disjoint_aggregate_t = hm.linalg.get_windows_by_index(x, np.arange(aggregate_size), aggregate_size, num_windows * num_test_functions)
 
     # Create corresponding windows of 'xc'. Note: we are currently concatenating the entire coarse domain 'num_windows'
     # times. This is not necessary if neighbor computation is done here and not inside create_interpolation(). For
     # now, we keep create_interpolation() general and do the nbhr computation there.
     # TODO(orenlivne): reduce storage here using smart periodic indexing or calculate the nbhr set here first
     # and only pass windows of nbhr values to create_interpolation.
-    xc_disjoint_aggregate_t = get_windows_by_index(
+    xc_disjoint_aggregate_t = hm.linalg.get_windows_by_index(
         xc, np.arange(xc.shape[0]), num_components, num_windows * num_test_functions)
 
     # Create local residual norms corresponding to the 'x'-windows.
@@ -45,27 +45,12 @@ def get_disjoint_windows(x, xc, r, aggregate_size: int, num_components: int, num
     return x_disjoint_aggregate_t, xc_disjoint_aggregate_t, r_norm_disjoint_aggregate_t
 
 
-def get_windows_by_index(x, index, stride, num_windows):
-    """
-    Returns periodic-index windows (samples) of a test matrix.
-    :param x: test matrix (#points x #functions).
-    :param index: relative window index to be extracted.
-    :param stride: stride between windows.
-    :param num_windows: number of windows to return.
-    :return: len(index) x num_windows matrix of samples.
-    """
-    return np.concatenate(tuple(
-        np.take(x, index + stride * offset, axis=0, mode="wrap")
-        for offset in range(int(np.ceil(num_windows / x.shape[1])))),
-        axis=1).transpose()[:num_windows]
-
-
 def residual_norm_windows(r, aggregate_size, num_windows, residual_window_size):
     # Each residual window is centered at the center of the aggregate = offset + aggregate_size // 2, and
     # extends ~ 0.5 * residual_window_size in each direction. Then the scaled L2 norm of window is calculated.
     window_start = aggregate_size // 2 - (residual_window_size // 2)
 
-    r_windows = get_windows_by_index(
+    r_windows = hm.linalg.get_windows_by_index(
         r, np.arange(window_start, window_start + residual_window_size), aggregate_size, num_windows * r.shape[1])
     r_norm_disjoint_aggregate_t = np.linalg.norm(r_windows, axis=1) / residual_window_size ** 0.5
 
