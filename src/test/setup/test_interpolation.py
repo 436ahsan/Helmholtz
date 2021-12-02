@@ -16,7 +16,7 @@ class TestInterpolation:
     def setup_method(self):
         """Fixed random seed for deterministic results."""
         np.random.seed(0)
-        hm.logging.set_simple_logging(logging.DEBUG)
+        hm.logging.set_simple_logging(logging.WARN)
 
     def test_create_coarsening_domain_non_repetitive(self):
         n = 32
@@ -322,7 +322,7 @@ class TestInterpolation:
 
         error_a = np.mean(norm(a.dot(x - p.dot(r.dot(x))), axis=0) / norm(x, axis=0))
         assert p[0].nnz == 4
-        assert error_a == pytest.approx(0.125, 1e-2)
+        assert error_a == pytest.approx(0.128, 1e-2)
         assert p.shape == (32, 16)
 
 

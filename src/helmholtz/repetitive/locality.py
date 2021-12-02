@@ -103,7 +103,8 @@ def create_two_level_hierarchy_from_matrix(a, location, r, p, aggregate_size, nc
     return multilevel
 
 
-def two_level_conv_factor(multilevel, nu_pre, nu_post: int = 0, print_frequency: int = None, debug: bool = False):
+def two_level_conv_factor(multilevel, nu_pre, nu_post: int = 0, print_frequency: int = None, debug: bool = False,
+                          residual_stop_value: float = 1e-10):
     level = multilevel.finest_level
     n = level.size
     # Test two-level cycle convergence for A*x=b with b=A*x0, x0=random[-1, 1].
@@ -119,7 +120,8 @@ def two_level_conv_factor(multilevel, nu_pre, nu_post: int = 0, print_frequency:
         return b - multilevel[0].operator(x)
 
     return hm.solve.run.run_iterative_method(
-        residual, two_level_cycle, np.random.random((n, )), 20, print_frequency=print_frequency)
+        residual, two_level_cycle, np.random.random((n, )), 20, print_frequency=print_frequency,
+        residual_stop_value=residual_stop_value)
 
 
 def two_level_conv_data_frame(kh, discretization, r, p, aggregate_size, m_values, nu_values):

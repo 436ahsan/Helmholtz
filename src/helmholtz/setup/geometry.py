@@ -67,7 +67,6 @@ def geometric_neighbors_from_locations(fine_location: np.ndarray,
         coarse_location: coarse-level variable location.
         domain_size: size of domain.
         aggregate_size: size of window (aggregate).
-        num_components: number of coarse variables per aggregate.
         max_caliber: number of neighbors to return.
 
     Returns: array of coarse variable location.

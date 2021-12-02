@@ -60,5 +60,6 @@ class TestIdealTvInterpolation:
         assert fill_in_factor == pytest.approx(1.67, 1e-2)
 
         nu = 4
-        y, conv_factor = hm.repetitive.locality.two_level_conv_factor(multilevel, nu, print_frequency=None)
-        assert conv_factor == pytest.approx(0.145, 1e-2)
+        y, conv_factor = hm.repetitive.locality.two_level_conv_factor(multilevel, nu, print_frequency=1,
+                                                                      residual_stop_value=1e-8)
+        assert conv_factor == pytest.approx(0.142, 1e-2)

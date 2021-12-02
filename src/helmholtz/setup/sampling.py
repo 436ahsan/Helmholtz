@@ -39,7 +39,8 @@ def get_disjoint_windows(x, xc, r, aggregate_size: int, num_components: int, num
     # Create local residual norms corresponding to the 'x'-windows.
     # TODO(orenlivne): in graph problems, replace residual_window_size by aggregate_size + sum of its
     #  residual_window_size aggregate sizes.
-    r_norm_disjoint_aggregate_t = residual_norm_windows(r, aggregate_size, num_windows)
+    residual_window_size = 3 * aggregate_size  # Good for 1D.
+    r_norm_disjoint_aggregate_t = residual_norm_windows(r, aggregate_size, num_windows, residual_window_size)
 
     return x_disjoint_aggregate_t, xc_disjoint_aggregate_t, r_norm_disjoint_aggregate_t
 
@@ -59,16 +60,15 @@ def get_windows_by_index(x, index, stride, num_windows):
         axis=1).transpose()[:num_windows]
 
 
-def residual_norm_windows(r, aggregate_size, num_windows):
-    residual_window_size = 3 * aggregate_size  # Good for 1D.
-    residual_window_offset = -(residual_window_size // 2)
+def residual_norm_windows(r, aggregate_size, num_windows, residual_window_size):
     # Each residual window is centered at the center of the aggregate = offset + aggregate_size // 2, and
     # extends ~ 0.5 * residual_window_size in each direction. Then the scaled L2 norm of window is calculated.
-    r_norm_disjoint_aggregate_t = np.concatenate(tuple(np.linalg.norm(
-        hm.linalg.get_window(r,
-                             (offset + aggregate_size // 2 + residual_window_offset) % r.shape[0],
-                             residual_window_size),
-        axis=0) for offset in range(num_windows))) / residual_window_size ** 0.5
+    window_start = aggregate_size // 2 - (residual_window_size // 2)
+
+    r_windows = get_windows_by_index(
+        r, np.arange(window_start, window_start + residual_window_size), aggregate_size, num_windows * r.shape[1])
+    r_norm_disjoint_aggregate_t = np.linalg.norm(r_windows, axis=1) / residual_window_size ** 0.5
+
     # In principle, each point in the aggregate should have a slightly shifted residual window, but we just take the
     # same residual norm for all points for simplicity. Should not matter much.
     return np.tile(r_norm_disjoint_aggregate_t[:, None], (aggregate_size, ))
