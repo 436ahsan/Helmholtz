@@ -25,34 +25,24 @@ def get_disjoint_windows(x, xc, r, aggregate_size: int, num_components: int, num
     """
     domain_size, num_test_functions = x.shape
     num_aggregates = int(np.ceil(domain_size / aggregate_size))
-    #    print("max_caliber", max_caliber, "num_test_functions", num_test_functions, "num_windows",
-    #    num_windows, "num_aggregates", num_aggregates)
 
     # Create windows of 'x'.
-    x_disjoint_aggregate_t = get_disjoint_windows_by_range(x, aggregate_size, aggregate_size, num_windows)
-    #x_disjoint_aggregate_t = get_windows_by_index(x, np.arange(aggregate_size), aggregate_size, num_windows)
+    x_disjoint_aggregate_t = get_windows_by_index(x, np.arange(aggregate_size), aggregate_size, num_windows * num_test_functions)
 
     # Create corresponding windows of 'xc'. Note: we are currently concatenating the entire coarse domain 'num_windows'
     # times. This is not necessary if neighbor computation is done here and not inside create_interpolation(). For
     # now, we keep create_interpolation() general and do the nbhr computation there.
     # TODO(orenlivne): reduce storage here using smart periodic indexing or calculate the nbhr set here first
     # and only pass windows of nbhr values to create_interpolation.
-    xc_disjoint_aggregate_t = get_disjoint_windows_by_range(
-        xc, num_components * num_aggregates, num_components, num_windows)
+    xc_disjoint_aggregate_t = get_windows_by_index(
+        xc, np.arange(num_components * num_aggregates), num_components, num_windows * num_test_functions)
 
     # Create local residual norms corresponding to the 'x'-windows.
-    # TODO(orenlivne): in graph problems, replace residual_window_size by aggregate_size + sum of its residual_window_size
-    # aggregate sizes.
+    # TODO(orenlivne): in graph problems, replace residual_window_size by aggregate_size + sum of its
+    #  residual_window_size aggregate sizes.
     r_norm_disjoint_aggregate_t = residual_norm_windows(r, aggregate_size, num_windows)
 
     return x_disjoint_aggregate_t, xc_disjoint_aggregate_t, r_norm_disjoint_aggregate_t
-
-
-def get_disjoint_windows_by_range(x, window_size, stride, num_windows):
-    return np.concatenate(
-        tuple(hm.linalg.get_window(x, stride * offset, window_size)
-              for offset in range(num_windows)),
-        axis=1).transpose()
 
 
 def get_windows_by_index(x, index, stride, num_windows):
