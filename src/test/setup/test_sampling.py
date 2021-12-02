@@ -52,11 +52,3 @@ class TestCoarseningUniform:
              [38, 39, 30, 31],
              [0, 1, 2, 3]
         ]))
-
-        # r = cr.Coarsener(np.array([[1, 0]]))
-        # r = r.tile(n // 2)
-        #
-        # xc = r.dot(x)
-        # xc_windows = hm.setup.sampling.get_windows(xc, aggregate_size, stride, num_windows)
-        #
-        # assert xc_windows.shape == (num_windows, aggregate_size)

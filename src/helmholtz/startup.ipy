@@ -25,7 +25,7 @@ logging.basicConfig(stream=sys.stdout, level=logging.INFO, format="%(levelname)-
 pd.set_option('display.max_rows', 500)
 pd.set_option('display.max_columns', 500)
 pd.set_option('display.width', 1000)
-pd.options.display.float_format = "{:,.2f}".format
+pd.options.display.float_format = "{:,.4f}".format
 
 logger = logging.getLogger("main")
 _LOGGER = logger
