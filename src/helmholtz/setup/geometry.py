@@ -72,10 +72,8 @@ def geometric_neighbors_from_locations(fine_location: np.ndarray,
 
     Returns: array of coarse variable location.
     """
-    xf = hm.setup.sampling.wrap_index_to_low_value(fine_location, domain_size)
-    xc = hm.setup.sampling.wrap_index_to_low_value(coarse_location, domain_size)
-
     # Find nearest neighbors of each fine P^T*A point (pta_vars).
     # These are INDICES into the rap_vars array.
-    nbhr = np.argsort(np.abs(xf[:, None] - xc), axis=1)
+    nbhr = np.argsort(
+        np.abs(hm.linalg.wrap_index_to_low_value(fine_location[:, None] - coarse_location, domain_size)), axis=1)
     return nbhr[:aggregate_size, :max_caliber]

@@ -59,12 +59,6 @@ def get_windows_by_index(x, index, stride, num_windows):
         axis=1).transpose()[:num_windows]
 
 
-def wrap_index_to_low_value(index, n):
-    result = index.copy()
-    result[result > n // 2] -= n
-    return result
-
-
 def residual_norm_windows(r, aggregate_size, num_windows):
     residual_window_size = 3 * aggregate_size  # Good for 1D.
     residual_window_offset = -(residual_window_size // 2)

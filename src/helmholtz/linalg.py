@@ -25,20 +25,6 @@ def normalize_signs(r, axis=0):
         return r * np.sign(r[0])[None, :]
 
 
-def get_window(x: np.ndarray, offset: int, aggregate_size: int) -> np.ndarray:
-    """
-    Returns a periodic window x[offset:offset+aggregate_size].
-
-    Args:
-        x: vector or matrix.
-        offset: window start.
-        aggregate_size: window size.
-
-    Returns: x[offset:offset+aggregate_size]. Wraps around if out of bounds.
-    """
-    return np.take(x, range(offset, offset + aggregate_size), axis=0, mode="wrap")
-
-
 def get_uniform_aggregate_starts(domain_size, aggregate_size):
     """
     Returns the list of aggregate starts, for a domain size and fixed aggregate size over the entire domain. The last
@@ -364,3 +350,28 @@ def create_folds(x: np.ndarray, num_samples: Tuple[int]) -> Tuple[np.ndarray]:
         num_samples, x.shape)
     endpoints = np.concatenate(([0], np.cumsum(num_samples)))
     return [x[begin:end] for begin, end in zip(endpoints[:-1], endpoints[1:])]
+
+
+def wrap_index_to_low_value(x, period):
+    """
+    Returns a periodic index modulo n in [-n/2,  n/2] (i.e., the remainder with last absolute value).
+
+    :param x: value to wrap.
+    :param period: period.
+    :return: index modulo n -- the remainder with last absolute value.
+    """
+    return (x + 0.5 * period) % period - 0.5 * period
+
+
+def get_window(x: np.ndarray, offset: int, aggregate_size: int) -> np.ndarray:
+    """
+    Returns a periodic window x[offset:offset+aggregate_size].
+
+    Args:
+        x: vector or matrix.
+        offset: window start.
+        aggregate_size: window size.
+
+    Returns: x[offset:offset+aggregate_size]. Wraps around if out of bounds.
+    """
+    return np.take(x, range(offset, offset + aggregate_size), axis=0, mode="wrap")
