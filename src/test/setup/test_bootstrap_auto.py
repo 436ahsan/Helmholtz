@@ -59,8 +59,8 @@ class TestBootstrapAuto:
 
         coarse_level = multilevel[1]
         assert coarse_level.a.shape == (8, 8)
-        assert coarse_level._r_csr.shape == (8, 16)
-        assert coarse_level._p_csr.shape == (16, 8)
+        assert coarse_level._r.shape == (8, 16)
+        assert coarse_level._p.shape == (16, 8)
         coarse_level.print()
 
         # Test two-level cycle convergence for A*x=0.
@@ -94,7 +94,7 @@ class TestBootstrapAuto:
 #        assert np.array(p.sum(axis=1)).flatten().std() < 1e-4
 
         # Coarsening ~ averaging.
-        r = coarse_level._r_csr
+        r = coarse_level._r
         assert_array_equal(r[0].nonzero()[0], [0, 0])
         assert_array_equal(r[0].nonzero()[1], [0, 1])
         assert_array_almost_equal(r[0].data, [-0.7, -0.71], decimal=2)
@@ -121,8 +121,8 @@ class TestBootstrapAuto:
 
         coarse_level = multilevel[1]
         assert coarse_level.a.shape == (8, 8)
-        assert coarse_level._r_csr.shape == (8, 16)
-        assert coarse_level._p_csr.shape == (16, 8)
+        assert coarse_level._r.shape == (8, 16)
+        assert coarse_level._p.shape == (16, 8)
         coarse_level.print()
 
     @unittest.skip("Bootstrap still WIP")

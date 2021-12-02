@@ -16,7 +16,7 @@ _LOGGER = logging.getLogger("multilevel")
 class Level:
     """A single level in the multilevel hierarchy."""
 
-    def __init__(self, a, b, relaxer, r_csr, p_csr):
+    def __init__(self, a, b, relaxer, r, p):
         """
         Creates a level in the multilevel hierarchy.
         Args:
@@ -25,14 +25,12 @@ class Level:
             relaxer: relaxation execution object.
             r: coarsening operator (type of coarse variables that this level is).
             p: this-level-to-next-finer-level interpolation.
-            r_csr: coarsening operator in CSR matrix form (for repetitive problems).
-            p_csr: interpolation operator in CSR matrix form (for repetitive problems).
         """
         self.a = a
         self.b = b
-        self._r_csr = r_csr
-        self._p_csr = p_csr
-        self._restriction_csr = p_csr.transpose() if p_csr is not None else None
+        self._r = r
+        self._p = p
+        self._restriction_csr = p.transpose() if p is not None else None
         self._relaxer = relaxer
 
     @staticmethod
@@ -47,10 +45,10 @@ class Level:
     def print(self):
         _LOGGER.info("a = \n" + str(self.a.toarray()))
 
-        if isinstance(self._r_csr, scipy.sparse.csr_matrix):
-            _LOGGER.info("r = \n" + str(self._r_csr.todense()))
-        if isinstance(self._p_csr, scipy.sparse.csr_matrix):
-            _LOGGER.info("p = \n" + str(self._p_csr.todense()))
+        if isinstance(self._r, scipy.sparse.csr_matrix):
+            _LOGGER.info("r = \n" + str(self._r.todense()))
+        if isinstance(self._p, scipy.sparse.csr_matrix):
+            _LOGGER.info("p = \n" + str(self._p.todense()))
 
     def stiffness_operator(self, x: np.array) -> np.array:
         """
@@ -146,7 +144,7 @@ class Level:
         Returns:
             x^c = R*x.
         """
-        return self._r_csr.dot(x)
+        return self._r.dot(x)
 
     def interpolate(self, xc: np.array) -> np.array:
         """
@@ -157,7 +155,7 @@ class Level:
         Returns:
             x = P*x^c.
         """
-        return self._p_csr.dot(xc)
+        return self._p.dot(xc)
 
 
 class Multilevel:
