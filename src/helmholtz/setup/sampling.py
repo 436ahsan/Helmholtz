@@ -23,8 +23,7 @@ def get_disjoint_windows(x, xc, r, aggregate_size: int, num_components: int, num
     - Windows of coarse-level test functions on the same aggregates.
     - Windows of local residual norms corresponding to the 'x' windows.
     """
-    domain_size, num_test_functions = x.shape
-    num_aggregates = int(np.ceil(domain_size / aggregate_size))
+    num_test_functions = x.shape[1]
 
     # Create windows of 'x'.
     x_disjoint_aggregate_t = get_windows_by_index(x, np.arange(aggregate_size), aggregate_size, num_windows * num_test_functions)
@@ -35,7 +34,7 @@ def get_disjoint_windows(x, xc, r, aggregate_size: int, num_components: int, num
     # TODO(orenlivne): reduce storage here using smart periodic indexing or calculate the nbhr set here first
     # and only pass windows of nbhr values to create_interpolation.
     xc_disjoint_aggregate_t = get_windows_by_index(
-        xc, np.arange(num_components * num_aggregates), num_components, num_windows * num_test_functions)
+        xc, np.arange(xc.shape[0]), num_components, num_windows * num_test_functions)
 
     # Create local residual norms corresponding to the 'x'-windows.
     # TODO(orenlivne): in graph problems, replace residual_window_size by aggregate_size + sum of its
