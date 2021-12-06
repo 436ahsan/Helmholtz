@@ -30,7 +30,8 @@ def create_interpolation_least_squares_domain(
         target_error: float = 0.2,
         kind: str = "l2",
         fit_scheme: str = "ridge",
-        weighted: bool = False) -> \
+        weighted: bool = False,
+        ritz: bool = False) -> \
         scipy.sparse.csr_matrix:
     """
     Creates the interpolation operator P by least squares fitting from r*x to x. Interpolatory sets are automatically
@@ -67,6 +68,10 @@ def create_interpolation_least_squares_domain(
             fine_location, coarse_location, domain_size, aggregate_size)
     else:
         nbhr = _get_neighbor_set(x, a, r, neighborhood)
+
+    if ritz:
+        # Apply local Ritz projection (on which sub-domain?) to obtain smoother TVs.
+        x, _ = hm.linalg.ritz(x, lambda x: a.dot(x))
 
     # Prepare fine and coarse test matrices.
     xc = r.dot(x)
@@ -153,13 +158,14 @@ def _create_interpolation_fitter(x: np.ndarray, xc: np.ndarray, residual: np.nda
     if weighted:
         # Weighted LS: sum(w*(xc- x))^2 = sum(w^2*xc^2 - w*x^2).
         weight = np.clip(r_norm_disjoint_aggregate_t, 1e-15, None) ** (-1)
+        #print("r_norm_disjoint_aggregate_t", r_norm_disjoint_aggregate_t)
     else:
         weight = np.ones_like(x_disjoint_aggregate_t)
 
     # Create folds.
     num_examples = int(x_disjoint_aggregate_t.shape[0])
     num_ls_examples = num_examples - num_test_examples
-    val_samples = int(0.2 * num_ls_examples)
+    val_samples = int(0.5 * num_ls_examples)
     fit_samples = num_examples - val_samples - num_test_examples
 
     if repetitive:
@@ -171,7 +177,9 @@ def _create_interpolation_fitter(x: np.ndarray, xc: np.ndarray, residual: np.nda
         fold_sizes = (fit_samples, val_samples, num_test_examples)
 
     # Ridge regularization parameter (list of values).
-    alpha = np.array([0, 0.01, 0.1, 0.1, 1])
+    #alpha = np.array([0])
+    alpha = np.array([0, 1e-4, 1e-3, 1e-2, 1e-1, 1])
+    #alpha = np.logspace(1e-4, 2, 10)
 
     if fit_scheme == "plain":
         fitter = lambda nbhr: \

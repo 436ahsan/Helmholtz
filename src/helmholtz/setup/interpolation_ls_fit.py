@@ -243,13 +243,15 @@ def create_interpolation_least_squares_ridge(
     assert len(nbhr) == n
     nc = xc.shape[1]
     if fit_samples is None or val_samples is None or test_samples is None:
-        fit_samples, val_samples, test_samples = num_examples // 3, num_examples // 3, num_examples // 3
+        fit_samples, val_samples, test_samples = num_examples // 2, num_examples // 4
+        test_samples = num_examples - fit_samples - val_samples
     folds = (fit_samples, val_samples, test_samples)
     x_fit, x_val, x_test = hm.linalg.create_folds(x, folds)
     xc_fit, xc_val, xc_test = hm.linalg.create_folds(xc, folds)
     weight_fit, weight_val, _ = hm.linalg.create_folds(weight, folds)
 
     # Fit interpolation by least-squares.
+    i = 0
     result = [optimized_fit_interpolation(
         np.diag(weight_fit[:, i]).dot(xc_fit[:, nbhr_i]),
         np.diag(weight_fit[:, i]).dot(x_fit[:, i]),

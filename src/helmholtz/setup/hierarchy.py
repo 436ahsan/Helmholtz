@@ -6,7 +6,8 @@ import helmholtz.hierarchy.multilevel as multilevel
 
 def create_coarse_level(a: scipy.sparse.csr_matrix, b: scipy.sparse.csr_matrix,
                         r: scipy.sparse.csr_matrix, p: scipy.sparse.csr_matrix,
-                        use_r_as_restriction: bool = False) -> multilevel.Level:
+                        use_r_as_restriction: bool = False,
+                        symmetrize: bool = False) -> multilevel.Level:
     """
     Creates a tiled coarse level.
     Args:
@@ -15,6 +16,7 @@ def create_coarse_level(a: scipy.sparse.csr_matrix, b: scipy.sparse.csr_matrix,
         r: aggregate coarsening.
         p: aggregate interpolation.
         use_r_as_restriction: use R*A*P as coarse operator, if True, else P^T*A*P.
+        symmetrize: iff True, use the symmetric part of the coarse-level operator.
 
     Returns: coarse level object.
     """
@@ -22,6 +24,9 @@ def create_coarse_level(a: scipy.sparse.csr_matrix, b: scipy.sparse.csr_matrix,
     restriction = r if use_r_as_restriction else p.transpose()
     ac = (restriction.dot(a)).dot(p)
     bc = (restriction.dot(b)).dot(p)
+    if symmetrize:
+        ac = 0.5 * (ac + ac.transpose())
+        bc = 0.5 * (bc + bc.transpose())
     relaxer = hm.solve.relax.KaczmarzRelaxer(ac, bc)
     return hm.hierarchy.multilevel.Level(ac, bc, relaxer, r, p, restriction)
 

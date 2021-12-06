@@ -105,11 +105,9 @@ class FixedAggSizeUniformCoarsener:
         aggregate size. Returns PCs of each aggregate and singular values of each aggregate."""
         x = self._x
         if self._repetitive:
-            # Keep enough windows so that we have enough samples (4 * aggregate_size) an over-determined LS problem
-            # for R.
-            x_aggregate_t = np.concatenate(
-                tuple(hm.linalg.get_window(x, offset, self._aggregate_size)
-                      for offset in range(max((4 * self._aggregate_size) // x.shape[1], 1))), axis=1).transpose()
+            # Keep enough windows=samples (4 * aggregate_size) an over-determined LS problem for R.
+            x_aggregate_t = hm.linalg.get_windows_by_index(
+                x, np.arange(self._aggregate_size), 1, 4 * self._aggregate_size)
             # Tile the same coarsening over all aggregates.
             aggregate_coarsening = create_coarsening(x_aggregate_t, self._num_components)
             svd_results = [aggregate_coarsening for _ in self._starts]

@@ -2,13 +2,10 @@ import logging
 import sys
 import numpy as np
 
-import helmholtz as hm
-import helmholtz.repetitive.coarsening_repetitive as cr
-
 logger = logging.getLogger("nb")
 
 
-class TestCoarseningUniform:
+class TestSampling:
 
     def setup_method(self):
         """Fixed random seed for deterministic results."""

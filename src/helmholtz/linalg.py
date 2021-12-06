@@ -240,7 +240,7 @@ def gram_schmidt(a: np.ndarray) -> np.ndarray:
 
 def ritz(x: np.ndarray, action) -> Tuple[np.ndarray, np.ndarray]:
     """
-    Performs a Ritz projection on matrix columns.
+    Performs a Ritz projection on matrix columns. Outputs the smallest-magnitude eigenvalues.
 
     Args:
         x: original matrix (n x k).
@@ -361,20 +361,6 @@ def wrap_index_to_low_value(x, period):
     :return: index modulo n -- the remainder with last absolute value.
     """
     return (x + 0.5 * period) % period - 0.5 * period
-
-
-def get_window(x: np.ndarray, offset: int, aggregate_size: int) -> np.ndarray:
-    """
-    Returns a periodic window x[offset:offset+aggregate_size].
-
-    Args:
-        x: vector or matrix.
-        offset: window start.
-        aggregate_size: window size.
-
-    Returns: x[offset:offset+aggregate_size]. Wraps around if out of bounds.
-    """
-    return np.take(x, range(offset, offset + aggregate_size), axis=0, mode="wrap")
 
 
 def get_windows_by_index(x, index, stride, num_windows):

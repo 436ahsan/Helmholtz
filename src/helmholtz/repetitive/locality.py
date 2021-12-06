@@ -80,7 +80,8 @@ def create_two_level_hierarchy(kh, discretization, m, r, p, aggregate_size, nc, 
     return multilevel
 
 
-def create_two_level_hierarchy_from_matrix(a, location, r, p, aggregate_size, nc, use_r_as_restriction: bool = False):
+def create_two_level_hierarchy_from_matrix(a, location, r, p, aggregate_size, nc, use_r_as_restriction: bool = False,
+                                           symmetrize: bool = False):
     m = a.shape[0]
     if isinstance(r, scipy.sparse.csr_matrix):
         r_csr = r
@@ -94,7 +95,8 @@ def create_two_level_hierarchy_from_matrix(a, location, r, p, aggregate_size, nc
     level0.location = location
     # relaxer=hm.solve.relax.GsRelaxer(a) if kh == 0 else None)
     level1 = hm.setup.hierarchy.create_coarse_level(level0.a, level0.b, r_csr, p_csr,
-                                                    use_r_as_restriction=use_r_as_restriction)
+                                                    use_r_as_restriction=use_r_as_restriction,
+                                                    symmetrize=symmetrize)
     # Calculate coarse-level variable locations. At each aggregate center we have 'num_components' coarse variables.
     level1.location = hm.setup.geometry.coarse_locations(level0.location, aggregate_size, nc)
 
@@ -132,11 +134,12 @@ def two_level_conv_data_frame(kh, discretization, r, p, aggregate_size, m_values
             index=m_values, columns=nu_values)
 
 
-def create_coarsening(x, aggregate_size, num_components, normalize: bool = False):
+def create_coarsening(x, aggregate_size, num_components, normalize: bool = False, num_windows: int = None):
     # Construct coarsening on an aggregate.
-    x_aggregate_t = np.concatenate(
-        tuple(hm.linalg.get_window(x, offset, aggregate_size)
-              for offset in range(max((4 * aggregate_size) // x.shape[1], 1))), axis=1).transpose()
+    if num_windows is None:
+        num_windows = 12 * aggregate_size
+    x_aggregate_t = hm.linalg.get_windows_by_index(
+        x, np.arange(aggregate_size), aggregate_size, num_windows)
     # Tile the same coarsening over all aggregates.
     r, s = hm.setup.coarsening_uniform.create_coarsening(x_aggregate_t, num_components, normalize=normalize)
     return hrc.Coarsener(r), s

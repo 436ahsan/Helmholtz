@@ -228,7 +228,7 @@ def bootstap(x,
     coarse_level = multilevel[1] if len(multilevel) > 1 else None
     _LOGGER.info("Relax cycle conv factor {:.3f} asymptotic RQ {:.3f} RER {:.3f} P error {:.3f}".format(
         conv_factor, level.rq(y), norm(level.operator(y)) / norm(y),
-        norm(y - coarse_level.p.dot(coarse_level.coarsen(y))) / norm(y) if coarse_level is not None else -1))
+        norm(y - coarse_level.interpolate(coarse_level.coarsen(y))) / norm(y) if coarse_level is not None else -1))
 
     # if conv_factor < relax_conv_factor:
     #     # Relaxation cycle is more efficient than relaxation, smooth the previous vectors.
@@ -317,7 +317,8 @@ def create_interpolation(x: np.ndarray,
                          max_caliber: int = 6,
                          target_error: float = 0.2,
                          repetitive: bool = False,
-                         weighted: bool = False) -> scipy.sparse.csr_matrix:
+                         weighted: bool = False,
+                         num_windows: int = None) -> scipy.sparse.csr_matrix:
     """
 
     :param x:
@@ -344,7 +345,7 @@ def create_interpolation(x: np.ndarray,
         p = hm.setup.interpolation.create_interpolation_least_squares_domain(
             x, a, r, fine_location, domain_size, aggregate_size=aggregate_size, num_components=num_components, neighborhood=neighborhood,
             repetitive=repetitive, caliber=caliber, max_caliber=max_caliber, target_error=target_error,
-            fit_scheme=fit_scheme, weighted=weighted)
+            fit_scheme=fit_scheme, weighted=weighted, num_windows=num_windows)
     else:
         raise Exception("Unsupported interpolation method '{}'".format(method))
     return p

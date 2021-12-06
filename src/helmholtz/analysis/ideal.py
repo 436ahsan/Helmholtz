@@ -71,7 +71,7 @@ def compare_spectrum(multilevel: hm.hierarchy.multilevel.Multilevel):
     for l in range(num_levels):
         v = vl[l]
         for k in range(l, 0, -1):
-            v = multilevel[k].p.dot(v)
+            v = multilevel[k].interpolate(v)
         vl_finest.append(v)
 
     return laml, vl_finest
