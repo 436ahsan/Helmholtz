@@ -175,7 +175,7 @@ def check_relax_cycle_shrinkage(multilevel, max_sweeps: int = 20, num_levels: in
         relax_cycle_b = lambda x, b: relax_cycle(x)
         method_list.append(("{}-level MiniCycle".format(num_levels), relax_cycle, relax_cycle_b, work, "red"))
 
-    fig, axs = plt.subplots(len(method_list), 5, figsize=(16, 4 * len(method_list)))
+    fig, axs = plt.subplots(len(method_list), 5, figsize=(18, 4 * len(method_list)))
 
     method_info = {}
     for row, (title, method, method_b, work, color) in enumerate(method_list):
@@ -197,16 +197,16 @@ def check_relax_cycle_shrinkage(multilevel, max_sweeps: int = 20, num_levels: in
         ax.set_title("Initial Error")
 
         ax = ax_row[2]
-        ax.plot(x_history[1])
-        ax.set_title("Error after 1 sweep")
+        ax.plot(x_history[num_sweeps])
+        ax.set_title("Error after {} sweeps".format(num_sweeps))
 
         ax = ax_row[3]
         ax.plot(r_history[0])
         ax.set_title("Initial Residual")
 
         ax = ax_row[4]
-        ax.plot(r_history[1])
-        ax.set_title("Residual after 1 sweep")
+        ax.plot(r_history[num_sweeps])
+        ax.set_title("Residual after {} sweeps".format(num_sweeps))
 
     ax.legend()
     return method_info

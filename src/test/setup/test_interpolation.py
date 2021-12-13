@@ -225,7 +225,7 @@ class TestInterpolation:
         assert mean_energy_error == pytest.approx(0.0128, 1e-2)
 
         p = hm.setup.interpolation.create_interpolation_least_squares_domain(
-            x, a, r, location, n,  aggregate_size=aggregate_size, num_components=num_components, repetitive=True)
+            x, a, r, location, n, aggregate_size=aggregate_size, num_components=num_components, repetitive=True)
 
         num_test_examples = 5
         x_test = x[:, -num_test_examples:]

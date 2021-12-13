@@ -27,11 +27,14 @@ def create_coarse_level(a: scipy.sparse.csr_matrix, b: scipy.sparse.csr_matrix,
     if symmetrize:
         ac = 0.5 * (ac + ac.transpose())
         bc = 0.5 * (bc + bc.transpose())
-    relaxer = hm.solve.relax.KaczmarzRelaxer(ac, bc)
+    if symmetrize:
+        relaxer = hm.solve.relax.KaczmarzRelaxer(ac, bc)
+    else:
+        relaxer = hm.solve.relax.SymmetricKaczmarzRelaxer(ac, bc)
     return hm.hierarchy.multilevel.Level(ac, bc, relaxer, r, p, restriction)
 
 
-def create_finest_level(a: scipy.sparse.spmatrix, relaxer=None) -> multilevel.Level:
+def create_finest_level(a: scipy.sparse.spmatrix, relaxer=None, symmetrize: bool = False) -> multilevel.Level:
     """
     Creates a repetitive domain finest level.
     Args:
@@ -42,5 +45,8 @@ def create_finest_level(a: scipy.sparse.spmatrix, relaxer=None) -> multilevel.Le
     """
     b = scipy.sparse.eye(a.shape[0])
     if relaxer is None:
-        relaxer = hm.solve.relax.KaczmarzRelaxer(a, b)
+        if symmetrize:
+            relaxer = hm.solve.relax.KaczmarzRelaxer(a, b)
+        else:
+            relaxer = hm.solve.relax.SymmetricKaczmarzRelaxer(a, b)
     return multilevel.Level.create_finest_level(a, relaxer)
