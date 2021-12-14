@@ -171,7 +171,7 @@ def check_relax_cycle_shrinkage(multilevel, max_sweeps: int = 20, num_levels: in
                                                     num_levels=num_levels).run(x)
         # This is two-level work.
         # TODO(orenlivne): generalize to multilevel work.
-        r = multilevel[1].r
+        r = multilevel[1]._r
         work = nu_pre + nu_post + (r.shape[0] / r.shape[1]) * nu_coarsest
         relax_cycle_b = lambda x, b: relax_cycle(x)
         method_list.append(("{}-level MiniCycle".format(num_levels), relax_cycle, relax_cycle_b, work, "red"))
