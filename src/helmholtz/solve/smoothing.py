@@ -30,6 +30,7 @@ def shrinkage_factor(operator, method, domain_shape: np.ndarray, num_examples: i
             slowness starts.
         output: if "stats", outputs the main stats (5 fields of the return values documented below). If "history",
             also outputs the x and residual (A*x) history.
+        x0: optional initial guess for the method run on A*x=0.
 
     Returns:
         mu: shrinkage factor.
