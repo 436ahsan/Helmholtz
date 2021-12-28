@@ -250,6 +250,7 @@ def create_interpolation_least_squares_ridge(
     xc_fit, xc_val, xc_test = hm.linalg.create_folds(xc, folds)
     weight_fit, weight_val, _ = hm.linalg.create_folds(weight, folds)
 
+    #print(alpha, x_fit.shape, x_val.shape)
     # Fit interpolation by least-squares.
     i = 0
     result = [optimized_fit_interpolation(
@@ -296,7 +297,7 @@ def create_interpolation_least_squares_plain(
     n = x.shape[1]
     nc = xc.shape[1]
     assert len(nbhr) == n
-
+    print("plain LS {}".format(x.shape))
     # Fit interpolation by unregularized weighted least-squares.
     p_coefficients = [np.linalg.lstsq(
         np.diag(weight[:, i]).dot(xc[:, nbhr_i]),

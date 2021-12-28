@@ -15,7 +15,7 @@ class TestMockCycle(unittest.TestCase):
 
     def test_mock_cycle_keeps_coarse_vars_invariant_representative(self):
         n = 16
-        kh = 0.5check
+        kh = 0.5
         a = hm.linalg.helmholtz_1d_operator(kh, n)
         relaxer = hm.solve.relax.KaczmarzRelaxer(a, scipy.sparse.eye(a.shape[0]))
         level = hm.hierarchy.multilevel.Level.create_finest_level(a, relaxer)

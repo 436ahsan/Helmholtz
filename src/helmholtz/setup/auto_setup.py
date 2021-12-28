@@ -320,7 +320,6 @@ def create_interpolation(x: np.ndarray,
                          weighted: bool = False,
                          num_windows: int = None) -> scipy.sparse.csr_matrix:
     """
-
     :param x:
     :param a:
     :param r:

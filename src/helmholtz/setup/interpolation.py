@@ -116,6 +116,7 @@ def _create_interpolation_fitter(x: np.ndarray, xc: np.ndarray, residual: np.nda
                                  num_windows: int,
                                  repetitive: bool = False, num_test_examples: int = 5,
                                  fit_scheme: str = "ridge",
+                                 regularize: bool = False,
                                  weighted: bool = False):
     """
     Creates an interpolation factory over the samples: a single aggregate (if repetitive) or entire domain (otherwise).
@@ -177,8 +178,10 @@ def _create_interpolation_fitter(x: np.ndarray, xc: np.ndarray, residual: np.nda
         fold_sizes = (fit_samples, val_samples, num_test_examples)
 
     # Ridge regularization parameter (list of values).
-    #alpha = np.array([0])
-    alpha = np.array([0, 1e-4, 1e-3, 1e-2, 1e-1, 1])
+    if regularize:
+        alpha = np.array([0, 1e-4, 1e-3, 1e-2, 1e-1, 1])
+    else:
+        alpha = np.array([0])
     #alpha = np.logspace(1e-4, 2, 10)
 
     if fit_scheme == "plain":

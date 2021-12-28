@@ -95,6 +95,7 @@ def _create_splitting(splitting: str, q: scipy.sparse.spmatrix):
     """
     if splitting == "direct":
         # Perform a sparse LU decomposition of Q*Q^T on the CPU and cache it for fast repeated linear solves.
+        # Note: Q*Q^T = I for SVD construction, so we don't need to invert in this case.
         return hm.linalg.SparseLuSolver(q.dot(np.transpose(q)))
     elif splitting == "jacobi":
         return _JacobiSplitting(q)
