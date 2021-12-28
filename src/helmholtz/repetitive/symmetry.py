@@ -38,3 +38,48 @@ def symmetrize(r, ap, num_components, aggregate_size):
 
     R = hrc.Coarsener(q.reshape((num_components, aggregate_size))).tile(n // aggregate_size)
     return R
+
+
+# def update_interpolation(x, r, caliber, num_windows):
+#     conv = [[np.nan] + [
+#         hm.setup.auto_setup.mock_cycle_conv_factor(level, r, nu)
+#         for nu in nu_values]]
+#     p = hm.setup.auto_setup.create_interpolation(
+#             x, level.a, r, level.location, domain_size, interpolation_method, aggregate_size=aggregate_size, num_components=num_components,
+#             neighborhood=neighborhood, repetitive=repetitive, target_error=0.1,
+#             caliber=caliber, fit_scheme=fit_scheme, weighted=weighted)
+#     ml = hm.repetitive.locality.create_two_level_hierarchy_from_matrix(
+#             level.a, level.location, r, p, aggregate_size, num_components,
+#                 use_r_as_restriction=True)
+#     ac = ml[1].a
+#     fill_in_factor = (ac.nnz / ml[0].a.nnz) * (ml[0].a.shape[0] / ac.shape[0])
+#     symmetry_deviation = np.max(np.abs(ac - ac.transpose()))
+#     two_level_conv = [
+#         hm.repetitive.locality.two_level_conv_factor(ml, nu, print_frequency=None)[1]
+#         for nu in nu_values]
+#     conv.append([symmetry_deviation] + two_level_conv)
+#     return ml, conv
+
+# caliber = 4
+# num_examples = 4
+# num_windows = 32
+# num_iterations = 10
+# x = hm.setup.auto_setup.get_test_matrix(level.a, num_sweeps_on_vectors, num_examples=num_examples)
+
+# all_conv = []
+# r = coarse_level._r
+# ml, conv = update_interpolation(x, r, caliber, num_windows)
+# p = ml[1]._p
+# all_conv += conv
+# for i in range(num_iterations):
+#     r = symmetrize(r, level.a.dot(p), num_components, aggregate_size)
+#     ml, conv = update_interpolation(x, r, caliber, num_windows)
+#     p = ml[1]._p
+#     all_conv += conv
+
+# all_conv = pd.DataFrame(all_conv,
+#                     columns=("Symmetry",) + tuple(nu_values),
+#                     index=sum((("{} Mock".format(i), "{} 2L".format(i))
+#                         for i in range(num_iterations + 1)), ()))
+# styler = all_conv.style.set_caption("Convergence Factors").format(precision=4)
+# display_html(styler._repr_html_(), raw=True)

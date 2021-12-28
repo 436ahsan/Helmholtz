@@ -98,7 +98,6 @@ class SolutionCycleProcessor(hm.hierarchy.processor.Processor):
         self._x_initial[lc] = xc_initial
         self._x[lc] = xc_initial
         self._b[lc] = coarse_level.restrict(self._b[l] - level.operator(x)) + coarse_level.operator(xc_initial)
-        pass
 
     def post_process(self, l):
         lc = l + 1

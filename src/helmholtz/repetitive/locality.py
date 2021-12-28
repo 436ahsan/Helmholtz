@@ -121,9 +121,10 @@ def two_level_conv_factor(multilevel, nu_pre, nu_post: int = 0, print_frequency:
     def residual(x):
         return b - multilevel[0].operator(x)
 
-    return hm.solve.run.run_iterative_method(
+    x, conv = hm.solve.run.run_iterative_method(
         residual, two_level_cycle, np.random.random((n, )), 20, print_frequency=print_frequency,
         residual_stop_value=residual_stop_value)
+    return x0 - x, conv
 
 
 def two_level_conv_data_frame(kh, discretization, r, p, aggregate_size, m_values, nu_values):
