@@ -13,7 +13,8 @@ _SMALL = 1e-12
 
 
 def run_iterative_method(operator, method, x: np.ndarray, num_sweeps: int = 30, print_frequency: int = None,
-                         residual_stop_value: float = 1e-10, conv_factor_type: str = "residual") -> np.ndarray:
+                         residual_stop_value: float = 1e-10, conv_factor_type: str = "residual",
+                         z: np.ndarray = None, x_exact: np.ndarray = None) -> np.ndarray:
     """
     Runs an solve method on A*x=0 and measures the convergence rate.
 
@@ -33,10 +34,13 @@ def run_iterative_method(operator, method, x: np.ndarray, num_sweeps: int = 30, 
     """
     # Print the error and residual norm of the first test function.
     x0 = x[:, 0] if x.ndim == 2 else x
+    if z is not None:
+        x0 -= z.dot(z.T.dot(x0[:, None])).flatten()
+    e = x_exact - x0 if x_exact is not None else x0
     r_norm = norm(operator(x0))
-    rer = r_norm / norm(x0)
+    rer = r_norm / norm(e)
     if print_frequency is not None:
-        _LOGGER.info("{:5d} |r| {:.3e} RER {:.5f}".format(0, r_norm, rer))
+        _LOGGER.info("{:5d} |r| {:.3e}           RER {:.5f}           {:.3f}".format(0, r_norm, rer, norm(e)))
     # Run 'num_sweeps' relaxation sweeps.
     if print_frequency == 0:
         print_frequency = num_sweeps // 10
@@ -50,11 +54,14 @@ def run_iterative_method(operator, method, x: np.ndarray, num_sweeps: int = 30, 
         rer_old = rer
         x = method(x)
         x0 = x[:, 0] if x.ndim == 2 else x
+        if z is not None:
+            x0 -= z.dot(z.T.dot(x0[:, None])).flatten()
+        e = x_exact - x0 if x_exact is not None else x0
         r_norm = norm(operator(x0))
-        rer = r_norm / norm(x0)
+        rer = r_norm / norm(e)
         if print_frequency is not None and i % print_frequency == 0:
             _LOGGER.info("{:5d} |r| {:.3e} ({:.5f}) RER {:.5f} ({:.5f}) {:.3f}".format(
-                i, r_norm, r_norm / max(1e-30, r_norm_old), rer, rer / max(1e-30, rer_old), norm(x0)))
+                i, r_norm, r_norm / max(1e-30, r_norm_old), rer, rer / max(1e-30, rer_old), norm(e)))
         r_norm_history[i] = r_norm
         rer_history[i] = rer
         if i >= min_sweeps and r_norm < residual_stop_value:

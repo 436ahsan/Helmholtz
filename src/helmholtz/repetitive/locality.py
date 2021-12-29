@@ -108,19 +108,22 @@ def create_two_level_hierarchy_from_matrix(a, location, r, p, aggregate_size, nc
 def two_level_conv_factor(multilevel, nu_pre, nu_post: int = 0, nu_coarsest: int = -1,
                           print_frequency: int = None, debug: bool = False,
                           residual_stop_value: float = 1e-10, z: np.ndarray = None,
-                          num_sweeps: int = 20):
+                          num_sweeps: int = 20, seed: int = None, num_levels: int = None):
+    if seed is not None:
+        np.random.seed(seed)
     level = multilevel.finest_level
     n = level.size
     # Test two-level cycle convergence for A*x=b with b=A*x0, x0=random[-1, 1].
-    x0 = 2 * np.random.random((n, )) - 1
+    x_exact = 2 * np.random.random((n, )) - 1
     if z is not None:
-        x0 -= z.dot(z.T.dot(x0[:, None])).flatten()
-    b = multilevel[0].operator(x0)
+        x_exact -= z.dot(z.T.dot(x_exact[:, None])).flatten()
+    b = multilevel[0].operator(x_exact)
     #b = np.random.random((n, ))
     #b = np.ones((n, ))
 
     def two_level_cycle(y):
-        return hm.solve.solve_cycle.solve_cycle(multilevel, 1.0, nu_pre, nu_post, nu_coarsest=nu_coarsest, debug=debug, rhs=b).run(y)
+        return hm.solve.solve_cycle.solve_cycle(
+            multilevel, 1.0, nu_pre, nu_post, nu_coarsest=nu_coarsest, debug=debug, rhs=b, num_levels=num_levels).run(y)
 
     def residual(x):
         return b - multilevel[0].operator(x)
@@ -128,12 +131,15 @@ def two_level_conv_factor(multilevel, nu_pre, nu_post: int = 0, nu_coarsest: int
     x_init = np.random.random((n, ))
     if z is not None:
         x_init -= z.dot(z.T.dot(x_init[:, None])).flatten()
-        e = x0 - x_init
+        #x_init = x0 + z[:, 0]
+        e = x_exact - x_init
         print(z.T.dot(e[:, None]))
     x, conv = hm.solve.run.run_iterative_method(
         residual, two_level_cycle, x_init, num_sweeps, print_frequency=print_frequency,
-        residual_stop_value=residual_stop_value)
-    return x0 - x, conv
+        residual_stop_value=residual_stop_value, z=z, x_exact=x_exact)
+    e = x_exact - x
+    print(z.T.dot(e[:, None]))
+    return x_exact - x, conv
 
 
 def two_level_conv_data_frame(kh, discretization, r, p, aggregate_size, m_values, nu_values):
