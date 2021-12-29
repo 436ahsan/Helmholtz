@@ -131,14 +131,9 @@ def two_level_conv_factor(multilevel, nu_pre, nu_post: int = 0, nu_coarsest: int
     x_init = np.random.random((n, ))
     if z is not None:
         x_init -= z.dot(z.T.dot(x_init[:, None])).flatten()
-        #x_init = x0 + z[:, 0]
-        e = x_exact - x_init
-        print(z.T.dot(e[:, None]))
     x, conv = hm.solve.run.run_iterative_method(
         residual, two_level_cycle, x_init, num_sweeps, print_frequency=print_frequency,
         residual_stop_value=residual_stop_value, z=z, x_exact=x_exact)
-    e = x_exact - x
-    print(z.T.dot(e[:, None]))
     return x_exact - x, conv
 
 
