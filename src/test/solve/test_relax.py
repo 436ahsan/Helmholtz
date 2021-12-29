@@ -49,12 +49,12 @@ class TestRelax:
 
         x = np.random.random((n, 1))
         b = np.zeros_like(x)
-        energy = x.transpose().dot(a.dot(x))[0, 0]
+        energy = x.T.dot(a.dot(x))[0, 0]
         for i in range(10):
             y = gs_relax_with_loop(kh, x)
             x = relaxer.step(x, b)
             assert_array_almost_equal(x - x.mean(), y - y.mean())
-            energy_new = x.transpose().dot(a.dot(x))[0, 0]
+            energy_new = x.T.dot(a.dot(x))[0, 0]
             assert energy_new < energy
             energy = energy_new
 

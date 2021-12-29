@@ -19,9 +19,9 @@ class KaczmarzRelaxer:
         if b is None:
             b = scipy.sparse.eye(a.shape[0])
         self._a = a.tocsr()
-        self._at = a.transpose()
+        self._at = a.T
         self._b = b.tocsr()
-        self._bt = b.transpose()
+        self._bt = b.T
         # Storing M = lower triangular parts of (A-lam*B)*(A-lam*B)^T in CSR format (the Kaczmarz splitting matrix) for
         # linear solve efficiency.
 

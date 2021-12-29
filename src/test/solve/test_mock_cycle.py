@@ -112,7 +112,7 @@ def _create_svd_coarsening(level, threshold: float = 0.1):
     x, conv_factor = hm.solve.run.run_iterative_method(level.operator, lambda x: level.relax(x, b), x, num_sweeps=10)
     # Generate coarse variables (R) based on a window of x.
     aggregate_size = 4
-    x_aggregate_t = x[:aggregate_size].transpose()
+    x_aggregate_t = x[:aggregate_size].T
     r, _ = cr.create_coarsening(x_aggregate_t, threshold)
 
     # Convert to sparse matrix + tile over domain.

@@ -188,7 +188,7 @@ def apply_bloch_boundary_conditions(a: scipy.sparse.dia_matrix, alpha: float) ->
     for s in (-1, 1):
         boundary = (a.offsets < -(n // 2)) if s > 0 else (a.offsets > (n // 2))
         a.data[boundary] = \
-            np.multiply(a.data[boundary], np.exp(-1j * alpha * (a.offsets[boundary] + s * n))[None, :].transpose(),
+            np.multiply(a.data[boundary], np.exp(-1j * alpha * (a.offsets[boundary] + s * n))[None, :].T,
                            casting="unsafe")
 
 
@@ -251,7 +251,7 @@ def ritz(x: np.ndarray, action) -> Tuple[np.ndarray, np.ndarray]:
     # Make x an orthogonal projection onto the space X spanned by the original x columns.
     x = gram_schmidt(x)
     # Form the Gram matrix.
-    g = x.transpose().dot(action(x))
+    g = x.T.dot(action(x))
     # Solve the eigenproblem g*z = lam*z for the coefficients z of the Ritz projection x*z.
     lam, z = eig(g)
     # Convert back to the original coordinates (x).
@@ -275,7 +275,7 @@ class SparseLuSolver:
         self._l_inv = scipy.sparse.csc_matrix(
             scipy.sparse.linalg.spsolve_triangular(lu.L.tocsr(), np.identity(n)))
         self._u_inv = scipy.sparse.csc_matrix(
-            scipy.sparse.linalg.spsolve_triangular(lu.U.transpose().tocsr(), np.identity(n))).transpose()
+            scipy.sparse.linalg.spsolve_triangular(lu.U.T.tocsr(), np.identity(n))).T
         self._pr = scipy.sparse.csc_matrix((np.ones(n), (lu.perm_r, np.arange(n))))
         self._pc = scipy.sparse.csc_matrix((np.ones(n), (np.arange(n), lu.perm_c)))
 
@@ -312,9 +312,9 @@ def pairwise_cos_similarity(x: np.ndarray, y: np.ndarray = None, squared: bool =
     x2 = np.sum(x ** 2, axis=0)
     y2 = np.sum(y ** 2, axis=0)
     if squared:
-        return (x.transpose().dot(y) ** 2) / np.clip((x2[:, None] * y2[None, :]), 1e-15, None)
+        return (x.T.dot(y) ** 2) / np.clip((x2[:, None] * y2[None, :]), 1e-15, None)
     else:
-        return x.transpose().dot(y) / np.clip((x2[:, None] * y2[None, :]) ** 0.5, 1e-15, None)
+        return x.T.dot(y) / np.clip((x2[:, None] * y2[None, :]) ** 0.5, 1e-15, None)
 
 
 def csr_vappend(a: scipy.sparse.csr_matrix, b: scipy.sparse.csr_matrix) -> scipy.sparse.csr_matrix:
@@ -375,4 +375,4 @@ def get_windows_by_index(x, index, stride, num_windows):
     return np.concatenate(tuple(
         np.take(x, index + stride * offset, axis=0, mode="wrap")
         for offset in range(int(np.ceil(num_windows / x.shape[1])))),
-        axis=1).transpose()[:num_windows]
+        axis=1).T[:num_windows]

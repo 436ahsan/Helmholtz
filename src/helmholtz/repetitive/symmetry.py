@@ -53,7 +53,7 @@ def symmetrize(r, ap, num_components, aggregate_size):
 #                 use_r_as_restriction=True)
 #     ac = ml[1].a
 #     fill_in_factor = (ac.nnz / ml[0].a.nnz) * (ml[0].a.shape[0] / ac.shape[0])
-#     symmetry_deviation = np.max(np.abs(ac - ac.transpose()))
+#     symmetry_deviation = np.max(np.abs(ac - ac.T))
 #     two_level_conv = [
 #         hm.repetitive.locality.two_level_conv_factor(ml, nu, print_frequency=None)[1]
 #         for nu in nu_values]

@@ -20,7 +20,7 @@ def coarse_locations(fine_location: np.ndarray, aggregate_size: int, num_compone
     Returns: array of coarse variable location.
     """
     return np.tile(np.add.reduceat(fine_location, np.arange(0, len(fine_location), aggregate_size)) / aggregate_size,
-                   (num_components, 1)).transpose().flatten()
+                   (num_components, 1)).T.flatten()
 
 
 def geometric_neighbors(aggregate_size: int, num_components: int):

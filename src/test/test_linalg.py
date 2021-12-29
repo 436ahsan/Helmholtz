@@ -154,7 +154,7 @@ class TestLinalg:
         p = scipy.sparse.csr_matrix((np.ones(m), (np.arange(m), np.random.choice(np.arange(n), m))), shape=(m, n))
         q = p + scipy.sparse.random(m, n, density=0.05)
         # A = Q*Q^T.
-        a = q.dot(q.transpose())
+        a = q.dot(q.T)
 
         lu_solver = hm.linalg.SparseLuSolver(a)
         b = np.random.random((m, 5))
@@ -192,7 +192,7 @@ class TestLinalg:
         aggregate_size = 4
         stride = 2
         num_windows = 21
-        x = np.arange(num_functions * n).reshape(num_functions, n).transpose()
+        x = np.arange(num_functions * n).reshape(num_functions, n).T
 
         x_windows = hm.linalg.get_windows_by_index(x, np.arange(aggregate_size), stride, num_windows)
 

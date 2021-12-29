@@ -33,7 +33,7 @@ class TestCoarseningRepetitive:
         x, _ = hm.solve.run.run_iterative_method(level.operator, lambda x: level.relax(x, b), x, num_sweeps=num_sweeps)
 
         # Generate coarse variables (R) based on a window of x.
-        x_aggregate_t = x[:aggregate_size].transpose()
+        x_aggregate_t = x[:aggregate_size].T
         r, _ = cr.create_coarsening(x_aggregate_t, 0.1)
 
         # Convert to sparse matrix + tile over domain.
@@ -60,7 +60,7 @@ class TestCoarseningRepetitive:
         # due to Kaczmarz stopping at point 31 (thus 30, 31, 1 are co-linear).
         r_by_offset = np.array([hm.linalg.normalize_signs(
             cr.create_coarsening(
-                hm.linalg.get_windows_by_index(x, np.arange(offset, aggregate_size + offset), 1, 1).transpose(), 0.1)[0].asarray())
+                hm.linalg.get_windows_by_index(x, np.arange(offset, aggregate_size + offset), 1, 1).T, 0.1)[0].asarray())
             for offset in range(len(x))])
         # R should not change much across different windows.
         mean_entry_error = np.mean(((np.std(r_by_offset, axis=0) / np.mean(np.abs(r_by_offset), axis=0)).flatten()))

@@ -112,7 +112,7 @@ class FixedAggSizeUniformCoarsener:
             aggregate_coarsening = create_coarsening(x_aggregate_t, self._num_components)
             svd_results = [aggregate_coarsening for _ in self._starts]
         else:
-            svd_results = [create_coarsening(x[start:start + self._aggregate_size].transpose(), self._num_components)
+            svd_results = [create_coarsening(x[start:start + self._aggregate_size].T, self._num_components)
                            for start in self._starts]
         r_aggregate_candidates = tuple(aggregate_svd_result[0] for aggregate_svd_result in svd_results)
         # Singular values, used for checking energy error in addition to the mock cycle criterion.
@@ -225,7 +225,7 @@ class UniformCoarsener:
             self._mock_conv_factor[candidate],
             work[candidate],
             efficiency[candidate]
-        )).transpose()
+        )).T
         if fmt == "dataframe":
             columns = ("i", "a", "nc", "cr", "Energy Error", "conv", "work", "eff")
             candidate = pd.DataFrame(candidate).rename(columns=dict(enumerate(columns))).astype(

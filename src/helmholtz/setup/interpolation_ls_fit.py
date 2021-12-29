@@ -60,7 +60,7 @@ class InterpolationLsFitter:
             x, xc = self._x, self._xc
             #            x = self._x - np.mean(self._x, axis=0)
             #            xc = self._xc - np.mean(self._xc, axis=0)
-            self._similarity = sklearn.metrics.pairwise.cosine_similarity(x.transpose(), xc.transpose())
+            self._similarity = sklearn.metrics.pairwise.cosine_similarity(x.T, xc.T)
         return self._similarity
 
     def relative_error(self, k, alpha_values, intercept: bool = False, test: bool = False,
@@ -155,8 +155,8 @@ def fit_interpolation(xc_fit, x_fit, xc_val, x_val, alpha, intercept: bool = Fal
 
     # The SVD computation part that does not depend on alpha.
     u, s, vt = scipy.linalg.svd(xc_fit)
-    v = vt.transpose()
-    q = s * (u.transpose()[:n].dot(x_fit))
+    v = vt.T
+    q = s * (u.T[:n].dot(x_fit))
 
     # Validation quantities.
     if intercept:

@@ -28,7 +28,7 @@ def plot_svd_coarsening_accuracy(level, num_sweeps: int, aggregate_size: int, nu
     # x = hm.solve.run.run_iterative_method(
     #    level.operator, lambda x: level.relax(x, b), x_random, num_sweeps=num_sweeps)[0]
     # start, end = 0, aggregate_size
-    # x_aggregate_t = x[start:end].transpose()
+    # x_aggregate_t = x[start:end].T
     # print(x_aggregate_t.shape)
     # r, s = hm.repetitive.coarsening_repetitive.create_coarsening(x_aggregate_t, threshold)
     r = r.asarray()

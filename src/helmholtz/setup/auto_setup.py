@@ -336,7 +336,7 @@ def create_interpolation(x: np.ndarray,
     :return: interpolation matrix.
     """
     if method == "svd":
-        p = r.transpose()
+        p = r.T
     elif method == "ls":
         # TODO(oren): replace caliber by true max_caliber in this call (right now 'max_caliber' is interpreted here
         # as the fixed interpolation caliber returned; make the call loop over all calibers and return the desirable

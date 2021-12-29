@@ -84,7 +84,7 @@ def create_interpolation_least_squares_domain(
     fitter, fold_sizes = _create_interpolation_fitter(
         x, xc, residual, aggregate_size, num_components, num_windows, repetitive=repetitive,
         num_test_examples=num_test_examples, fit_scheme=fit_scheme, weighted=weighted)
-    folds = tuple(f.transpose() for f in hm.linalg.create_folds(x.transpose(), fold_sizes))
+    folds = tuple(f.T for f in hm.linalg.create_folds(x.T, fold_sizes))
 
     calibers = np.array([caliber]) if caliber is not None else np.arange(1, max_caliber + 1, dtype=int)
     # Increase caliber (fitting interpolation with LS) until the test error A-norm is below the accuracy threshold.
@@ -152,7 +152,7 @@ def _create_interpolation_fitter(x: np.ndarray, xc: np.ndarray, residual: np.nda
         r_norm_disjoint_aggregate_t = hm.setup.sampling.residual_norm_windows(
             residual, 3 * aggregate_size, aggregate_size, num_windows)
     else:
-        x_disjoint_aggregate_t, xc_disjoint_aggregate_t = x.transpose(), xc.transpose()
+        x_disjoint_aggregate_t, xc_disjoint_aggregate_t = x.T, xc.T
         # TODO(orenlivne): fix this to be all local residual norms in the non-repetitive case.
         r_norm_disjoint_aggregate_t = None
 

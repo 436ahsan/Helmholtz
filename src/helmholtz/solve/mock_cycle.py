@@ -60,7 +60,7 @@ class MockCorrector:
         self._omega = omega
         qt = np.transpose(q)
         self._q = q
-        self._qt = self._q.transpose()
+        self._qt = self._q.T
         self._q0 = baseline_coarse_values
 
     def __call__(self, x: np.ndarray) -> np.ndarray:
@@ -131,7 +131,7 @@ class _JacobiSplitting(_Splitting):
         Args:
             q: scipy CSR sparse aggregation matrix Q: nc x n.
         """
-        self._d_inv = 1 / np.ndarray((q.dot(q.transpose())).diagonal())
+        self._d_inv = 1 / np.ndarray((q.dot(q.T)).diagonal())
 
     def solve(self, r: np.ndarray) -> np.ndarray:
         """

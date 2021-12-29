@@ -133,7 +133,7 @@ def _create_aggregate_coarsening(x, threshold, max_coarsening_ratio, max_aggrega
         if fixed_aggregate_size is None:
             aggregate_size += 1
         end = min(start + aggregate_size, domain_size)
-        x_aggregate_t = x[start:end].transpose()
+        x_aggregate_t = x[start:end].T
         r, s = create_coarsening(x_aggregate_t, threshold)
         r = r.asarray()
         # n = actual aggregate size after trimming to domain end. nc = #coarse variables.
