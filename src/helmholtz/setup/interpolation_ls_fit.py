@@ -297,7 +297,7 @@ def create_interpolation_least_squares_plain(
     n = x.shape[1]
     nc = xc.shape[1]
     assert len(nbhr) == n
-    print("plain LS {}".format(x.shape))
+    #print("plain LS {}".format(x.shape))
     # Fit interpolation by unregularized weighted least-squares.
     p_coefficients = [np.linalg.lstsq(
         np.diag(weight[:, i]).dot(xc[:, nbhr_i]),

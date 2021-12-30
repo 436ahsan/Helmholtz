@@ -92,9 +92,9 @@ def shrinkage_factor(operator, method, domain_shape: np.ndarray, num_examples: i
                 np.mean(rer), rer_conv_factor))
         residual_history.append(r_norm)
         rer_history.append(rer)
-        # red = np.mean(r_norm / history[0])
-        # reduction.append(red)
-        # efficiency.append(red ** (1 / i))
+        # rer = np.mean(r_norm / history[0])
+        # reduction.append(rer)
+        # efficiency.append(rer ** (1 / i))
     residual_history = np.array(residual_history)
     # reduction = np.array(reduction)
     # efficiency = np.array(efficiency)
@@ -114,6 +114,7 @@ def shrinkage_factor(operator, method, domain_shape: np.ndarray, num_examples: i
     if output == "history":
         result = result + (x_history, r_history)
     return result
+
 
 def _conv_model(x, x0, y0, c, p):
     return np.piecewise(x, [x < x0],

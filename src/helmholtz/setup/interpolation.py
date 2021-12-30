@@ -182,7 +182,7 @@ def _create_interpolation_fitter(x: np.ndarray, xc: np.ndarray, residual: np.nda
         alpha = np.array([0, 1e-4, 1e-3, 1e-2, 1e-1, 1])
     else:
         alpha = np.array([0])
-    #alpha = np.logspace(1e-4, 2, 10)
+        #alpha = np.logspace(1e-4, 2, 10)
 
     if fit_scheme == "plain":
         fitter = lambda nbhr: \

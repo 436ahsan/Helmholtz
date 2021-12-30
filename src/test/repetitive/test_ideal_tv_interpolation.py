@@ -53,7 +53,7 @@ class TestIdealTvInterpolation:
             neighborhood=neighborhood, repetitive=repetitive, target_error=0.1,
             caliber=caliber, fit_scheme=fit_scheme, weighted=weighted)
         multilevel = hm.repetitive.locality.create_two_level_hierarchy(
-            kh, discretization, n, R, p, aggregate_size, num_components)
+            kh, discretization, n, R, p, p.T, aggregate_size, num_components)
 
         ac = multilevel[1].a
         fill_in_factor = (ac.nnz / multilevel[0].a.nnz) * (multilevel[0].a.shape[0] / ac.shape[0])
