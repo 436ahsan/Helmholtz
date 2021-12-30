@@ -57,7 +57,7 @@ def mock_conv_factor_for_domain_size(kh, discretization, r, aggregate_size, m, n
     return np.array([hm.setup.auto_setup.mock_cycle_conv_factor(level, r_csr, nu) for nu in nu_values])
 
 
-def create_two_level_hierarchy(kh, discretization, m, r, p, aggregate_size, nc, use_r_as_restriction: bool = False):
+def create_two_level_hierarchy(kh, discretization, m, r, p, q, aggregate_size, nc):
     a = hm.linalg.helmholtz_1d_discrete_operator(kh, discretization, m)
     if isinstance(r, scipy.sparse.csr_matrix):
         r_csr = r
@@ -70,8 +70,7 @@ def create_two_level_hierarchy(kh, discretization, m, r, p, aggregate_size, nc, 
     level0 = hm.setup.hierarchy.create_finest_level(a)
     level0.location = np.arange(a.shape[0])
     # relaxer=hm.solve.relax.GsRelaxer(a) if kh == 0 else None)
-    level1 = hm.setup.hierarchy.create_coarse_level(level0.a, level0.b, r_csr, p_csr,
-                                                    use_r_as_restriction=use_r_as_restriction)
+    level1 = hm.setup.hierarchy.create_coarse_level(level0.a, level0.b, r_csr, p_csr, q)
     # Calculate coarse-level variable locations. At each aggregate center we have 'num_components' coarse variables.
     level1.location = hm.setup.geometry.coarse_locations(level0.location, aggregate_size, nc)
 
@@ -80,8 +79,7 @@ def create_two_level_hierarchy(kh, discretization, m, r, p, aggregate_size, nc, 
     return multilevel
 
 
-def create_two_level_hierarchy_from_matrix(a, location, r, p, aggregate_size, nc, use_r_as_restriction: bool = False,
-                                           symmetrize: bool = False):
+def create_two_level_hierarchy_from_matrix(a, location, r, p, q, aggregate_size, nc, symmetrize: bool = False):
     m = a.shape[0]
     if isinstance(r, scipy.sparse.csr_matrix):
         r_csr = r
@@ -94,9 +92,7 @@ def create_two_level_hierarchy_from_matrix(a, location, r, p, aggregate_size, nc
     level0 = hm.setup.hierarchy.create_finest_level(a)
     level0.location = location
     # relaxer=hm.solve.relax.GsRelaxer(a) if kh == 0 else None)
-    level1 = hm.setup.hierarchy.create_coarse_level(level0.a, level0.b, r_csr, p_csr,
-                                                    use_r_as_restriction=use_r_as_restriction,
-                                                    symmetrize=symmetrize)
+    level1 = hm.setup.hierarchy.create_coarse_level(level0.a, level0.b, r_csr, p_csr, q, symmetrize=symmetrize)
     # Calculate coarse-level variable locations. At each aggregate center we have 'num_components' coarse variables.
     level1.location = hm.setup.geometry.coarse_locations(level0.location, aggregate_size, nc)
 

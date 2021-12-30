@@ -188,7 +188,8 @@ def bootstap(x,
              max_caliber: int = 6,
              target_error: float = 0.2,
              repetitive: bool = False,
-             aggregate_size: int = None) -> Tuple[np.ndarray, hm.hierarchy.multilevel.Multilevel]:
+             aggregate_size: int = None,
+             symmetrize: bool = False) -> Tuple[np.ndarray, hm.hierarchy.multilevel.Multilevel]:
     """
     Improves test functions and a multilevel hierarchy on a fixed-size domain by bootstrapping.
     Args:
@@ -208,6 +209,7 @@ def bootstap(x,
             aggregate, or the R*A*R^T sparsity pattern.
         repetitive: whether to exploit problem repetitiveness by creating a constant R stencil on all aggregates
             using windows from a single (or few) test vectors.
+        symmetrize: whether to use the sparse symmetric coarse-level operator Q*A*P or P^T*A*P.
 
     Returns:
         improved x, multilevel hierarchy with the same number of levels.
@@ -279,7 +281,11 @@ def bootstap(x,
                     title, len(error), np.mean(error), np.max(error), np.mean(error_a), np.max(error_a)))
 
         # 'level' now becomes the next coarser level and x_level the corresponding test matrix.
-        coarse_level = hierarchy.create_coarse_level(level.a, level.b, r, p)
+        if symmetrize:
+            q = hm.repetitive.symmetry.symmetrize(r, level.a.dot(p), aggregate_size, nc)
+        else:
+            q = p.T
+        coarse_level = hierarchy.create_coarse_level(level.a, level.b, r, p, q)
         coarse_level.location = coarse_location
         coarse_level.domain_size = level.domain_size
         level = coarse_level

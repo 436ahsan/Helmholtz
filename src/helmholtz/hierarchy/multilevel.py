@@ -16,7 +16,7 @@ _LOGGER = logging.getLogger("multilevel")
 class Level:
     """A single level in the multilevel hierarchy."""
 
-    def __init__(self, a, b, relaxer, r, p, restriction):
+    def __init__(self, a, b, relaxer, r, p, q):
         """
         Creates a level in the multilevel hierarchy.
         Args:
@@ -25,13 +25,13 @@ class Level:
             relaxer: relaxation execution object.
             r: coarsening operator (type of coarse variables that this level is).
             p: this-level-to-next-finer-level interpolation.
-            restriction: restriction operator. Usually P^T, but could be different (e.g., r).
+            q: restriction operator. Usually P^T, but could be different (e.g., r).
         """
         self.a = a
         self.b = b
         self._r = r
         self._p = p
-        self._restriction = restriction
+        self._q = q
         self._relaxer = relaxer
 
     @staticmethod
@@ -134,7 +134,7 @@ class Level:
         Returns:
             P^T*x.
         """
-        return self._restriction.dot(x)
+        return self._q.dot(x)
 
     def coarsen(self, x: np.array) -> np.array:
         """

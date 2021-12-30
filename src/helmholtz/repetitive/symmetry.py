@@ -4,7 +4,16 @@ import helmholtz.repetitive.coarsening_repetitive as hrc
 import numpy as np
 
 
-def symmetrize(r, ap, num_components, aggregate_size):
+def symmetrize(r, ap, aggregate_size, num_components):
+    """
+    Returns Q such that Q*A*P is symmetric and has the sparsity pattern of R*A*P in a repetitive framework.
+
+    :param r: R.
+    :param ap: A*P.
+    :param aggregate_size: coarse aggregate size.
+    :num_components: number of principal components = # coarse vars per aggregate.
+    :return:
+    """
     n, nc = ap.shape
     Q = r[:num_components]
     ap_cols = {}
@@ -36,8 +45,8 @@ def symmetrize(r, ap, num_components, aggregate_size):
     q = Q.data.copy()
     q -= C.T.dot(np.linalg.solve(C.dot(C.T), C.dot(q)))
 
-    R = hrc.Coarsener(q.reshape((num_components, aggregate_size))).tile(n // aggregate_size)
-    return R
+    Q = hrc.Coarsener(q.reshape((num_components, aggregate_size))).tile(n // aggregate_size)
+    return Q
 
 
 # def update_interpolation(x, r, caliber, num_windows):
@@ -49,8 +58,7 @@ def symmetrize(r, ap, num_components, aggregate_size):
 #             neighborhood=neighborhood, repetitive=repetitive, target_error=0.1,
 #             caliber=caliber, fit_scheme=fit_scheme, weighted=weighted)
 #     ml = hm.repetitive.locality.create_two_level_hierarchy_from_matrix(
-#             level.a, level.location, r, p, aggregate_size, num_components,
-#                 use_r_as_restriction=True)
+#             level.a, level.location, r, p, aggregate_size, num_components, restriction=r)
 #     ac = ml[1].a
 #     fill_in_factor = (ac.nnz / ml[0].a.nnz) * (ml[0].a.shape[0] / ac.shape[0])
 #     symmetry_deviation = np.max(np.abs(ac - ac.T))

@@ -118,7 +118,6 @@ class SymmetricKaczmarzRelaxer:
         self._num_sweeps = num_sweeps
 
     def step(self, x: np.array, b: np.array, lam: float = 0) -> np.array:
-        #   print("SymmetricKaczmarzRelaxer", SymmetricKaczmarzRelaxer)
         for i in range(self._num_sweeps):
             x = self._relax_forward.step(x, b, lam=lam)
         for i in range(self._num_sweeps):
