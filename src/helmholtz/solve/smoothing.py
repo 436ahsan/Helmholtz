@@ -12,7 +12,8 @@ _LOGGER = logging.getLogger(__name__)
 
 def shrinkage_factor(operator, method, domain_shape: np.ndarray, num_examples: int = 5,
                      slow_conv_factor: float = 1.3, print_frequency: int = None, max_sweeps: int = 100,
-                     leeway_factor: float = 1.2, output: str = "stats", x0: np.ndarray = None) -> float:
+                     leeway_factor: float = 1.2, min_residual_reduction: float = 0.2,
+                     output: str = "stats", x0: np.ndarray = None) -> float:
     """
     Returns the shrinkage factor of an iterative method, the residual-to-error ratio (RER) reduction in the first
     num_sweeps steps for A*x = 0, starting from an initial guess.
@@ -28,6 +29,7 @@ def shrinkage_factor(operator, method, domain_shape: np.ndarray, num_examples: i
         max_sweeps: maximum number of iterations to run.
         leeway_factor: efficiency inflation factor past the point of diminishing returns to use in estimating where
             slowness starts.
+        min_residual_reduction: minimum residual norm reduction required for PODR.
         output: if "stats", outputs the main stats (5 fields of the return values documented below). If "history",
             also outputs the x and residual (A*x) history.
         x0: optional initial guess for the method run on A*x=0.
@@ -102,7 +104,9 @@ def shrinkage_factor(operator, method, domain_shape: np.ndarray, num_examples: i
     # Find point of diminishing returns (PODR). Allow a leeway of 'leeway_factor' from the maximum efficiency point.
     reduction = np.mean(residual_history / residual_history[0], axis=1)
     efficiency = reduction ** (1 / np.clip(np.arange(residual_history.shape[0]), 1e-2, None))
+    sufficient_reduction_index = min(np.where(reduction < min_residual_reduction)[0])
     index = max(np.where(efficiency < leeway_factor * min(efficiency))[0])
+    index = max(index, sufficient_reduction_index)
     # factor = residual reduction per sweep over the first 'index' sweeps.
     factor = efficiency[index]
 
