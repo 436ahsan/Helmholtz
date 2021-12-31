@@ -177,7 +177,6 @@ def check_relaxation_speed(index, level, leeway_factor: float = 1.2):
 def bootstap(x,
              multilevel: hm.hierarchy.multilevel.Multilevel,
              num_levels: int,
-             relax_conv_factor: float,
              num_sweeps: int = 10,
              interpolation_method: str = "ls",
              num_test_examples: int = 5,
@@ -196,8 +195,6 @@ def bootstap(x,
         x: test matrix.
         multilevel: initial multilevel hierarchy.
         num_levels: number of levels in the returned multilevel hierarchy.
-        relax_conv_factor: relaxation convergence factor over the first 'num_sweeps', starting from a random
-            initial guess.
         num_sweeps: number of relaxations or cycles to run on fine-level vectors to improve them.
         interpolation_method: type of interpolation ("svd"|"ls").
         num_test_examples: number of test functions dedicated to testing (do not participate in SVD, LS fit).
@@ -232,14 +229,8 @@ def bootstap(x,
         conv_factor, level.rq(y), norm(level.operator(y)) / norm(y),
         norm(y - coarse_level.interpolate(coarse_level.coarsen(y))) / norm(y) if coarse_level is not None else -1))
 
-    # if conv_factor < relax_conv_factor:
-    #     # Relaxation cycle is more efficient than relaxation, smooth the previous vectors.
     _LOGGER.info("Improving vectors by relaxation cycles")
     x, _ = hm.solve.run.run_iterative_method(level.operator, relax_cycle, x, num_sweeps)
-    # else:
-    #     # Prepend the vector y to x, since our folds are sorted as fit, then test.
-    #     x = np.concatenate((y[:, None], x), axis=1)
-    #     _LOGGER.info("Added vector to TF set, #examples {}".format(x.shape[1]))
 
     # Recreate all coarse levels. One down-pass, relaxing at each level, hopefully starting from improved x so the
     # process improves all levels.

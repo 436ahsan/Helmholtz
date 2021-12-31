@@ -10,7 +10,7 @@ _LOGGER = logging.getLogger(__name__)
 def compare_coarsening(level, nu,
                        domain_size: float,
                        aggregate_size: int, num_components: int,
-                       calibers=(2, 3, 4), ideal_tv: bool = False,
+                       ideal_tv: bool = False,
                        num_examples: int = 5,
                        nu_values: np.ndarray = np.arange(1, 12),
                        interpolation_method: str = "ls",
@@ -18,8 +18,14 @@ def compare_coarsening(level, nu,
                        weighted: bool = False,
                        neighborhood: str = "extended",
                        repetitive: bool = False,
-                       nu_coarsest: int = -1):
+                       nu_coarsest: int = -1,
+                       m: int = None):
     # Generate initial test vectors.
+    subdomain_size = m * aggregate_size
+    a_subdomain = level.a.tocsr()[:subdomain_size, :subdomain_size]
+    # if m is None:
+    #     m = level.size // aggregate_size
+    # _LOGGER.info("Domain size {}".format(m * aggregate_size))
     if ideal_tv:
         _LOGGER.info("Generating {} ideal TVs".format(num_examples))
         x, lam = hm.analysis.ideal.ideal_tv(level.a, num_examples)
@@ -29,21 +35,23 @@ def compare_coarsening(level, nu,
         _LOGGER.info("RER {:.3f}".format(norm(level.a.dot(x)) / norm(x)))
 
     # Create coarsening.
-    r, s = hm.repetitive.locality.create_coarsening(x, aggregate_size, num_components, normalize=False)
-    r = r.tile(level.size // aggregate_size)
-    xc = r.dot(x)
+    coarsener, s = hm.repetitive.locality.create_coarsening(x, aggregate_size, num_components, normalize=False)
+    r = coarsener.tile(level.a.shape[0] // aggregate_size)
+    r_subdomain = coarsener.tile(m)
 
     # Mock cycle rates.
-    mock_conv = [hm.setup.auto_setup.mock_cycle_conv_factor(level, r, nu) for nu in nu_values]
+    level_subdomain = hm.setup.hierarchy.create_finest_level(a_subdomain)
+    mock_conv = [hm.setup.auto_setup.mock_cycle_conv_factor(level_subdomain, r_subdomain, nu) for nu in nu_values]
 
     # Interpolation by LS fitting for different calibers.
+    calibers = (2, 3, 4)
     p = dict((caliber, hm.setup.auto_setup.create_interpolation(
         x, level.a, r, level.location, domain_size, interpolation_method, aggregate_size=aggregate_size,
         num_components=num_components,
         neighborhood=neighborhood, repetitive=repetitive, target_error=0.1,
         caliber=caliber, fit_scheme=fit_scheme, weighted=weighted)) for caliber in calibers)
 
-    # Symmetrizing restriction for high-order P.
+    # Symmetrizing restriction for high-order P. 'calibers' must contain 4 for this to work.
     q = hm.repetitive.symmetry.symmetrize(r, level.a.dot(p[4]), aggregate_size, num_components)
 
     # Measure 2-level rates.
@@ -57,10 +65,11 @@ def compare_coarsening(level, nu,
     ]
 
     l2c = []
-    a = level.a
+    a_domain = level.a.tocsr()
     for _, r, p, q in coarsening_types:
         ml = hm.repetitive.locality.create_two_level_hierarchy_from_matrix(
-            a, level.location, r, p, q, aggregate_size, num_components)
+            a_domain, level.location, r, p, q, aggregate_size, num_components, m=m)
+        a = ml[0].a
         ac = ml[1].a
         fill_in_factor = (ac.nnz / a.nnz) * (a.shape[0] / ac.shape[0])
         symmetry_deviation = np.max(np.abs(ac - ac.transpose()))

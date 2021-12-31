@@ -79,22 +79,44 @@ def create_two_level_hierarchy(kh, discretization, m, r, p, q, aggregate_size, n
     return multilevel
 
 
-def create_two_level_hierarchy_from_matrix(a, location, r, p, q, aggregate_size, nc, symmetrize: bool = False):
-    m = a.shape[0]
-    if isinstance(r, scipy.sparse.csr_matrix):
-        r_csr = r
-    else:
-        r_csr = hm.linalg.tile_array(r, m // aggregate_size)
-    if isinstance(p, scipy.sparse.csr_matrix):
-        p_csr = p
-    else:
-        p_csr = hm.linalg.tile_array(p, m // aggregate_size)
+# TODO(orenlivne): clean this so that the callers pass in all objects for a problem on a fixed domain of size
+# m * aggregate_size. This may be a sub-domain for locality in a repetitive framework.
+def create_two_level_hierarchy_from_matrix(a, location, r, p, q, aggregate_size, num_components, symmetrize: bool = False,
+                                           m: int = None):
+    """
+
+    :param a:
+    :param location:
+    :param r:
+    :param p:
+    :param q:
+    :param aggregate_size:
+    :param num_components:
+    :param symmetrize:
+    :param m: size of domain in aggregates. If None, m = a.shape[0] // aggregate_size.
+    :return: two-level hierarchy.
+    """
+    if m is None:
+        m = a.shape[0] // aggregate_size
+    # Use the first m fine-level points as the sub-domain.
+
+    r_csr = r if isinstance(r, scipy.sparse.csr_matrix) else hm.linalg.tile_array(r, m)
+    p_csr = p if isinstance(p, scipy.sparse.csr_matrix) else hm.linalg.tile_array(p, m)
+    q_csr = q if isinstance(q, scipy.sparse.csc_matrix) else hm.linalg.tile_array(q, m)
+
+    n = m * aggregate_size
+    nc = (n * num_components) // aggregate_size
+    a = a[:n, :n]
+    location = location[:n]
+    r_csr = r_csr[:nc, :n]
+    p_csr = p_csr[:n, :nc]
+    q_csr = q_csr[:nc, :n]
     level0 = hm.setup.hierarchy.create_finest_level(a)
     level0.location = location
     # relaxer=hm.solve.relax.GsRelaxer(a) if kh == 0 else None)
-    level1 = hm.setup.hierarchy.create_coarse_level(level0.a, level0.b, r_csr, p_csr, q, symmetrize=symmetrize)
+    level1 = hm.setup.hierarchy.create_coarse_level(level0.a, level0.b, r_csr, p_csr, q_csr, symmetrize=symmetrize)
     # Calculate coarse-level variable locations. At each aggregate center we have 'num_components' coarse variables.
-    level1.location = hm.setup.geometry.coarse_locations(level0.location, aggregate_size, nc)
+    level1.location = hm.setup.geometry.coarse_locations(level0.location, aggregate_size, num_components)
 
     multilevel = hm.hierarchy.multilevel.Multilevel.create(level0)
     multilevel.add(level1)
