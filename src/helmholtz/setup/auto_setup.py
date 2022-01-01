@@ -134,7 +134,7 @@ def build_coarse_level(level: hm.hierarchy.multilevel.Level,
         _LOGGER.info("Bootstrap step {}/{}".format(i + 1, num_bootstrap_steps))
         # Set relax_conv_factor to a high value so that we never append a bootstrap vector to the TV set.
         x, multilevel = hm.setup.auto_setup.bootstap(
-            x, multilevel, num_levels, 2.0,
+            x, multilevel, num_levels,
             num_sweeps=num_sweeps, interpolation_method=interpolation_method, neighborhood=neighborhood,
             repetitive=repetitive, num_test_examples=num_test_examples, max_caliber=max_caliber,
             target_error=target_error)
@@ -246,8 +246,18 @@ def bootstap(x,
                      "eff {:.2f}".format(
             r.shape, aggregate_size, nc, cr, mean_energy_error, num_sweeps, mock_conv, mock_efficiency))
 
+        # Calculate local Mock cycle rates.
+        # TODO(oren): remove this double call to creating R. This is only a convenience so we can tile it on
+        # a smaller sub-domain.
+        coarsener, _ = hm.repetitive.locality.create_coarsening(x, aggregate_size, nc, normalize=False)
+        m = 4
+        subdomain_size = m * aggregate_size
+        a_subdomain = level.a.tocsr()[:subdomain_size, :subdomain_size]
+        level_subdomain = hm.setup.hierarchy.create_finest_level(a_subdomain)
+        r_subdomain = coarsener.tile(m)
         nu_values = np.union1d(np.array(list(range(1, 4))), [num_sweeps])
-        mock_conv_factor = np.array([hm.setup.auto_setup.mock_cycle_conv_factor(level, r, nu) for nu in nu_values])
+        mock_conv_factor = np.array([hm.setup.auto_setup.mock_cycle_conv_factor(level_subdomain, r_subdomain, nu)
+                                     for nu in nu_values])
         _LOGGER.info("Mock cycle conv factor {} for nu {}".format(
             np.array2string(mock_conv_factor, precision=3), np.array2string(nu_values)))
 
@@ -265,11 +275,11 @@ def bootstap(x,
 
         # Measure two-level rates. This should be local, but for now using global.
         ml = hm.repetitive.locality.create_two_level_hierarchy_from_matrix(
-            a_domain, level.location, r, p, q, aggregate_size, nc)
-        a = ml[0].a
-        ac = ml[1].a
-        two_level_conv = [hm.repetitive.locality.two_level_conv_factor(
-            ml, nu, nu_coarsest=nu_coarsest, print_frequency=None)[1] for nu in nu_values]
+            level.a, level.location, r, p, q, aggregate_size, nc, m=m)
+        two_level_conv = np.array([hm.repetitive.locality.two_level_conv_factor(
+            ml, nu, nu_coarsest=-1, print_frequency=None)[1] for nu in nu_values])
+        _LOGGER.info("2-level cycle conv factor {} for nu {}".format(
+            np.array2string(two_level_conv, precision=3), np.array2string(nu_values)))
 
         coarse_level = hierarchy.create_coarse_level(level.a, level.b, r, p, q)
         coarse_level.location = coarse_location

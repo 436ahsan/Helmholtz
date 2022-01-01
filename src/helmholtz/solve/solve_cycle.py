@@ -77,7 +77,7 @@ class SolutionCycleProcessor(hm.hierarchy.processor.Processor):
         self._print_state(l, "initial")
         level = self._multilevel[l]
         if self._nu_coarsest == -1:
-            self._x[l] = scipy.sparse.linalg.gmres(level.a, self._b[l])[0]
+            self._x[l] = scipy.sparse.linalg.gmres(level.a, self._b[l], tol=1e-10)[0]
             #self._x[l] = scipy.sparse.linalg.bicgstab(level.a, self._b[l])[0]
             #self._x[l] = scipy.sparse.linalg.spsolve(level.a, self._b[l])
             #self._x[l] = np.linalg.solve(level.a.todense(), self._b[l])

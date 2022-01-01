@@ -32,7 +32,7 @@ class TestIdealTvInterpolation:
 
         # Interpolation parameters.
         interpolation_method = "ls"
-        fit_scheme = "ridge"
+        fit_scheme = "plain"
         weighted = True
         neighborhood = "extended"  # "aggregate" # "extended"
         num_test_examples = 5
@@ -61,5 +61,5 @@ class TestIdealTvInterpolation:
 
         nu = 4
         y, conv_factor = hm.repetitive.locality.two_level_conv_factor(multilevel, nu, print_frequency=1,
-                                                                      residual_stop_value=1e-8)
-        assert conv_factor == pytest.approx(0.142, 1e-2)
+                                                                      residual_stop_value=1e-9)
+        assert conv_factor == pytest.approx(0.145, 1e-2)

@@ -191,7 +191,7 @@ class UniformCoarsener:
         self._mock_conv_factor = np.array([hm.setup.auto_setup.mock_cycle_conv_factor(level, r, nu) for r in r_values])
 
     # TODO(oren): max_conv_factor can be derived from cycle index instead of being passed in.
-    def get_coarsening_info(self, max_conv_factor, fmt="array"):
+    def get_coarsening_info(self, max_conv_factor, fmt: str = "array"):
         """
         Returns a table of coarsening matrix performance statistics vs. aggregate size and # principal components
         (coarse vars per aggregate).
