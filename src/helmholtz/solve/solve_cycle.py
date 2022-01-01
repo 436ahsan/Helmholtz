@@ -1,7 +1,7 @@
 """Multilevel solution cycle of A*x=b. Coarsest level problem is solved via a direct solver."""
 import logging
 import numpy as np
-from scipy.sparse.linalg import spsolve
+import scipy.sparse.linalg
 
 import helmholtz as hm
 import helmholtz.hierarchy.multilevel as multilevel
@@ -76,13 +76,24 @@ class SolutionCycleProcessor(hm.hierarchy.processor.Processor):
     def process_coarsest(self, l):
         self._print_state(l, "initial")
         level = self._multilevel[l]
-        if self._nu_coarsest < 0:
-            self._x[l] = spsolve(level.a, self._b[l])
+        if self._nu_coarsest == -1:
+            self._x[l] = scipy.sparse.linalg.gmres(level.a, self._b[l])[0]
+            #self._x[l] = scipy.sparse.linalg.bicgstab(level.a, self._b[l])[0]
+            #self._x[l] = scipy.sparse.linalg.spsolve(level.a, self._b[l])
             #self._x[l] = np.linalg.solve(level.a.todense(), self._b[l])
             self._print_state(l, "exact")
+        elif self._nu_coarsest == 0:
+            r_norm_initial = scaled_norm(self._b[l] - level.operator(self._x[l]))
+            r_norm_prev = r_norm_initial
+            n = 10
+            for i in range(10):
+                self._relax(l, n)
+                r_norm = scaled_norm(self._b[l] - level.operator(self._x[l]))
+                if r_norm < 1e-3 * r_norm_initial: #or r_norm > 0.99 * r_norm_prev:
+                   break
+                r_norm_prev = r_norm
         else:
             self._relax(l, self._nu_coarsest)
-            self._print_state(l, "relax {}".format(self._nu_coarsest))
 
     def pre_process(self, l):
         # Execute at level L right before switching to the next-coarser level L+1.

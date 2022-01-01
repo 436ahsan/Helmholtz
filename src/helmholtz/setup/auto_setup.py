@@ -114,21 +114,17 @@ def build_coarse_level(level: hm.hierarchy.multilevel.Level,
     """
     multilevel = hm.hierarchy.multilevel.Multilevel.create(level)
     a = level.a
-    # x_log = []
-    # r_log = []
 
     # Initialize fine-level test functions to random. Use enough to have enough windows if repetitive.
     num_examples = 20 if not repetitive else int(np.ceil(24 * max_caliber / level.size))
     x = hm.solve.run.random_test_matrix((a.shape[0],), num_examples=num_examples)
-    # x_log.append(x)
 
     # Improve vectors with 1-level relaxation.
     _LOGGER.info("Generating {} TV with {} sweeps".format(num_examples, num_sweeps))
     b = np.zeros_like(x)
-    x, _ = hm.solve.run.run_iterative_method(
-        level.operator, lambda x: level.relax(x, b), x, num_sweeps=num_sweeps)
+    x = hm.solve.run.run_iterative_method(
+        level.operator, lambda x: level.relax(x, b), x, num_sweeps=num_sweeps)[0]
     _LOGGER.info("RER {:.3f}".format(norm(a.dot(x)) / norm(x)))
-    # x_log.append(x)
 
     # Bootstrap to improve vectors, R, P.
     num_levels = 2
@@ -142,9 +138,6 @@ def build_coarse_level(level: hm.hierarchy.multilevel.Level,
             num_sweeps=num_sweeps, interpolation_method=interpolation_method, neighborhood=neighborhood,
             repetitive=repetitive, num_test_examples=num_test_examples, max_caliber=max_caliber,
             target_error=target_error)
-        # x_log.append(x)
-        # # TODO(orenlivne): remove this since it's a private  memnber.
-        # r_log.append(multilevel[1]._r_csr)
         _LOGGER.info("RER {:.6f}".format(norm(a.dot(x)) / norm(x)))
         _LOGGER.info("-" * 80)
     return multilevel[1]
@@ -264,18 +257,20 @@ def bootstap(x,
             neighborhood=neighborhood, repetitive=repetitive, target_error=target_error)
         coarse_location = hm.setup.geometry.coarse_locations(level.location, aggregate_size, nc)
 
-        for title, x_set in ((("all", x),) if repetitive else (("fit", x_fit), ("test", x_test))):
-            error = norm(x_set - p.dot(r.dot(x_set)), axis=0) / norm(x_set, axis=0)
-            error_a = norm(level.a.dot(x_set - p.dot(r.dot(x_set))), axis=0) / norm(x_set, axis=0)
-            _LOGGER.info(
-                "{:<4s} set size {:<2d} P L2 error mean {:.2f} max {:.2f} A error mean {:.2f} max {:.2f}".format(
-                    title, len(error), np.mean(error), np.max(error), np.mean(error_a), np.max(error_a)))
-
         # 'level' now becomes the next coarser level and x_level the corresponding test matrix.
         if symmetrize:
             q = hm.repetitive.symmetry.symmetrize(r, level.a.dot(p), aggregate_size, nc)
         else:
             q = p.T
+
+        # Measure two-level rates. This should be local, but for now using global.
+        ml = hm.repetitive.locality.create_two_level_hierarchy_from_matrix(
+            a_domain, level.location, r, p, q, aggregate_size, nc)
+        a = ml[0].a
+        ac = ml[1].a
+        two_level_conv = [hm.repetitive.locality.two_level_conv_factor(
+            ml, nu, nu_coarsest=nu_coarsest, print_frequency=None)[1] for nu in nu_values]
+
         coarse_level = hierarchy.create_coarse_level(level.a, level.b, r, p, q)
         coarse_level.location = coarse_location
         coarse_level.domain_size = level.domain_size

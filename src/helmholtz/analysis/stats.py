@@ -1,5 +1,6 @@
 import helmholtz as hm
 import logging
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from numpy.linalg import norm
@@ -21,6 +22,8 @@ def compare_coarsening(level, nu,
                        nu_coarsest: int = -1,
                        m: int = None):
     # Generate initial test vectors.
+    if m is None:
+        m = level.size // aggregate_size
     subdomain_size = m * aggregate_size
     a_subdomain = level.a.tocsr()[:subdomain_size, :subdomain_size]
     # if m is None:
@@ -37,10 +40,10 @@ def compare_coarsening(level, nu,
     # Create coarsening.
     coarsener, s = hm.repetitive.locality.create_coarsening(x, aggregate_size, num_components, normalize=False)
     r = coarsener.tile(level.a.shape[0] // aggregate_size)
-    r_subdomain = coarsener.tile(m)
 
-    # Mock cycle rates.
+    # Calculate local Mock cycle rates.
     level_subdomain = hm.setup.hierarchy.create_finest_level(a_subdomain)
+    r_subdomain = coarsener.tile(m)
     mock_conv = [hm.setup.auto_setup.mock_cycle_conv_factor(level_subdomain, r_subdomain, nu) for nu in nu_values]
 
     # Interpolation by LS fitting for different calibers.
@@ -82,3 +85,26 @@ def compare_coarsening(level, nu,
                             columns=("Fill-in", "Symmetry") + tuple(nu_values),
                             index=("Mock",) + tuple(item[0] for item in coarsening_types))
     return all_conv, r, p, q
+
+
+def run_r_vs_q(level, z, r, p, q, aggregate_size, num_components, nu, nu_coarsest):
+    titles = ("r", "q")
+    restrictions = (r, q)
+    fig, axs = plt.subplots(1, len(titles), figsize=(12, 4))
+
+    for title, restriction, ax in zip(titles, restrictions, axs):
+        print("Restriction", title)
+        ml = hm.repetitive.locality.create_two_level_hierarchy_from_matrix(
+            level.a, level.location, r, p, restriction, aggregate_size, num_components)
+        y, _ = hm.repetitive.locality.two_level_conv_factor(
+                    ml, nu_pre=0, nu_post=nu, nu_coarsest=nu_coarsest, print_frequency=1,
+                    debug=False, z=z, seed=0, num_sweeps=15, num_levels=2)
+        #y -= z.dot(z.T.dot(y[:, None])).flatten()
+
+        # Asymptotic vector.
+        ax.set_title("Slowest Vector in Two-level Cycle(0, {})".format(nu))
+        e = ml[1].interpolate(r.dot(y))
+        ax.plot(y, label="x");
+        ax.plot(e, label="PRx");
+        ax.grid(True)
+        ax.legend()
