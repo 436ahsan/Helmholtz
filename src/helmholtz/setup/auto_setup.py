@@ -22,8 +22,10 @@ def setup(a: scipy.sparse.spmatrix,
           repetitive: bool = False,
           max_coarsest_relax_conv_factor: float = 0.8,
           max_coarsest_level_size: int = 10,
+          caliber: int = None,
           target_error: float = 0.2,
-          leeway_factor: float = 1.2) -> hierarchy.multilevel.Multilevel:
+          leeway_factor: float = 1.2,
+          symmetrize: bool = False) -> hierarchy.multilevel.Multilevel:
     """
     Creates low-residual test functions and multilevel hierarchy for solving A*x=b.
     Args:
@@ -72,7 +74,8 @@ def setup(a: scipy.sparse.spmatrix,
         _LOGGER.info("Coarsening level {}->{}".format(num_levels - 2, num_levels - 1))
         level = build_coarse_level(level, num_sweeps, num_bootstrap_steps=num_bootstrap_steps,
                                    interpolation_method=interpolation_method, repetitive=repetitive,
-                                   neighborhood=neighborhood, target_error=target_error)
+                                   neighborhood=neighborhood, target_error=target_error, symmetrize=symmetrize,
+                                   caliber=caliber)
         multilevel.add(level)
         shrinkage_factor, num_sweeps, residual, _, _, relax_conv_factor = \
             check_relaxation_speed(num_levels - 1, level, leeway_factor=leeway_factor)
@@ -88,11 +91,13 @@ def build_coarse_level(level: hm.hierarchy.multilevel.Level,
                        num_sweeps: int,
                        num_bootstrap_steps: int = 1,
                        max_caliber: int = 6,
+                       caliber: int = None,
                        target_error: float = 0.2,
                        num_test_examples: int = 5,
                        interpolation_method: str = "ls",
                        neighborhood: str = "extended",
-                       repetitive: bool = False) -> \
+                       repetitive: bool = False,
+                       symmetrize: bool = False) -> \
         Tuple[np.ndarray, np.ndarray, hm.hierarchy.multilevel.Multilevel]:
     """
     Creates the next-coarser level in the multilevel hierarchy.
@@ -137,7 +142,7 @@ def build_coarse_level(level: hm.hierarchy.multilevel.Level,
             x, multilevel, num_levels,
             num_sweeps=num_sweeps, interpolation_method=interpolation_method, neighborhood=neighborhood,
             repetitive=repetitive, num_test_examples=num_test_examples, max_caliber=max_caliber,
-            target_error=target_error)
+            target_error=target_error, symmetrize=symmetrize, caliber=caliber)
         _LOGGER.info("RER {:.6f}".format(norm(a.dot(x)) / norm(x)))
         _LOGGER.info("-" * 80)
     return multilevel[1]
@@ -178,6 +183,7 @@ def bootstap(x,
              max_conv_factor: float = 0.4,
              neighborhood: str = "extended",
              max_caliber: int = 6,
+             caliber: int = None,
              target_error: float = 0.2,
              repetitive: bool = False,
              aggregate_size: int = None,
@@ -252,7 +258,7 @@ def bootstap(x,
         coarsener, _ = hm.repetitive.locality.create_coarsening(x, aggregate_size, nc, normalize=False)
         m = 4
         subdomain_size = m * aggregate_size
-        a_subdomain = level.a.tocsr()[:subdomain_size, :subdomain_size]
+        a_subdomain = level.a[:subdomain_size, :subdomain_size]
         level_subdomain = hm.setup.hierarchy.create_finest_level(a_subdomain)
         r_subdomain = coarsener.tile(m)
         nu_values = np.union1d(np.array(list(range(1, 4))), [num_sweeps])
@@ -264,7 +270,7 @@ def bootstap(x,
         # Create the interpolation operator P.
         p = create_interpolation(
             x_level, level.a, r, level.location, level.domain_size, interpolation_method, aggregate_size=aggregate_size, num_components=nc, max_caliber=max_caliber,
-            neighborhood=neighborhood, repetitive=repetitive, target_error=target_error)
+            neighborhood=neighborhood, repetitive=repetitive, target_error=target_error, caliber=caliber)
         coarse_location = hm.setup.geometry.coarse_locations(level.location, aggregate_size, nc)
 
         # 'level' now becomes the next coarser level and x_level the corresponding test matrix.
@@ -277,7 +283,7 @@ def bootstap(x,
         ml = hm.repetitive.locality.create_two_level_hierarchy_from_matrix(
             level.a, level.location, r, p, q, aggregate_size, nc, m=m)
         two_level_conv = np.array([hm.repetitive.locality.two_level_conv_factor(
-            ml, nu, nu_coarsest=-1, print_frequency=None)[1] for nu in nu_values])
+            ml, nu, nu_coarsest=500, print_frequency=None)[1] for nu in nu_values])
         _LOGGER.info("2-level cycle conv factor {} for nu {}".format(
             np.array2string(two_level_conv, precision=3), np.array2string(nu_values)))
 

@@ -73,7 +73,7 @@ class TestLinalg:
     def test_tile_csr_matrix(self):
         n = 4
         kh = 0.5
-        a = hm.linalg.helmholtz_1d_operator(kh, n).tocsr()
+        a = hm.linalg.helmholtz_1d_operator(kh, n)
 
         a_expected = \
             [[-1.75, 1., 0., 1.],

@@ -77,15 +77,15 @@ class SolutionCycleProcessor(hm.hierarchy.processor.Processor):
         self._print_state(l, "initial")
         level = self._multilevel[l]
         if self._nu_coarsest == -1:
-            self._x[l] = scipy.sparse.linalg.gmres(level.a, self._b[l], tol=1e-10)[0]
+            #self._x[l] = scipy.sparse.linalg.gmres(level.a, self._b[l], tol=1e-10)[0]
             #self._x[l] = scipy.sparse.linalg.bicgstab(level.a, self._b[l])[0]
             #self._x[l] = scipy.sparse.linalg.spsolve(level.a, self._b[l])
-            #self._x[l] = np.linalg.solve(level.a.todense(), self._b[l])
+            self._x[l] = np.linalg.solve(level.a.todense(), self._b[l])
             self._print_state(l, "exact")
         elif self._nu_coarsest == 0:
             r_norm_initial = scaled_norm(self._b[l] - level.operator(self._x[l]))
             r_norm_prev = r_norm_initial
-            n = 10
+            n = 100
             for i in range(10):
                 self._relax(l, n)
                 r_norm = scaled_norm(self._b[l] - level.operator(self._x[l]))

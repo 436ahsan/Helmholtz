@@ -22,7 +22,7 @@ class TestInterpolation:
         n = 32
         kh = 0.6
         num_sweeps = 100
-        a = hm.linalg.helmholtz_1d_operator(kh, n).tocsr()
+        a = hm.linalg.helmholtz_1d_operator(kh, n)
         location = np.arange(n)
         # Generate relaxed test matrix.
         level = hm.setup.hierarchy.create_finest_level(a)
@@ -97,7 +97,7 @@ class TestInterpolation:
     def test_create_interpolation_least_squares_domain_repetitive(self):
         n = 32
         kh = 0.5
-        a = hm.linalg.helmholtz_1d_operator(kh, n).tocsr()
+        a = hm.linalg.helmholtz_1d_operator(kh, n)
         location = np.arange(n)
         level = hm.setup.hierarchy.create_finest_level(a)
         # Generate relaxed test matrix.
@@ -121,7 +121,7 @@ class TestInterpolation:
         n = 33
         kh = 0.6
         max_conv_factor = 0.3
-        a = hm.linalg.helmholtz_1d_operator(kh, n).tocsr()
+        a = hm.linalg.helmholtz_1d_operator(kh, n)
         location = np.arange(n)
         level = hm.setup.hierarchy.create_finest_level(a)
         # Generate relaxed test matrix.
@@ -158,7 +158,7 @@ class TestInterpolation:
         n = 16
         kh = 1.0
         max_conv_factor = 0.3
-        a = hm.linalg.helmholtz_1d_operator(kh, n).tocsr()
+        a = hm.linalg.helmholtz_1d_operator(kh, n)
         location = np.arange(n)
         level = hm.setup.hierarchy.create_finest_level(a)
         # Generate relaxed test matrix.
@@ -192,7 +192,7 @@ class TestInterpolation:
     def test_create_interpolation_least_squares_domain_ideal_tvs(self):
         n = 32
         kh = 0.6
-        a = hm.linalg.helmholtz_1d_operator(kh, n).tocsr()
+        a = hm.linalg.helmholtz_1d_operator(kh, n)
         location = np.arange(n)
         # Generate relaxed test matrix.
         x, _ = helmholtz.analysis.ideal.ideal_tv(a, 10)
@@ -211,7 +211,7 @@ class TestInterpolation:
     def test_create_interpolation_least_squares_domain_repetitive_large_aggregate(self):
         n = 18
         kh = 1.0
-        a = hm.linalg.helmholtz_1d_operator(kh, n).tocsr()
+        a = hm.linalg.helmholtz_1d_operator(kh, n)
         location = np.arange(n)
 
         # Generate relaxed test matrix.
@@ -248,7 +248,7 @@ class TestInterpolation:
         n = 16
         kh = 1.0
         max_conv_factor = 0.3
-        a = hm.linalg.helmholtz_1d_operator(kh, n).tocsr()
+        a = hm.linalg.helmholtz_1d_operator(kh, n)
         location = np.arange(n)
         level = hm.setup.hierarchy.create_finest_level(a)
         # Generate relaxed test matrix.
@@ -283,7 +283,7 @@ class TestInterpolation:
         """Weighted least-squares interpolation fitting."""
         n = 32
         kh = 0.5
-        a = hm.linalg.helmholtz_1d_operator(kh, n).tocsr()
+        a = hm.linalg.helmholtz_1d_operator(kh, n)
         location = np.arange(n)
         level = hm.setup.hierarchy.create_finest_level(a)
         # Generate relaxed test matrix.
@@ -307,7 +307,7 @@ class TestInterpolation:
         """Weighted least-squares interpolation fitting."""
         n = 32
         kh = 0.5
-        a = hm.linalg.helmholtz_1d_operator(kh, n).tocsr()
+        a = hm.linalg.helmholtz_1d_operator(kh, n)
         location = np.arange(n)
         level = hm.setup.hierarchy.create_finest_level(a)
         # Generate relaxed test matrix.

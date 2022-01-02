@@ -47,7 +47,7 @@ class TestBootstrapAuto:
     def test_laplace_coarsening_repetitive(self):
         n = 16
         kh = 0
-        a = hm.linalg.helmholtz_1d_5_point_operator(kh, n).tocsr()
+        a = hm.linalg.helmholtz_1d_5_point_operator(kh, n)
         location = np.arange(n)
 
         multilevel = hm.setup.auto_setup.setup(a, location, n, max_levels=2, repetitive=True)
@@ -76,7 +76,7 @@ class TestBootstrapAuto:
         P = SVD interpolation = R^T."""
         n = 16
         kh = 0
-        a = hm.linalg.helmholtz_1d_5_point_operator(kh, n).tocsr()
+        a = hm.linalg.helmholtz_1d_5_point_operator(kh, n)
 
         multilevel = hm.setup.auto_setup.setup(a, max_levels=2, num_bootstrap_steps=2)
 
@@ -109,7 +109,7 @@ class TestBootstrapAuto:
     def test_helmholtz_coarsening(self):
         n = 16
         kh = 0.5
-        a = hm.linalg.helmholtz_1d_5_point_operator(kh, n).tocsr()
+        a = hm.linalg.helmholtz_1d_5_point_operator(kh, n)
         location = np.arange(n)
 
         multilevel = hm.setup.auto_setup.setup(a, location, n, max_levels=2)
@@ -136,7 +136,7 @@ class TestBootstrapAuto:
         max_levels = 2
 
         # Initialize test functions (to random) and hierarchy at coarsest level.
-        a = hm.linalg.helmholtz_1d_5_point_operator(kh, n).tocsr()
+        a = hm.linalg.helmholtz_1d_5_point_operator(kh, n)
         level = hierarchy.create_finest_level(a)
         level.location = np.arange(n)
         multilevel = hm.hierarchy.multilevel.Multilevel.create(level)

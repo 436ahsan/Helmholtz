@@ -89,7 +89,7 @@ def sparse_circulant(vals: np.array, offsets: np.array, n: int, dtype=np.double)
     dupvals = np.concatenate((vals, v))
     dupoffsets[dupoffsets > n] -= 2 * n
 
-    return scipy.sparse.diags(dupvals, dupoffsets, shape=(n, n), dtype=dtype)
+    return scipy.sparse.diags(dupvals, dupoffsets, shape=(n, n), dtype=dtype).tocsr()
 
 
 def tile_csr_matrix(a: scipy.sparse.csr_matrix, n: int, stride: int = None, total_col: int = None) -> scipy.sparse.csr_matrix:
