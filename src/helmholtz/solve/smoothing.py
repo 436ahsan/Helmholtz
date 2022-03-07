@@ -158,7 +158,8 @@ def plot_diminishing_returns_point(factor, num_sweeps, conv, ax, title: str = "R
 def check_relax_cycle_shrinkage(multilevel, max_sweeps: int = 20, num_levels: int = None,
                                 nu_pre: int = 2, nu_post: int = 2, nu_coarsest: int = 4,
                                 slow_conv_factor: float = 0.95, leeway_factor: float = 1.2,
-                                num_examples: int = 5, x0: np.ndarray = None):
+                                num_examples: int = 5, x0: np.ndarray = None,
+                                print_frequency: int = 1, plot: bool = True):
     """Checks the two-level relaxation cycle shrinkage vs. relaxation, unless num_levels=1, in which case
     we only run relaxation."""
     level = multilevel[0]
@@ -181,38 +182,42 @@ def check_relax_cycle_shrinkage(multilevel, max_sweeps: int = 20, num_levels: in
         relax_cycle_b = lambda x, b: relax_cycle(x)
         method_list.append(("{}-level MiniCycle".format(num_levels), relax_cycle, relax_cycle_b, work, "red"))
 
-    fig, axs = plt.subplots(len(method_list), 5, figsize=(18, 4 * len(method_list)))
+    if plot:
+        fig, axs = plt.subplots(len(method_list), 5, figsize=(18, 4 * len(method_list)))
 
     method_info = {}
     for row, (title, method, method_b, work, color) in enumerate(method_list):
-        ax_row = axs[row] if len(method_list) > 1 else axs
-        _LOGGER.info(title)
+        if plot:
+            ax_row = axs[row] if len(method_list) > 1 else axs
+            _LOGGER.info(title)
         info = hm.solve.smoothing.shrinkage_factor(
-            operator, method_b, (n,), print_frequency=1, max_sweeps=max_sweeps,
+            operator, method_b, (n,), print_frequency=print_frequency, max_sweeps=max_sweeps,
             slow_conv_factor=slow_conv_factor, leeway_factor=leeway_factor, output="history", x0=x0)
         method_info[title] = info
+
         factor, num_sweeps, residual, conv, rer, relax_conv_factor, x_history, r_history = info
-        _LOGGER.info(
-            "Relax conv {:.2f} shrinkage {:.2f} PODR RER {:.2f} after {} sweeps. Work {:.1f} eff {:.2f}".format(
-                relax_conv_factor, factor, np.mean(rer[num_sweeps]), num_sweeps, work,
-                np.mean(residual[num_sweeps] / residual[0]) ** (1 / (num_sweeps * work))))
-        hm.solve.smoothing.plot_diminishing_returns_point(factor, num_sweeps, conv, ax_row[0], title=title, color=color)
+        if plot:
+            _LOGGER.info(
+                "Relax conv {:.2f} shrinkage {:.2f} PODR RER {:.2f} after {} sweeps. Work {:.1f} eff {:.2f}".format(
+                    relax_conv_factor, factor, np.mean(rer[num_sweeps]), num_sweeps, work,
+                    np.mean(residual[num_sweeps] / residual[0]) ** (1 / (num_sweeps * work))))
+            hm.solve.smoothing.plot_diminishing_returns_point(factor, num_sweeps, conv, ax_row[0], title=title, color=color)
 
-        ax = ax_row[1]
-        ax.plot(x_history[0])
-        ax.set_title("Initial Error")
+            ax = ax_row[1]
+            ax.plot(x_history[0])
+            ax.set_title("Initial Error")
 
-        ax = ax_row[2]
-        ax.plot(x_history[num_sweeps])
-        ax.set_title("Error after {} sweeps".format(num_sweeps))
+            ax = ax_row[2]
+            ax.plot(x_history[num_sweeps])
+            ax.set_title("Error after {} sweeps".format(num_sweeps))
 
-        ax = ax_row[3]
-        ax.plot(r_history[0])
-        ax.set_title("Initial Residual")
+            ax = ax_row[3]
+            ax.plot(r_history[0])
+            ax.set_title("Initial Residual")
 
-        ax = ax_row[4]
-        ax.plot(r_history[num_sweeps])
-        ax.set_title("Residual after {} sweeps".format(num_sweeps))
+            ax = ax_row[4]
+            ax.plot(r_history[num_sweeps])
+            ax.set_title("Residual after {} sweeps".format(num_sweeps))
 
-    ax.legend()
+            ax.legend()
     return method_info

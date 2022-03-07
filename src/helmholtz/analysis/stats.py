@@ -1,4 +1,5 @@
 import helmholtz as hm
+import helmholtz.repetitive.coarsening_repetitive as hrc
 import logging
 import matplotlib.pyplot as plt
 import numpy as np
@@ -8,11 +9,44 @@ from numpy.linalg import norm
 _LOGGER = logging.getLogger(__name__)
 
 
+def mock_cycle_rate(a, aggregate_size: int, num_components, nu_values: np.ndarray = np.arange(1, 12),
+                    r: np.ndarray = None):
+    # Create fine-level matrix.
+    n = a.shape[0]
+    level = hm.setup.hierarchy.create_finest_level(a)
+    multilevel = hm.setup.hierarchy.multilevel.Multilevel.create(level)
+
+    # 'location' is an array of variable locations at all levels. Used only for interpolation neighbor determination.
+    # Finest-level variable locations are assumed to be [0..n-1], i.e. a domain of size n with meshsize h = 1.
+    level.location = np.arange(n)
+    # Relaxation shrinkage.
+    method_info = hm.solve.smoothing.check_relax_cycle_shrinkage(
+        multilevel, num_levels=1, leeway_factor=1.3, slow_conv_factor=0.95, num_examples=5,
+        print_frequency=None, plot=False)
+    info = method_info["Kaczmarz"]
+    shrinkage = info[0]
+    num_sweeps = 2 * method_info["Kaczmarz"][1]
+    # Create relaxed TVs.
+    x_random = hm.solve.run.random_test_matrix((level.a.shape[0],), num_examples=4)
+    b = np.zeros_like(x_random)
+    x = hm.solve.run.run_iterative_method(
+        level.operator, lambda x: level.relax(x, b), x_random, num_sweeps=num_sweeps)[0]
+    # Create coarsening.
+    if r is None:
+        r, s = hm.repetitive.locality.create_coarsening(x, aggregate_size, num_components, normalize=False)
+        r = r.asarray()
+    #    r = np.array([[0.5, -0.5]])
+    #    print(kh, r)
+    R = hrc.Coarsener(r).tile(level.a.shape[0] // aggregate_size)
+    return [shrinkage, 2 * num_sweeps] + [hm.setup.auto_setup.mock_cycle_conv_factor(level, R, nu) for nu in nu_values]
+
+
 def compare_coarsening(level,
                        coarsening_types,
                        nu,
                        domain_size: float,
-                       aggregate_size: int, num_components: int,
+                       aggregate_size: int,
+                       num_components: int,
                        ideal_tv: bool = False,
                        num_examples: int = 5,
                        nu_values: np.ndarray = np.arange(1, 12),
@@ -90,11 +124,44 @@ def compare_coarsening(level,
     return all_conv, r, p, q
 
 
-def coarsen_qap(level, nu,
-                       domain_size: float,
+def initial_tv(level, nu: int, ideal_tv: bool = False, num_examples: int = 5):
+    if ideal_tv:
+        _LOGGER.info("Generating {} ideal TVs".format(num_examples))
+        x, lam = hm.analysis.ideal.ideal_tv(level.a, num_examples)
+    else:
+        _LOGGER.info("Generating {} TVs with {} sweeps".format(num_examples, nu))
+        x = hm.setup.auto_setup.get_test_matrix(level.a, nu, num_examples=num_examples)
+        _LOGGER.info("RER {:.3f}".format(norm(level.a.dot(x)) / norm(x)))
+    return x
+
+
+def improve_tv(x, multilevel, num_cycles: int = 1, print_frequency: int = None):
+    # TODO(orenlivne): update parameters of relaxation cycle to reasonable values if needed.
+    nu1, nu2, nu_coarsest = 2, 2, 4
+
+    def relax_cycle(x):
+        return hm.solve.relax_cycle.relax_cycle(multilevel, 1.0, nu1, nu2, nu_coarsest).run(x)
+
+    level = multilevel[0]
+    # First, test relaxation cycle convergence on a random vector. If slow, this yields a yet unseen slow to converge
+    # error to add to the test function set, and indicate that we should NOT attempt to improve the current TFs with
+    # relaxation cycle, since it will do more harm than good.
+    y, conv_factor = hm.solve.run.run_iterative_method(level.operator, relax_cycle,
+                                                       np.random.random((level.a.shape[0], 1)),
+                                                       num_sweeps=20, print_frequency=print_frequency)
+    y = y.flatten()
+    coarse_level = multilevel[1] if len(multilevel) > 1 else None
+    _LOGGER.info("Relax cycle conv factor {:.3f} asymptotic RQ {:.3f} RER {:.3f} P error {:.3f}".format(
+        conv_factor, level.rq(y), norm(level.operator(y)) / norm(y),
+        norm(y - coarse_level.interpolate(coarse_level.coarsen(y))) / norm(y) if coarse_level is not None else -1))
+
+    _LOGGER.info("Improving vectors by relaxation cycles ({}, {}; {})".format(nu1, nu2, nu_coarsest))
+    x, _ = hm.solve.run.run_iterative_method(level.operator, relax_cycle, x, num_cycles)
+    return x
+
+
+def build_coarse_level(level, x, domain_size: float,
                        aggregate_size: int, num_components: int,
-                       ideal_tv: bool = False,
-                       num_examples: int = 5,
                        interpolation_method: str = "ls",
                        fit_scheme: str = "ridge",
                        weighted: bool = False,
@@ -110,24 +177,25 @@ def coarsen_qap(level, nu,
     # if m is None:
     #     m = level.size // aggregate_size
     # _LOGGER.info("Domain size {}".format(m * aggregate_size))
-    if ideal_tv:
-        _LOGGER.info("Generating {} ideal TVs".format(num_examples))
-        x, lam = hm.analysis.ideal.ideal_tv(level.a, num_examples)
-    else:
-        _LOGGER.info("Generating {} TVs with {} sweeps".format(num_examples, nu))
-        x = hm.setup.auto_setup.get_test_matrix(level.a, nu, num_examples=num_examples)
-        _LOGGER.info("RER {:.3f}".format(norm(level.a.dot(x)) / norm(x)))
 
     # Create coarsening.
+    _LOGGER.info("Coarsening: aggregate_size {} num_components {}".format(aggregate_size, num_components))
     coarsener, s = hm.repetitive.locality.create_coarsening(x, aggregate_size, num_components, normalize=False)
     r = coarsener.tile(level.a.shape[0] // aggregate_size)
 
     # Calculate local Mock cycle rates.
+    nu_values = np.arange(1, 12)
     level_subdomain = hm.setup.hierarchy.create_finest_level(a_subdomain)
     r_subdomain = coarsener.tile(m)
+    mock_conv = np.array([hm.setup.auto_setup.mock_cycle_conv_factor(ml1[0], ml1[1]._r, nu) for nu in nu_values])
+    print(mock_conv)
+    two_level_conv = np.array([hm.repetitive.locality.two_level_conv_factor(
+        multilevel, nu, nu_coarsest=-1, print_frequency=None)[1] for nu in nu_values])
+    print(two_level_conv)
 
     # Interpolation by LS fitting for different calibers.
     caliber = 4
+    print(x.shape, level.a.shape, r.shape)
     p = hm.setup.auto_setup.create_interpolation(
         x, level.a, r, level.location, domain_size, interpolation_method, aggregate_size=aggregate_size,
         num_components=num_components,

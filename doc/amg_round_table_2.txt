@@ -1,0 +1,7 @@
+Numerical PDE Solvers: AMG+ vs. DNN
+
+A wave of recent papers presents a variety of discretized PD solvers based on Deep Neural Networks (DNN). These solvers typically spend $O(10^6)$ operations per gridpoint during execution, and much more ($O(10^{^12})--O(10^{14})) during setup, i.e. network training. They utilize extremely fast, highly parallel hardware (developed for other purposes), but still yield low-accuracy results. they typically claim several orders of magnitude speed-up over existing methods.
+
+Most of these claims are based on comparison with old, inefficient and/or poorly applied numerical schemes. Several examples will be reviewed in detail. The audience will be invited to find (for future meetings) a counterexample: a paper describing a DNN algorithm that can truly start to compete with state-of-the-art numerical schemes, and in particular, multigrid methods.
+
+Multigrid and AMG solvers (especially the new AMG+ approach) typically solve the same problems in $O(10^3)$ operations per gridpoint, and $O(10^5)$ in the setup phase. This is because they require only local ``training'' (learning from examples), and because they directly use (not expensively {\bf learn}) all the {\bf known} physical and geometric properties of the problem. Their generalizability and high-level processing will be discussed.

@@ -155,7 +155,7 @@ class TestBootstrapAuto:
 
         # Relax vector + coarsen in first iteration; then 2-level cycle + improve hierarchy (bootstrap).
         for i, expected_residual_norm in enumerate(expected_residual_norms):
-            x, multilevel = hm.setup.auto_setup.bootstap(x, multilevel, max_levels, relax_conv_factor, num_sweeps=10)
+            x, multilevel = hm.setup.auto_setup.bootstrap(x, multilevel, max_levels, relax_conv_factor, num_sweeps=10)
             assert norm(a.dot(x)) / norm(x) == pytest.approx(expected_residual_norm, 1e-2)
 
             # Test two-level cycle convergence for A*x=0.

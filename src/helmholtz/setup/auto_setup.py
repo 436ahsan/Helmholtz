@@ -138,7 +138,7 @@ def build_coarse_level(level: hm.hierarchy.multilevel.Level,
     for i in range(num_bootstrap_steps):
         _LOGGER.info("Bootstrap step {}/{}".format(i + 1, num_bootstrap_steps))
         # Set relax_conv_factor to a high value so that we never append a bootstrap vector to the TV set.
-        x, multilevel = hm.setup.auto_setup.bootstap(
+        x, multilevel = hm.setup.auto_setup.bootstrap(
             x, multilevel, num_levels,
             num_sweeps=num_sweeps, interpolation_method=interpolation_method, neighborhood=neighborhood,
             repetitive=repetitive, num_test_examples=num_test_examples, max_caliber=max_caliber,
@@ -172,22 +172,22 @@ def check_relaxation_speed(index, level, leeway_factor: float = 1.2):
     return factor, num_sweeps, residual, conv, rer, relax_conv_factor
 
 
-def bootstap(x,
-             multilevel: hm.hierarchy.multilevel.Multilevel,
-             num_levels: int,
-             num_sweeps: int = 10,
-             interpolation_method: str = "ls",
-             num_test_examples: int = 5,
-             print_frequency: int = None,
-             max_aggregate_size: int = 8,
-             max_conv_factor: float = 0.4,
-             neighborhood: str = "extended",
-             max_caliber: int = 6,
-             caliber: int = None,
-             target_error: float = 0.2,
-             repetitive: bool = False,
-             aggregate_size: int = None,
-             symmetrize: bool = False) -> Tuple[np.ndarray, hm.hierarchy.multilevel.Multilevel]:
+def bootstrap(x,
+              multilevel: hm.hierarchy.multilevel.Multilevel,
+              num_levels: int,
+              num_sweeps: int = 10,
+              interpolation_method: str = "ls",
+              num_test_examples: int = 5,
+              print_frequency: int = None,
+              max_aggregate_size: int = 8,
+              max_conv_factor: float = 0.4,
+              neighborhood: str = "extended",
+              max_caliber: int = 6,
+              caliber: int = None,
+              target_error: float = 0.2,
+              repetitive: bool = False,
+              aggregate_size: int = None,
+              symmetrize: bool = False) -> Tuple[np.ndarray, hm.hierarchy.multilevel.Multilevel]:
     """
     Improves test functions and a multilevel hierarchy on a fixed-size domain by bootstrapping.
     Args:

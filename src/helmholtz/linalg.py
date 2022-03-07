@@ -31,7 +31,7 @@ def get_uniform_aggregate_starts(domain_size, aggregate_size):
     two aggregates overlap if the domain size is not divisible by the aggregate size.
     Args:
         domain_size: domain size.
-        aggregate_size: aggregate sixe.
+        aggregate_size: aggregate size.
 
     Returns: list of aggregate start indices.
     """
@@ -136,7 +136,8 @@ def tile_array(r: np.ndarray, n: int) -> scipy.sparse.csr_matrix:
     return scipy.sparse.block_diag(tuple(r for _ in range(n))).tocsr()
 
 
-def helmholtz_1d_discrete_operator(kh: float, discretization: str, n: int, bc: str = "periodic") -> \
+def helmholtz_1d_discrete_operator(kh: float, discretization: str, n: int, bc: str = "periodic",
+                                   stencil: np.ndarray = None) -> \
         scipy.sparse.dia_matrix:
     """
     Returns the normalized FD-discretized 1D Helmholtz operator with periodic boundary conditions. The discretization
@@ -162,6 +163,10 @@ def helmholtz_1d_discrete_operator(kh: float, discretization: str, n: int, bc: s
         a = helmholtz_1d_operator(kh, n, dtype=dtype)
     elif discretization == "5-point":
         a = helmholtz_1d_5_point_operator(kh, n, dtype=dtype)
+    elif discretization == "custom":
+        start = - len(stencil) // 2 + 1
+        offsets = np.arange(start, start + len(stencil), dtype=int)
+        return sparse_circulant(stencil, offsets, n, dtype=dtype)
     else:
         raise Exception("Unsupported discretization {}".format(discretization))
 
