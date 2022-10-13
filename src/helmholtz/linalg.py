@@ -327,7 +327,7 @@ def falgout_mixed_elliptic(a: float, b: float, c: float, grid_shape: Tuple[int],
     offsets = np.concatenate((
         [(-1, 0), (0, 0), (1, 0)],
         [(0, -1), (0, 0), (0, 1)],
-        [(-1, -1), (0, -1), (1, -1),
+        [(-1, -1), (-1, 0), (-1, 1),
          (0, -1), (0, 0), (0, 1),
          (1, -1), (1, 0), (1, 1),]
     ))
