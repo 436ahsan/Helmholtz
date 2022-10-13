@@ -304,35 +304,34 @@ def helmholtz_1d_5_point_operator(kh: float, n: int, dtype=np.double) -> scipy.s
                             dtype=dtype)
 
 
-def falgout_mixed_elliptic(a: float, b: float, c: float, grid_shape: Tuple[int], dtype=np.double) -> scipy.sparse.dia_matrix:
+def falgout_mixed_elliptic(a: float, b: float, c: float, grid_shape: Tuple[int], h: float,
+                           boundary: str = "periodic") -> scipy.sparse.csr_matrix:
     """
-    Returns the Falgout normalized operator discertizing -a*u_{xx}-b*u_{yy}+c*u_{xxyy} with periodic B.C. on
-    an n x n grid.
 
     Args:
-        grid_shape: grid size.
-
-    Returns:
-        Helmholtz operator (as a sparse matrix).
+        a: coefficient of u_{xx}.
+        b: coefficient of u_{yy}.
+        c: coefficient of u_{xxyy}.
+        grid_shape: grid shape (m, n).
+        h: meshsize in all directions.
+        boundary: type of boundary condition.
+                'dirichlet': stencil is truncated to zero outside domain.
+                'periodic': periodic boundary conditions.
+    Returns: the discrete operator (as a sparse matrix).
     """
-    uxx = np.array([[0, 0, 0],
-            [1, -2, 1],
-            [0, 0, 0],])
-    uyy = np.array([[0, 1, 0],
-            [0, -2, 0],
-            [0, 1, 0],])
-    uxxyy = np.array([[-1, -4, -1],
-     [2, 8, 2],
-     [-1, -4, -1],])
-    # B.C. are Dirichlet + another layer of zeros. Is periodic supported in pyamg?
-    stencil = -a * uxx - b * uyy + c * uxxyy
-    n = grid_shape[0]
-    offset = [np.array([-1, 0, 1]) - n,
-              np.array([-1, 0, 1]),
-              np.array([-1, 0, 1]) + n]
-    return sparse_circulant(stencil.flatten().astype(float), np.array(offset).flatten().astype(int),
-                            np.prod(grid_shape), dtype=dtype)
-
+    stencil = np.concatenate((
+        (a / h ** 2) * np.array([-1, 2, -1]),
+        (b / h ** 2) * np.array([-1, 2, -1]),
+        (c / h ** 4) * np.array([1, -2, 1, -2, 4, -2, 1, -2, 1]),
+    ))
+    offsets = np.concatenate((
+        [(-1, 0), (0, 0), (1, 0)],
+        [(0, -1), (0, 0), (0, 1)],
+        [(-1, -1), (0, -1), (1, -1),
+         (0, -1), (0, 0), (0, 1),
+         (1, -1), (1, 0), (1, 1),]
+    ))
+    return stencil_grid(stencil, offsets, grid_shape, boundary=boundary)
 
 
 def gram_schmidt(a: np.ndarray) -> np.ndarray:
