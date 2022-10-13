@@ -7,6 +7,19 @@ from scipy.linalg import eig
 from typing import Tuple
 
 
+def unit_vector(d, i, dtype=float):
+    """
+    Returns the d-dimensional unit vector in the ith direction.
+    :param d: dimension.
+    :param i: direction.
+    :param dtype: data type.
+    :return: e_i in R^d.
+    """
+    e = np.zeros((d,), dtype=dtype)
+    e[i] = 1
+    return e
+
+
 def normalize_signs(r, axis=0):
     """
     Multiplies r by a diagonal matrix with entries +1 or -1 so that the signs of the first row (or column)
@@ -70,7 +83,7 @@ def scaled_norm_of_matrix(e: np.ndarray) -> float:
     return norm(e, axis=0) / e.shape[0] ** 0.5
 
 
-def sparse_circulant(vals: np.array, offsets: np.array, n: int, dtype=np.double) -> scipy.sparse.dia_matrix:
+def sparse_circulant(vals: np.array, offsets: np.array, n: int, dtype = np.double) -> scipy.sparse.dia_matrix:
     """
     Creates a sparse square circulant matrix from a stencil.
     Args:
@@ -88,8 +101,69 @@ def sparse_circulant(vals: np.array, offsets: np.array, n: int, dtype=np.double)
     dupoffsets = np.concatenate((offsets, n + o))
     dupvals = np.concatenate((vals, v))
     dupoffsets[dupoffsets > n] -= 2 * n
-
     return scipy.sparse.diags(dupvals, dupoffsets, shape=(n, n), dtype=dtype).tocsr()
+
+
+def stencil_grid(stencil: np.array, offsets: np.array, grid_shape: Tuple[int], dtype: np.dtype = np.double,
+                 boundary: str = "periodic") -> scipy.sparse.csr_matrix:
+    """
+    Creates a sparse d-D matrix from a stencil with periodic boundary conditions.
+    Args:
+        stencil: stencil values.
+        offsets: corresponding diagonal offsets. 0 corresponds to the middle of the stencil.
+        grid_shape: grid shape (tuple of size 2).
+        dtype: matrix element type.
+        boundary: type of boundary condition.
+            'dirichlet': stencil is truncated to zero outside domain.
+            'periodic': periodic boundary conditions.
+
+    Returns:
+        n x n sparse matrix with vals[i, j] on diagonal offsets[i, j] with periodic boundary conditions.
+
+    Example:
+    >>> hm.linalg.stencil_grid([2, -1, -1], [(0, ), (-1, ), (1, )], (6, ), boundary="dirichlet").todense()
+    matrix([[ 2., -1.,  0.,  0.,  0., 0.],
+        [-1.,  2., -1.,  0.,  0.,  0.],
+        [ 0., -1.,  2., -1.,  0.,  0.],
+        [ 0.,  0., -1.,  2., -1.,  0.],
+        [ 0.,  0.,  0., -1.,  2., -1.],
+        [ 0.,  0.,  0.,  0., -1.,  2.]])
+    >>> hm.linalg.stencil_grid([4, -1, -1, -1, -1], [(0, 0), (-1, 0), (1, 0), (0, -1), (0, 1)], (4, 4),
+        boundary="periodic").todense()
+    matrix([[ 4., -1.,  0., -1., -1.,  0.,  0.,  0.,  0.,  0.,  0.,  0., -1.,  0.,  0.,  0.],
+            [-1.,  4., -1.,  0.,  0., -1.,  0.,  0.,  0.,  0.,  0.,  0.,  0., -1.,  0.,  0.],
+            [ 0., -1.,  4., -1.,  0.,  0., -1.,  0.,  0.,  0.,  0.,  0.,  0.,  0., -1.,  0.],
+            [-1.,  0., -1.,  4.,  0.,  0.,  0., -1.,  0.,  0.,  0.,  0.,  0.,  0.,  0., -1.],
+            [-1.,  0.,  0.,  0.,  4., -1.,  0., -1., -1.,  0.,  0.,  0.,  0.,  0.,  0.,  0.],
+            [ 0., -1.,  0.,  0., -1.,  4., -1.,  0.,  0., -1.,  0.,  0.,  0.,  0.,  0.,  0.],
+            [ 0.,  0., -1.,  0.,  0., -1.,  4., -1.,  0.,  0., -1.,  0.,  0.,  0.,  0.,  0.],
+            [ 0.,  0.,  0., -1., -1.,  0., -1.,  4.,  0.,  0.,  0., -1.,  0.,  0.,  0.,  0.],
+            [ 0.,  0.,  0.,  0., -1.,  0.,  0.,  0.,  4., -1.,  0., -1., -1.,  0.,  0.,  0.],
+            [ 0.,  0.,  0.,  0.,  0., -1.,  0.,  0., -1.,  4., -1.,  0.,  0., -1.,  0.,  0.],
+            [ 0.,  0.,  0.,  0.,  0.,  0., -1.,  0.,  0., -1.,  4., -1.,  0.,  0., -1.,  0.],
+            [ 0.,  0.,  0.,  0.,  0.,  0.,  0., -1., -1.,  0., -1.,  4.,  0.,  0.,  0., -1.],
+            [-1.,  0.,  0.,  0.,  0.,  0.,  0.,  0., -1.,  0.,  0.,  0.,  4., -1.,  0., -1.],
+            [ 0., -1.,  0.,  0.,  0.,  0.,  0.,  0.,  0., -1.,  0.,  0., -1.,  4., -1.,  0.],
+            [ 0.,  0., -1.,  0.,  0.,  0.,  0.,  0.,  0.,  0., -1.,  0.,  0., -1.,  4., -1.],
+            [ 0.,  0.,  0., -1.,  0.,  0.,  0.,  0.,  0.,  0.,  0., -1., -1.,  0., -1.,  4.]])
+    """
+    grid_size = np.prod(grid_shape)
+    # Gridpoint coordinates.
+    x = np.unravel_index(np.arange(grid_size, dtype=int), grid_shape)
+    row = np.concatenate(tuple(np.arange(grid_size) for _ in range(len(stencil))))
+    data = np.concatenate(tuple([v] * grid_size for v in stencil))
+    if boundary == "periodic":
+        col_sub = np.array([np.concatenate(tuple(np.mod(xd + offset[d], grid_shape[d]) for offset in offsets))
+                            for d, xd in enumerate(x)]).T
+    elif boundary == "dirichlet":
+        col_sub = np.array([np.concatenate(tuple(xd + offset[d] for offset in offsets)) for d, xd in enumerate(x)]).T
+        in_domain = np.logical_and.reduce(np.array([
+            (0 <= col_sub[:, d]) & (col_sub[:, d] < grid_shape[d]) for d in range(len(grid_shape))]))
+        row, col_sub, data = row[in_domain], col_sub[in_domain], data[in_domain]
+    else:
+        raise Exception("Unsupported boundary conditions '{}'".format(boundary))
+    col = np.array([np.ravel_multi_index(sub, grid_shape) for sub in col_sub])
+    return scipy.sparse.csr_matrix((data, (row, col)), shape=(grid_size, grid_size), dtype=dtype)
 
 
 def tile_csr_matrix(a: scipy.sparse.csr_matrix, n: int, stride: int = None, total_col: int = None) -> scipy.sparse.csr_matrix:
@@ -228,6 +302,37 @@ def helmholtz_1d_5_point_operator(kh: float, n: int, dtype=np.double) -> scipy.s
     return sparse_circulant(np.array([-1, 16, -30 + 12 * kh ** 2, 16, -1], dtype=float) / 12,
                             np.array([-2, -1, 0, 1, 2]), n,
                             dtype=dtype)
+
+
+def falgout_mixed_elliptic(a: float, b: float, c: float, grid_shape: Tuple[int], dtype=np.double) -> scipy.sparse.dia_matrix:
+    """
+    Returns the Falgout normalized operator discertizing -a*u_{xx}-b*u_{yy}+c*u_{xxyy} with periodic B.C. on
+    an n x n grid.
+
+    Args:
+        grid_shape: grid size.
+
+    Returns:
+        Helmholtz operator (as a sparse matrix).
+    """
+    uxx = np.array([[0, 0, 0],
+            [1, -2, 1],
+            [0, 0, 0],])
+    uyy = np.array([[0, 1, 0],
+            [0, -2, 0],
+            [0, 1, 0],])
+    uxxyy = np.array([[-1, -4, -1],
+     [2, 8, 2],
+     [-1, -4, -1],])
+    # B.C. are Dirichlet + another layer of zeros. Is periodic supported in pyamg?
+    stencil = -a * uxx - b * uyy + c * uxxyy
+    n = grid_shape[0]
+    offset = [np.array([-1, 0, 1]) - n,
+              np.array([-1, 0, 1]),
+              np.array([-1, 0, 1]) + n]
+    return sparse_circulant(stencil.flatten().astype(float), np.array(offset).flatten().astype(int),
+                            np.prod(grid_shape), dtype=dtype)
+
 
 
 def gram_schmidt(a: np.ndarray) -> np.ndarray:
