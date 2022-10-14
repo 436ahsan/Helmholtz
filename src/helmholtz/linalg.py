@@ -104,15 +104,14 @@ def sparse_circulant(vals: np.array, offsets: np.array, n: int, dtype = np.doubl
     return scipy.sparse.diags(dupvals, dupoffsets, shape=(n, n), dtype=dtype).tocsr()
 
 
-def stencil_grid(stencil: np.array, offsets: np.array, grid_shape: Tuple[int], dtype: np.dtype = np.double,
-                 boundary: str = "periodic") -> scipy.sparse.csr_matrix:
+def stencil_grid(stencil: np.array, offsets: np.array, grid_shape: Tuple[int], boundary: str = "periodic") \
+        -> scipy.sparse.csr_matrix:
     """
     Creates a sparse d-D matrix from a stencil with periodic boundary conditions.
     Args:
         stencil: stencil values.
         offsets: corresponding diagonal offsets. 0 corresponds to the middle of the stencil.
         grid_shape: grid shape (tuple of size 2).
-        dtype: matrix element type.
         boundary: type of boundary condition.
             'dirichlet': stencil is truncated to zero outside domain.
             'periodic': periodic boundary conditions.
@@ -147,23 +146,32 @@ def stencil_grid(stencil: np.array, offsets: np.array, grid_shape: Tuple[int], d
             [ 0.,  0., -1.,  0.,  0.,  0.,  0.,  0.,  0.,  0., -1.,  0.,  0., -1.,  4., -1.],
             [ 0.,  0.,  0., -1.,  0.,  0.,  0.,  0.,  0.,  0.,  0., -1., -1.,  0., -1.,  4.]])
     """
+    num_dims = len(grid_shape)
     grid_size = np.prod(grid_shape)
+    stencil_size = len(stencil)
     # Gridpoint coordinates.
     x = np.unravel_index(np.arange(grid_size, dtype=int), grid_shape)
-    row = np.concatenate(tuple(np.arange(grid_size) for _ in range(len(stencil))))
-    data = np.concatenate(tuple([v] * grid_size for v in stencil))
+    row = np.tile(np.arange(grid_size), stencil_size)
+    data = np.zeros(stencil_size * grid_size, )
+    for i, v in enumerate(stencil):
+        data[i * grid_size:(i + 1) * grid_size] = v
     if boundary == "periodic":
-        col_sub = np.array([np.concatenate(tuple(np.mod(xd + offset[d], grid_shape[d]) for offset in offsets))
-                            for d, xd in enumerate(x)]).T
+        col_sub = [np.concatenate(tuple(np.mod(xd + offset[d], grid_shape[d]) for offset in offsets))
+                   for d, xd in enumerate(x)]
     elif boundary == "dirichlet":
-        col_sub = np.array([np.concatenate(tuple(xd + offset[d] for offset in offsets)) for d, xd in enumerate(x)]).T
-        in_domain = np.logical_and.reduce(np.array([
-            (0 <= col_sub[:, d]) & (col_sub[:, d] < grid_shape[d]) for d in range(len(grid_shape))]))
-        row, col_sub, data = row[in_domain], col_sub[in_domain], data[in_domain]
+        col_sub = [np.zeros((stencil_size * grid_size, ), dtype=int) for _ in range(num_dims)]
+        for d, xd in enumerate(x):
+            for i, offset in enumerate(offsets):
+                col_sub[d][i * grid_size:(i + 1) * grid_size] = xd + offset[d]
+        col_sub = np.array(col_sub)
+        in_domain = np.full((len(col_sub[0]), ), True)
+        for d in range(num_dims):
+            in_domain &= ((0 <= col_sub[d]) & (col_sub[d] < grid_shape[d]))
+        row, col_sub, data = row[in_domain], col_sub[:, in_domain], data[in_domain]
     else:
         raise Exception("Unsupported boundary conditions '{}'".format(boundary))
-    col = np.array([np.ravel_multi_index(sub, grid_shape) for sub in col_sub])
-    return scipy.sparse.csr_matrix((data, (row, col)), shape=(grid_size, grid_size), dtype=dtype)
+    col = np.ravel_multi_index(col_sub, grid_shape)
+    return scipy.sparse.csr_matrix((data, (row, col)), shape=(grid_size, grid_size))
 
 
 def tile_csr_matrix(a: scipy.sparse.csr_matrix, n: int, stride: int = None, total_col: int = None) -> scipy.sparse.csr_matrix:
