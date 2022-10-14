@@ -93,7 +93,7 @@ class LfaComputer:
     def _relax(self, t):
         if self.relax == "gs":
             return np.diag([gs(self.stencil, th) for th in harmonics(t)])
-        elif self.relax == "kaczmarz":
+        elif self.relax == "relax":
             return np.diag([kaczmarz(self.stencil, th) for th in harmonics(t)])
         else:
             raise Exception("Unsupported relaxation type {}".format(self.relax))

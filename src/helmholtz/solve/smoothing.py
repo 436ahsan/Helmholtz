@@ -169,7 +169,7 @@ def check_relax_cycle_shrinkage(multilevel, max_sweeps: int = 20, num_levels: in
     operator = lambda x: a.dot(x)
     relax = lambda x: level.relax(x, b)
     relax_b = lambda x, b: level.relax(x, b)
-    method_list = [("Kaczmarz", relax, relax_b, 1, "blue")]
+    method_list = [("relax", relax, relax_b, 1, "blue")]
 
     if num_levels >= 2:
         def relax_cycle(x):
