@@ -133,6 +133,7 @@ def two_level_conv_factor(multilevel, nu_pre, nu_post: int = 0, nu_coarsest: int
     n = level.size
     # Test two-level cycle convergence for A*x=b with b=A*x0, x0=random[-1, 1].
     x_exact = 2 * np.random.random((n, )) - 1
+    x_exact = np.zeros_like(x_exact)
     if z is not None:
         x_exact -= z.dot(z.T.dot(x_exact[:, None])).flatten()
     b = multilevel[0].operator(x_exact)
